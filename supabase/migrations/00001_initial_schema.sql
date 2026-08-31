@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
     name VARCHAR(255) NOT NULL,
     slug VARCHAR(255) UNIQUE NOT NULL,
     logo_url TEXT,
-    plan_code VARCHAR(50) NOT NULL DEFAULT 'FREE',
+    plan_code VARCHAR(50) NOT NULL DEFAULT 'STARTER',
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

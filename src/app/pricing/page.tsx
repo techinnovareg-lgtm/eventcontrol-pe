@@ -64,7 +64,7 @@ export default function PricingPage() {
         </div>
 
         {/* Pricing Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
           {(Object.keys(PLAN_LIMITS) as PlanCode[]).map((code) => {
             const plan = PLAN_LIMITS[code];
             const price = isAnnual ? plan.annualPricePEN : plan.monthlyPricePEN;
@@ -111,7 +111,7 @@ export default function PricingPage() {
                         : 'bg-slate-900 hover:bg-slate-800 text-white'
                     }`}
                   >
-                    {code === 'FREE' ? 'Comenzar Gratis' : `Elegir Plan ${plan.name}`}
+                    {code === 'STARTER' ? 'Crear Cuenta (Plan Starter)' : `Elegir Plan ${plan.name}`}
                   </Link>
                 </div>
               </div>

@@ -1,4 +1,4 @@
-export type PlanCode = 'FREE' | 'STARTER' | 'PROFESSIONAL' | 'BUSINESS';
+export type PlanCode = 'STARTER' | 'PROFESSIONAL' | 'BUSINESS';
 
 export interface PlanDefinition {
   code: PlanCode;
@@ -15,26 +15,6 @@ export interface PlanDefinition {
 }
 
 export const PLAN_LIMITS: Record<PlanCode, PlanDefinition> = {
-  FREE: {
-    code: 'FREE',
-    name: 'Gratuito (Demo)',
-    monthlyPricePEN: 0,
-    annualPricePEN: 0,
-    maxActiveEvents: 1,
-    maxPassesPerEvent: 50,
-    maxWorkspaceUsers: 1,
-    maxCutsPerEvent: 2,
-    hasAdvancedSeating: false,
-    hasPdfExecutive: false,
-    features: [
-      '1 Evento Activo',
-      'Hasta 50 pases por evento',
-      '1 Usuario (Owner)',
-      'Check-in QR básico',
-      'Dashboard en tiempo real',
-      'Exportación Excel',
-    ],
-  },
   STARTER: {
     code: 'STARTER',
     name: 'Starter',
@@ -49,7 +29,7 @@ export const PLAN_LIMITS: Record<PlanCode, PlanDefinition> = {
     features: [
       'Hasta 3 Eventos Activos',
       'Hasta 150 pases por evento',
-      '1 Usuario',
+      '1 Usuario (Owner)',
       'Plano de Mesas Interactivo',
       'WhatsApp Asistido (wa.me)',
       '5 Cortes de Catering por evento',
@@ -106,7 +86,7 @@ export const PLAN_LIMITS: Record<PlanCode, PlanDefinition> = {
  * Checks if workspace can create a new event based on plan limits
  */
 export function checkCanCreateEvent(planCode: PlanCode, currentActiveEventsCount: number): { allowed: boolean; reason?: string } {
-  const plan = PLAN_LIMITS[planCode] || PLAN_LIMITS.FREE;
+  const plan = PLAN_LIMITS[planCode] || PLAN_LIMITS.STARTER;
 
   if (plan.maxActiveEvents !== -1 && currentActiveEventsCount >= plan.maxActiveEvents) {
     return {
@@ -122,7 +102,7 @@ export function checkCanCreateEvent(planCode: PlanCode, currentActiveEventsCount
  * Checks if guest count exceeds plan limit per event
  */
 export function checkCanImportPasses(planCode: PlanCode, passesCount: number): { allowed: boolean; reason?: string } {
-  const plan = PLAN_LIMITS[planCode] || PLAN_LIMITS.FREE;
+  const plan = PLAN_LIMITS[planCode] || PLAN_LIMITS.STARTER;
 
   if (passesCount > plan.maxPassesPerEvent) {
     return {
