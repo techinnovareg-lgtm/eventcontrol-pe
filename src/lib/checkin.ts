@@ -2,6 +2,7 @@ import { CheckIn, CheckInResultStatus, GuestGroup } from '@/lib/supabase/types';
 import { resolveQRToken } from '@/lib/qr-engine';
 import { getEventGuestGroups } from '@/lib/events';
 import { getEventTableAssignments, getEventTables } from '@/lib/tables';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 
 let checkInsLogStore: CheckIn[] = [];
 
@@ -139,6 +140,7 @@ export function executeAtomicCheckIn(
   };
 
   checkInsLogStore.unshift(checkInRecord);
+  checkInRealtimeChannel.notify(checkInRecord);
 
   return {
     success: true,
