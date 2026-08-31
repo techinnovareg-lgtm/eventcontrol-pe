@@ -25,18 +25,18 @@ export default function Home() {
             <a href="#faq" className="hover:text-brand-600 transition">FAQ</a>
           </nav>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <Link 
               href="/login" 
-              className="text-sm font-medium text-slate-700 hover:text-brand-600 transition"
+              className="text-sm font-medium text-slate-700 hover:text-brand-600 transition px-3 py-2"
             >
               Iniciar Sesión
             </Link>
             <Link 
-              href="/register" 
-              className="text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl transition shadow-sm"
+              href="/login" 
+              className="text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5"
             >
-              Probar Gratis
+              <Sparkles className="w-4 h-4" /> Acceso a Demo
             </Link>
           </div>
         </div>
@@ -60,16 +60,16 @@ export default function Home() {
 
           <div className="mt-8 flex items-center justify-center gap-4">
             <Link
-              href="/register"
-              className="px-6 py-3.5 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-xl transition shadow-lg flex items-center gap-2"
+              href="/login"
+              className="px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl transition shadow-lg flex items-center gap-2"
             >
-              Comenzar Prueba Gratuita <ArrowRight className="w-4 h-4" />
+              <Sparkles className="w-4 h-4" /> Acceder a Demo de Prueba <ArrowRight className="w-4 h-4" />
             </Link>
             <Link
               href="/pricing"
               className="px-6 py-3.5 bg-white hover:bg-slate-100 text-slate-800 font-bold text-sm rounded-xl border border-slate-300 transition"
             >
-              Ver Planes y Tarifas
+              Ver Planes y Tarifas (Starter / Pro / Business)
             </Link>
           </div>
 
@@ -182,7 +182,7 @@ export default function Home() {
                   </div>
 
                   <Link href="/pricing" className="mt-6 w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl text-center block">
-                    Ver Plan
+                    Ver Plan {plan.name}
                   </Link>
                 </div>
               );
@@ -198,6 +198,10 @@ export default function Home() {
           </div>
 
           <div className="space-y-4 text-xs">
+            <div className="p-4 bg-white rounded-xl border border-slate-200">
+              <h4 className="font-bold text-slate-900 mb-1">¿Cómo puedo probar la plataforma?</h4>
+              <p className="text-slate-600">Puedes ingresar directamente a la demo de prueba haciendo clic en el botón "Acceso a Demo". Accederás a un espacio de trabajo con datos de prueba cargados.</p>
+            </div>
             <div className="p-4 bg-white rounded-xl border border-slate-200">
               <h4 className="font-bold text-slate-900 mb-1">¿El invitado necesita descargar alguna app?</h4>
               <p className="text-slate-600">No. El invitado únicamente presenta la imagen de su código QR descargada o recibida por WhatsApp en su teléfono.</p>
