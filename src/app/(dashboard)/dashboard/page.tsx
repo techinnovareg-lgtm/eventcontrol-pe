@@ -18,9 +18,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
-            <span className="text-xs bg-slate-800 px-3 py-1.5 rounded-full text-slate-300 border border-slate-700">
-              Rol: <strong className="text-white font-semibold">OWNER</strong>
-            </span>
+            <Link 
+              href="/workspace"
+              className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-full text-slate-300 border border-slate-700 transition"
+            >
+              Rol: <strong className="text-white font-semibold">OWNER</strong> (Ver Workspace)
+            </Link>
             <Link 
               href="/login" 
               className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition"
