@@ -1,13 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Camera, QrCode, ShieldCheck, CheckCircle2, XCircle, AlertTriangle, 
-  Users, MapPin, RefreshCw, ArrowLeft, Zap, Lock
+  Users, MapPin, RefreshCw, ArrowLeft, Zap, Lock, Wifi, WifiOff, Download, CloudUpload
 } from 'lucide-react';
 import { resolveQRToken, getOrCreateGroupQRToken } from '@/lib/qr-engine';
 import { executeAtomicCheckIn, simulateConcurrentScans, CheckInExecutionResult } from '@/lib/checkin';
+import { 
+  downloadEventOfflineManifest, executeOfflineCheckIn, 
+  syncOfflineQueueToServer, getPendingOfflineQueueCount 
+} from '@/lib/offline-db';
 import { getEventGuestGroups } from '@/lib/events';
 import { getEventTableAssignments, getEventTables } from '@/lib/tables';
 
@@ -19,12 +23,16 @@ export default function MobileScanCheckInPage() {
   const assignments = getEventTableAssignments(eventId);
   const tables = getEventTables(eventId);
 
+  const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [manifestDownloaded, setManifestDownloaded] = useState<boolean>(false);
+
   const [selectedTokenHash, setSelectedTokenHash] = useState<string>('');
   const [passesRequested, setPassesRequested] = useState<number>(1);
   const [resultModal, setResultModal] = useState<CheckInExecutionResult | null>(null);
   const [concurrencyResult, setConcurrencyResult] = useState<{ operatorA: CheckInExecutionResult; operatorB: CheckInExecutionResult } | null>(null);
+  const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
 
-  // Auto select first group's token for fast testing
   const activeToken = selectedTokenHash ? resolveQRToken(selectedTokenHash).token : null;
   const activeGroup = activeToken ? groups.find(g => g.id === activeToken.group_id) : null;
 
@@ -37,6 +45,36 @@ export default function MobileScanCheckInPage() {
     }
   }
 
+  const checkPendingQueue = async () => {
+    try {
+      const count = await getPendingOfflineQueueCount(eventId);
+      setPendingSyncCount(count);
+    } catch (e) {}
+  };
+
+  useEffect(() => {
+    checkPendingQueue();
+  }, []);
+
+  const handleDownloadManifest = async () => {
+    await downloadEventOfflineManifest(eventId, currentWorkspaceId);
+    setManifestDownloaded(true);
+    alert('¡Manifiesto guardado en IndexedDB! El escáner funcionará en puerta incluso si se corta internet.');
+  };
+
+  const handleSyncQueue = async () => {
+    setSyncStatusMsg('Sincronizando registros offline con el servidor...');
+    const res = await syncOfflineQueueToServer(eventId);
+    await checkPendingQueue();
+
+    if (res.conflictCount > 0) {
+      setSyncStatusMsg(`Sincronización completada: ${res.syncedCount} exitosos, ${res.conflictCount} conflictos de sobrecupo aislados.`);
+    } else {
+      setSyncStatusMsg(`¡Éxito! ${res.syncedCount} registros sincronizados atómicamente.`);
+    }
+    setTimeout(() => setSyncStatusMsg(null), 5000);
+  };
+
   const handleSelectGroup = (groupId: string) => {
     const token = getOrCreateGroupQRToken(groupId, eventId, currentWorkspaceId);
     setSelectedTokenHash(token.token_hash);
@@ -45,19 +83,26 @@ export default function MobileScanCheckInPage() {
     setConcurrencyResult(null);
   };
 
-  const handleConfirmCheckIn = () => {
+  const handleConfirmCheckIn = async () => {
     if (!selectedTokenHash) {
       alert('Por favor selecciona o escanea un código QR.');
       return;
     }
 
-    const res = executeAtomicCheckIn(selectedTokenHash, passesRequested, 'operador-seguridad-01', eventId);
-    setResultModal(res);
+    if (isOnline) {
+      // Online execution
+      const res = executeAtomicCheckIn(selectedTokenHash, passesRequested, 'operador-seguridad-01', eventId);
+      setResultModal(res);
+    } else {
+      // Offline execution against IndexedDB (Caso 6)
+      const res = await executeOfflineCheckIn(selectedTokenHash, passesRequested, 'operador-seguridad-01', eventId);
+      await checkPendingQueue();
+      setResultModal(res);
+    }
   };
 
   const handleSimulateConcurrency = () => {
     if (!selectedTokenHash) return;
-    // Simulate Op A trying to enter 3, Op B trying to enter 3 simultaneously
     const res = simulateConcurrentScans(selectedTokenHash, 3, 3);
     setConcurrencyResult(res);
   };
@@ -70,9 +115,45 @@ export default function MobileScanCheckInPage() {
           <Link href="/dashboard" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> Salir
           </Link>
-          <div className="flex items-center gap-1.5 bg-emerald-950 text-emerald-400 border border-emerald-800 px-3 py-1 rounded-full text-xs font-bold">
-            <ShieldCheck className="w-4 h-4" /> MODO SEGURIDAD PWA
+
+          {/* Network Mode Toggle (Online / Offline simulation) */}
+          <button
+            onClick={() => setIsOnline(!isOnline)}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+              isOnline 
+                ? 'bg-emerald-950 text-emerald-400 border-emerald-800' 
+                : 'bg-amber-950 text-amber-400 border-amber-800'
+            }`}
+          >
+            {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+            {isOnline ? 'ONLINE' : 'OFFLINE (Caché)'}
+          </button>
+        </div>
+
+        {/* Sync Status Banner */}
+        {syncStatusMsg && (
+          <div className="p-3 bg-indigo-950 border border-indigo-800 text-indigo-200 text-xs rounded-xl text-center">
+            {syncStatusMsg}
           </div>
+        )}
+
+        {/* Offline Controls Bar */}
+        <div className="flex gap-2 text-xs">
+          <button
+            onClick={handleDownloadManifest}
+            className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition flex items-center justify-center gap-1"
+          >
+            <Download className="w-3.5 h-3.5 text-brand-400" /> {manifestDownloaded ? 'Caché Actualizado' : 'Descargar Manifiesto'}
+          </button>
+
+          {pendingSyncCount > 0 && (
+            <button
+              onClick={handleSyncQueue}
+              className="py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl transition flex items-center justify-center gap-1 animate-pulse"
+            >
+              <CloudUpload className="w-3.5 h-3.5" /> Sincronizar ({pendingSyncCount})
+            </button>
+          )}
         </div>
 
         {/* Camera Feed Simulation Box */}
@@ -81,7 +162,9 @@ export default function MobileScanCheckInPage() {
             <Camera className="w-8 h-8" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-200">Visor de Cámara Activado</h2>
+            <h2 className="text-sm font-bold text-slate-200">
+              Visor de Cámara ({isOnline ? 'Conectado a Servidor' : 'Operando en IndexedDB Local'})
+            </h2>
             <p className="text-xs text-slate-400">Apunta el escáner al código QR del invitado</p>
           </div>
 
@@ -275,7 +358,7 @@ export default function MobileScanCheckInPage() {
       )}
 
       <footer className="text-center text-[10px] text-slate-600 pt-4">
-        EventControl Security PWA Module • SSL TLS 1.3
+        EventControl Security PWA Module • Dexie.js Offline Cache
       </footer>
     </div>
   );
