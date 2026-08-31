@@ -1,0 +1,458 @@
+DOCUMENTO DE ESPECIFICACIÓNFUNCIONAL Y TÉCNICA
+Plataforma SaaS de Control de Invitados, Mesas,Check-in QR y Asistencia en Tiempo Real
+Versión 1.0 — 31 de agosto de 2026MVP orientado inicialmente a Wedding Planners y eventos sociales
+1. Resumen ejecutivo
+El proyecto evoluciona de una aplicación personalizada para un único cliente a una plataforma web SaaS multiusuario. Su función principal será recibir la lista de grupos confirmados desde un archivo Excel generado a partir de un sistema externo de invitaciones/RSVP, generar un QR seguro por grupo, permitir organizar visualmente los grupos en mesas, controlar el ingreso mediante escaneo QR y mostrar un dashboard operativo en tiempo real.
+La invitación digital, el RSVP y la confirmación inicial NO forman parte del producto. Se consideran procesos externos. La plataforma comienza cuando el Wedding Planner u organizador dispone del Excel de confirmados.
+El producto debe poder utilizarse desde PC, tablet y smartphone mediante una PWA/Web App responsive. No se recomienda desarrollar una aplicación móvil nativa en el MVP.
+2. Alcance actualizado
+Incluido en MVP
+Fuera de alcance inicial
+Registro/autenticación de usuarios
+Creación de invitaciones digitales
+Multiusuario y aislamiento por cuenta
+RSVP externo
+Creación y gestión de eventos
+Marketplace de proveedores
+Importación Excel/CSV
+Presupuestos y contratos
+Mapeo/validación de columnas
+Lista de regalos
+Grupos de invitados y cantidad de pases
+Galería/fotos
+QR único por grupo
+Chat con invitados
+Envío manual asistido por WhatsApp
+IA de planificación
+Plano/espacio virtual de mesas
+Aplicación Android/iOS nativa
+Asignación de grupos a mesas
+Integración oficial de WhatsApp en MVP
+Check-in QR parcial y completo
+Pagos dentro de la plataforma en MVP
+Dashboard en tiempo real
+Módulos generales de bodas
+Cortes con hora y nombre
+Integraciones complejas con terceros
+Control de personas presentes y posteriores al corte
+Indicador de platos requeridos
+Historial/auditoría
+Exportación Excel/PDF, incluyendo resumen y dashboards
+Landing page comercial y planes
+3. Flujo de negocio definitivo
+Paso
+Descripción
+1. Registro
+El usuario crea su cuenta y accede a su espacio de trabajo.
+2. Crear evento
+Nombre, tipo, fecha, hora, lugar y datos básicos.
+3. Importar Excel
+Se carga la lista de grupos confirmados. Se permite mapear columnas. Puede editarse o actualizarse en cualquier momento.
+4. Validar
+El sistema detecta filas inválidas, duplicados, cantidades faltantes y teléfonos con formato incorrecto.
+5. Crear grupos
+Cada fila válida se convierte en un grupo de invitación con una cantidad de pases.
+6. Generar QR
+Se crea un token seguro y único por grupo. El QR no contiene nombres ni datos personales.
+7. Organizar mesas
+El administrador crea mesas, define capacidad y arrastra/asigna grupos.
+8. Compartir QR
+Si existe teléfono del responsable, se habilita un botón para preparar/enviar el mensaje por WhatsApp.
+9. Check-in
+Seguridad escanea el QR y registra cuántas personas del grupo ingresan en ese momento.
+10. Ingreso parcial
+El mismo QR puede utilizarse nuevamente mientras existan pases pendientes.
+11. Cierre del grupo
+Cuando ingresados = autorizados, el QR queda bloqueado para nuevos ingresos.
+12. Dashboard
+Cada registro actualiza la asistencia, ocupación por mesa y totales.
+13. Cortes
+El administrador registra una fotografía del estado a una hora determinada.
+14. Catering
+El corte de comida determina cuántas personas están presentes y cuántos platos se requieren.
+15. Llegadas posteriores
+Las nuevas entradas quedan identificadas como posteriores al corte de comida.
+16. Cierre
+El evento puede cerrarse y conservar su histórico y reportes.
+4. Modelo conceptual de datos
+Entidades principales:
+Tenant/Workspace: cuenta aislada del Wedding Planner o negocio.
+User: usuario perteneciente a un workspace, con rol.
+Event: evento administrado.
+GuestGroup: grupo/familia asociado a una invitación externa.
+QRPass: token único asociado al grupo.
+Table: mesa, capacidad y posición dentro del plano.
+TableAssignment: relación entre grupo y mesa.
+CheckIn: cada movimiento de ingreso.
+Cut: corte manual con fotografía del estado del evento.
+AuditLog: acciones críticas de usuarios y operadores.
+ExportJob/Report: generación de Excel/PDF.
+5. Excel de entrada
+El archivo CUMPLE.xlsx adjunto se toma como referencia real del flujo. Su estructura actual presenta una columna con el nombre/descripción del grupo y otra con la cantidad de invitados. El sistema no debe depender de nombres exactos de columnas: debe permitir mapearlas durante la importación.
+Campo recomendado
+Obligatorio
+Uso
+Grupo / responsable
+Sí
+Identificador visible del grupo para el administrador.
+Cantidad de pases
+Sí
+Número máximo de asistentes autorizados.
+Teléfono responsable
+No
+Permite habilitar el envío asistido del QR por WhatsApp.
+Identificador externo
+No
+Referencia opcional del sistema de invitaciones.
+Observaciones
+No
+Información operativa interna.
+Regla: el teléfono es opcional. Si no existe, el QR puede descargarse/copiarse y compartirse por otros medios.
+6. QR: seguridad y lógica
+El QR no debe codificar directamente nombres, teléfonos, mesa ni cantidad de invitados. Debe contener un identificador/token aleatorio, no predecible y suficientemente largo. El backend resuelve ese token contra el evento y el grupo correspondiente.
+Token criptográficamente aleatorio.
+HTTPS obligatorio.
+Token no reutilizable después de completar todos los pases.
+Revocación/reemisión desde administración.
+Protección contra enumeración de códigos.
+Registro de cada escaneo y decisión.
+No exponer datos personales al escanear con una cámara genérica.
+Control de concurrencia para evitar que dos operadores registren más personas de las autorizadas.
+7. Check-in parcial
+Ejemplo: grupo autorizado para 5 personas.
+Momento
+Acción
+Resultado
+Primer ingreso
+Llegan 3
+3/5. Estado PARCIAL.
+Segundo ingreso
+Llegan 2
+5/5. Estado COMPLETO.
+Tercer intento
+Alguien presenta nuevamente el QR
+Rechazado: grupo completo.
+Intento de exceso
+Se intenta registrar más pases que los autorizados
+Rechazado y registrado en auditoría.
+8. Plano virtual de mesas
+Crear mesas con nombre/número.
+Definir capacidad.
+Ubicar mesas visualmente en un lienzo.
+Arrastrar grupos desde una bandeja de 'sin asignar'.
+Ver ocupación: asignados/capacidad.
+Advertir sobre sobrecupo.
+Permitir mover grupos entre mesas.
+Mostrar posteriormente el número de mesa asociado al grupo en el check-in y dashboard.
+Guardar una versión final del plano antes del evento.
+9. Dashboard operativo
+Indicadores mínimos:
+Indicador
+Descripción
+Pases autorizados
+Total de personas permitidas por los grupos.
+Ingresados
+Personas efectivamente registradas.
+Pendientes
+Autorizados que aún no ingresaron.
+Grupos completos
+QR que alcanzaron el máximo autorizado.
+Grupos parciales
+QR con ingresos pero con pases pendientes.
+Ocupación por mesa
+Personas ingresadas asociadas a cada mesa.
+Llegadas posteriores al corte de comida
+Personas que ingresaron después del corte.
+Platos requeridos
+Número de personas presentes al momento del corte de comida.
+Intentos inválidos/duplicados
+Eventos de control de seguridad.
+10. Sistema de cortes
+Un corte es una fotografía inmutable del estado del evento en un momento determinado. El usuario puede crear cortes con nombre libre, por ejemplo: 'Inicio ceremonia', 'Brindis', 'Servicio de comida', 'Último control'.
+Dato del corte
+Contenido
+Fecha y hora
+Momento exacto del corte.
+Nombre
+Nombre operativo del corte.
+Autorizados
+Total autorizado al momento.
+Presentes
+Total ingresado acumulado.
+Pendientes
+Autorizados menos ingresados.
+Distribución por mesa
+Presentes por mesa.
+Grupos completos/parciales
+Estado de los grupos.
+Platos requeridos
+Especialmente relevante para el corte de comida.
+Los ingresos posteriores al corte no modifican retrospectivamente el corte. Se registran como nuevos movimientos y se reflejan en tiempo real como llegadas posteriores.
+11. Control de catering
+El corte de comida debe mostrar inmediatamente el número de personas presentes. Ese valor se utilizará como referencia de platos a servir. Después del corte, el dashboard debe mostrar un contador de personas que llegaron posteriormente para facilitar la gestión de platos faltantes.
+Ejemplo: corte de comida 19:00 = 231 presentes → 231 platos. A las 19:20 ingresan 6 → '6 llegadas posteriores al corte / 6 posibles platos pendientes de atención'.
+12. WhatsApp: dos niveles
+12.1 MVP sin costo
+Si el Excel incluye 'Teléfono responsable', el sistema mostrará un botón 'Enviar QR por WhatsApp'. El botón abrirá WhatsApp/WhatsApp Web con un mensaje preparado y el enlace/QR correspondiente. El envío lo realiza el usuario desde su propio WhatsApp. No requiere API ni costo de mensajería para el desarrollador.
+12.2 Evolución: WhatsApp Business Platform
+La automatización real desde el servidor deberá considerarse como una funcionalidad futura. WhatsApp Business Platform cobra según mercado y categoría de mensaje; para Perú se han publicado tarifas de referencia de USD 0.0200 por mensaje de utilidad/autenticación en los primeros tramos de 2026. El costo exacto debe verificarse en la tarifa vigente de Meta al implementar esta función. Por ello no se debe incluir envío automático masivo de WhatsApp en el precio base del MVP.
+13. Exportación
+Exportar lista de grupos.
+Exportar asignación de mesas.
+Exportar historial de check-in.
+Exportar cortes.
+Exportar resumen operativo.
+Exportar resumen completo del evento a Excel.
+Generar PDF del evento con portada, indicadores, distribución por mesas, cortes y resumen de asistencia.
+Permitir generar un PDF ejecutivo que incluya los principales dashboards mediante capturas/renderizados de los componentes, no simplemente datos tabulares.
+14. Multiusuario / SaaS
+El producto pasa a ser multi-tenant: cada Wedding Planner/organización tendrá un workspace aislado. Ningún usuario podrá consultar o modificar eventos pertenecientes a otro workspace.
+Rol
+Permisos principales
+Owner
+Facturación, usuarios, eventos, configuración y todos los datos del workspace.
+Admin
+Crear/editar eventos, importar invitados, mesas, QR, dashboard y reportes.
+Coordinador
+Gestionar eventos y dashboard según permisos asignados.
+Seguridad/Check-in
+Solo escanear QR y registrar ingresos; no ver información innecesaria.
+Consulta
+Solo lectura de dashboard/reportes, si el plan lo permite.
+15. Landing page comercial
+La plataforma deberá contar con una landing pública independiente del panel privado.
+Hero: propuesta de valor clara.
+Demostración visual del flujo: Excel → QR → Mesas → Check-in → Dashboard.
+Beneficios para Wedding Planners.
+Funcionalidades.
+Modo de operación sin app para invitados.
+Control de ingreso en tiempo real.
+Cortes y control de catering.
+Exportación de reportes.
+Preguntas frecuentes.
+Planes y precios.
+CTA: Crear cuenta / Probar gratis / Iniciar sesión.
+Footer con términos, privacidad y contacto.
+16. Modelo de planes propuesto
+El cambio a SaaS modifica la recomendación comercial. En lugar de cobrar el desarrollo a cada usuario, la plataforma debe tener un plan gratuito limitado para adquisición y planes accesibles para Wedding Planners. Los precios siguientes son una propuesta inicial para validar mercado en Perú, no una tarifa definitiva.
+Plan
+Precio mensual sugerido
+Precio anual sugerido
+Perfil
+Starter
+S/29/mes
+S/299/año
+Planner independiente con pocos eventos.
+Professional
+S/59/mes
+S/599/año
+Planner con eventos recurrentes y equipo pequeño.
+Business
+S/99/mes
+S/1,199/año
+Planner profesional/agencia con mayor volumen.
+Recomendación: ofrecer aproximadamente 2 meses gratis en el pago anual. No incluir costos de WhatsApp API, dominio personalizado o servicios externos de terceros dentro del precio si generan cargos directos.
+17. Límites sugeridos por plan
+Característica
+Starter
+Professional
+Business
+Eventos activos
+3
+10
+Ilimitados*
+Pases por evento
+150
+500
+1,000+
+Usuarios/workspace
+1
+5
+10+
+Importación Excel
+Sí
+Sí
+Sí
+QR por grupo
+Sí
+Sí
+Sí
+Plano de mesas
+Sí
+Avanzado
+Avanzado
+Check-in
+Sí
+Sí
+Sí
+Dashboard en vivo
+Sí
+Sí
+Sí
+Cortes
+5
+Ilimitados
+Ilimitados
+Exportación Excel
+Sí
+Sí
+Sí
+PDF ejecutivo
+Sí
+Sí
+Sí
+Roles de equipo
+Básico
+Sí
+Sí
+Histórico
+90 días
+1 año
+Según política
+WhatsApp asistido
+Sí
+Sí
+Sí
+WhatsApp API
+No
+Add-on
+Add-on
+Soporte
+Básico
+Prioritario
+Prioritario
+*Sujeto a política de uso razonable. Los límites deben poder modificarse desde configuración sin reprogramar el producto.
+18. Justificación de precios
+El mercado actual valida tanto el pago por evento como las suscripciones. GuestOS publica un plan Pro de USD 39 por evento hasta 500 invitados y un Business de USD 99/mes con eventos ilimitados, colaboración multi-staff y API. GuestQR ofrece check-in QR y conteo en vivo gratis, y planes para planners de USD 149/mes y USD 249/mes. InviteQR cobra de forma única por módulos, incluyendo seating chart por USD 29. En Perú, Festeja Bonito publica planes de S/69, S/119 y S/199 por evento y su plan Deluxe incluye check-in QR, mesas, panel y reportes. Esto sugiere que una plataforma peruana enfocada en planners puede posicionarse por debajo de las soluciones profesionales internacionales, pero por encima de una simple invitación digital.
+Referencia
+Modelo observado
+GuestOS
+USD 39/evento; USD 99/mes Business; USD 249/mes Enterprise.
+GuestQR
+Gratis para check-in; USD 149/mes Studio; USD 249/mes Agency.
+InviteQR
+Pago único; seating chart USD 29; bundles hasta USD 184.
+Festeja Bonito Perú
+S/69, S/119, S/199 por evento; check-in QR en Deluxe.
+19. Costos para el desarrollador: objetivo S/0
+El MVP debe diseñarse para poder desarrollarse y desplegarse inicialmente sin gasto directo del desarrollador, utilizando software open source y niveles gratuitos de servicios. Esto no equivale a infraestructura gratuita ilimitada en producción.
+Componente
+Estrategia inicial
+Frontend/PWA
+Framework open source + hosting con free tier.
+Backend/DB
+Servicio con free tier y políticas RLS/multi-tenant.
+Repositorio
+GitHub Free.
+QR
+Librería open source, generación local.
+PDF/Excel
+Librerías open source.
+Dominio
+Subdominio del hosting en MVP; dominio propio como costo del producto.
+WhatsApp
+Enlace asistido desde WhatsApp; sin API en MVP.
+Analítica
+Opción gratuita o prescindible en MVP.
+Correo transaccional
+Evitar dependencia inicial o usar cuota gratuita.
+Regla financiera: cualquier servicio que empiece a generar cargos por superar límites debe quedar asociado a la cuenta del cliente/plataforma, no a una tarjeta personal del desarrollador, salvo acuerdo explícito.
+20. Arquitectura recomendada
+Arquitectura recomendada: PWA responsive + backend gestionado + base de datos relacional + autenticación + almacenamiento local para el modo check-in + sincronización en tiempo real. Una implementación basada en React/Next.js + Supabase + hosting con free tier es una candidata fuerte para el MVP; la selección definitiva debe hacerse antes de programar y documentarse en el ADR de arquitectura.
+El check-in debe diseñarse con tolerancia a conectividad intermitente. Antes del evento, el dispositivo de seguridad debe poder sincronizar los datos necesarios del evento y validar localmente los QR autorizados. Al recuperar conectividad, los movimientos se sincronizan con el servidor resolviendo conflictos mediante reglas transaccionales.
+21. Seguridad y privacidad
+Aislamiento multi-tenant mediante políticas de autorización a nivel de datos.
+HTTPS obligatorio.
+Contraseñas nunca almacenadas en texto plano.
+Tokens QR no predecibles.
+Principio de mínimo privilegio.
+Personal de seguridad no debe acceder a información administrativa innecesaria.
+Auditoría de importaciones, cambios de mesa, reemisiones y check-ins.
+Backups y política de retención.
+Protección de datos personales conforme al marco aplicable en Perú.
+Exportaciones protegidas y controladas.
+Revocación de sesiones y control de dispositivos cuando corresponda.
+22. Casos de prueba críticos
+Prueba
+Resultado esperado
+QR válido, primer ingreso
+Registrar cantidad menor al máximo y dejar estado parcial.
+QR válido, ingreso final
+Llegar exactamente al máximo y bloquear nuevos ingresos.
+QR excedido
+Rechazar intento que supere los pases.
+QR inválido
+No permitir ingreso.
+QR revocado
+Rechazar ingreso y registrar evento.
+Dos operadores simultáneos
+Nunca superar la cantidad autorizada.
+Sin Internet
+Validar/registrar según cache local y sincronizar posteriormente.
+Internet vuelve
+Sincronizar sin duplicar movimientos.
+Cambio de mesa antes del evento
+Actualizar relación sin alterar historial de check-in previo.
+Corte
+Congelar snapshot sin modificarlo por ingresos posteriores.
+Llegada posterior a comida
+Clasificar como posterior al corte.
+Teléfono presente
+Habilitar acción WhatsApp asistida.
+Teléfono ausente
+No mostrar acción de WhatsApp.
+Excel con errores
+Mostrar errores y permitir corregir/reimportar sin duplicar.
+Usuario de otro workspace
+No debe poder acceder a datos ajenos.
+23. Roadmap
+Fase
+Contenido
+Fase 0 — Diseño
+Requisitos, UX, arquitectura, modelo de datos, seguridad y criterios de aceptación.
+Fase 1 — Cuenta/Workspace
+Landing, registro, login, workspace, roles básicos.
+Fase 2 — Eventos/Excel
+Crear evento, importar, mapear, validar y administrar grupos.
+Fase 3 — QR/Mesas
+Generación QR, plano, mesas, asignaciones y distribución.
+Fase 4 — Check-in
+Escáner, ingreso parcial/completo, duplicados y auditoría.
+Fase 5 — Dashboard
+Tiempo real, mesas, presentes, pendientes y estados.
+Fase 6 — Cortes/Catering
+Cortes, comparativas y control de llegadas posteriores.
+Fase 7 — Reportes
+Excel, PDF ejecutivo y resumen con dashboards.
+Fase 8 — WhatsApp
+WhatsApp asistido en MVP; evaluar API oficial como add-on posterior.
+Fase 9 — QA/Producción
+Pruebas, seguridad, carga, offline, despliegue y documentación.
+24. Criterios de aceptación del MVP
+Un usuario puede registrarse, crear un evento e importar un Excel real.
+El sistema puede transformar cada grupo en un QR único.
+El administrador puede organizar grupos en mesas visualmente.
+El QR puede ser compartido por WhatsApp de forma asistida cuando existe teléfono.
+Seguridad puede escanear desde smartphone.
+Un grupo puede ingresar en varias tandas.
+El sistema nunca permite superar los pases autorizados.
+El dashboard se actualiza con los movimientos.
+Se pueden crear cortes y estos permanecen inmutables.
+El corte de comida muestra el número de personas presentes.
+Las llegadas posteriores al corte quedan identificadas.
+Se puede exportar Excel y PDF.
+Un usuario no puede ver información de otro workspace.
+El sistema mantiene un registro de auditoría.
+El flujo principal funciona con conectividad intermitente y dispone de una estrategia de recuperación.
+25. Recomendación comercial final
+Se recomienda convertir el proyecto en SaaS multiusuario desde el inicio, aunque el primer piloto sea con el cliente actual. Esto incrementa moderadamente la complejidad frente a una aplicación monousuario, pero evita rehacer autenticación, aislamiento de datos, roles, facturación, landing y estructura de cuentas cuando aparezcan otros Wedding Planners.
+El cliente original puede recibir un acceso fundador/piloto con condiciones preferenciales a cambio de validar el producto en eventos reales. Para el mercado general se recomienda lanzar un plan Free y planes Starter/Professional/Business. El desarrollo inicial para construir el producto base puede ser financiado por el cliente piloto o tratado como inversión del desarrollador, pero no se debe mezclar el costo de desarrollo con el precio mensual de los futuros usuarios.
+26. Próximo documento a producir
+El siguiente paso antes de entregar instrucciones a un agente de IA debe ser el Documento de Arquitectura y Diseño del MVP: mapa de pantallas, wireframes, componentes, esquema SQL, políticas multi-tenant, API, estrategia offline/sincronización, seguridad del QR, estructura de planes, landing page, flujo de onboarding y definición exacta de los criterios de aceptación por sprint.
+Fuentes de referencia de mercado
+GuestOS — https://guestos.app/pricing
+GuestQR — https://guestqr.app/pricing
+InviteQR — https://inviteqr.com/pricing
+Festeja Bonito — https://festejabonito.com/pricing
+Invitación externa de referencia proporcionada por el cliente — https://www.avillaltacreadordigital.com/boda-ronny-diana
+WhatsApp Business Platform — tarifas y documentación oficial de Meta: https://developers.facebook.com/docs/whatsapp/pricing
