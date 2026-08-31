@@ -91,18 +91,24 @@ export default function EventsPage() {
               </div>
 
               {/* Actions Footer */}
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+              <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-100 text-center">
                 <Link
                   href={`/events/${evt.id}/import`}
-                  className="flex-1 py-2 px-3 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-brand-200"
+                  className="py-2 px-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-brand-200"
                 >
-                  <FileSpreadsheet className="w-4 h-4" /> Importar Excel
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
                 </Link>
                 <Link
-                  href="/dashboard"
-                  className="py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition"
+                  href={`/events/${evt.id}/qr`}
+                  className="py-2 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-indigo-200"
                 >
-                  Ver Dashboard
+                  <Users className="w-3.5 h-3.5" /> QR Tokens
+                </Link>
+                <Link
+                  href={`/events/${evt.id}/tables`}
+                  className="py-2 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-purple-200"
+                >
+                  <MapPin className="w-3.5 h-3.5" /> Mesas
                 </Link>
               </div>
             </div>
