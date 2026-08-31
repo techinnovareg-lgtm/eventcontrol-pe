@@ -17,12 +17,18 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/scan"
+              className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1 shadow-sm"
+            >
+              <QrCode className="w-4 h-4" /> Escáner Seguridad (PWA)
+            </Link>
             <Link 
               href="/workspace"
               className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-full text-slate-300 border border-slate-700 transition"
             >
-              Rol: <strong className="text-white font-semibold">OWNER</strong> (Ver Workspace)
+              Rol: <strong className="text-white font-semibold">OWNER</strong>
             </Link>
             <Link 
               href="/login" 
