@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { 
   Users, CheckCircle2, Clock, Grid, Plus, LogOut, QrCode, 
-  MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart
+  MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart, ShieldCheck
 } from 'lucide-react';
 import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
@@ -52,6 +52,12 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href="/qa"
+              className="text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1 shadow-sm"
+            >
+              <ShieldCheck className="w-4 h-4" /> Batería QA
+            </Link>
             <Link
               href="/scan"
               className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1 shadow-sm"
