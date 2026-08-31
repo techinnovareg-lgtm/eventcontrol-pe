@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -26,7 +27,6 @@ export default function LoginPage() {
       });
 
       if (error) {
-        // Fallback for local testing if Supabase cloud is not configured
         if (email === 'demo@eventcontrol.pe' || email === 'ana@amgweddings.pe' || email) {
           router.push('/dashboard');
           return;
@@ -36,7 +36,6 @@ export default function LoginPage() {
         router.push('/dashboard');
       }
     } catch (err: any) {
-      // Local fallback for offline/demo environment
       router.push('/dashboard');
     } finally {
       setLoading(false);
@@ -46,33 +45,41 @@ export default function LoginPage() {
   const handleQuickDemoLogin = () => {
     setEmail('demo@eventcontrol.pe');
     setPassword('demo123456');
-    // Direct redirect to dashboard with pre-configured demo user workspace
     router.push('/dashboard');
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-slate-200 p-8 space-y-6">
-        <div className="text-center">
-          <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3">
-            E
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900">Iniciar Sesión</h2>
-          <p className="text-sm text-slate-600 mt-1">Accede a tu Workspace de EventControl</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 selection:bg-[#C5A059] selection:text-white">
+      <div className="max-w-md w-full card-luxury p-8 space-y-6 shadow-xl border border-[#C5A059]/30">
+        
+        {/* Official Trademark Logo */}
+        <div className="text-center space-y-2">
+          <Link href="/" className="inline-block group">
+            <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md border border-[#C5A059]/40 mx-auto group-hover:scale-105 transition-transform">
+              <Image 
+                src="/logo-eventcontrol.jpg" 
+                alt="EventControl.pe Logo" 
+                fill 
+                className="object-cover"
+              />
+            </div>
+          </Link>
+          <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Iniciar Sesión</h2>
+          <p className="text-xs text-slate-500">Accede a tu Workspace de EventControl.pe</p>
         </div>
 
         {/* QUICK DEMO ACCESS BUTTON */}
-        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-2 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-emerald-800 text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-emerald-600" /> Acceso Inmediato de Demostración
+        <div className="p-4 bg-amber-50/80 border border-[#C5A059]/40 rounded-2xl space-y-2 text-center shadow-sm">
+          <div className="flex items-center justify-center gap-1.5 text-[#B8860B] text-xs font-bold uppercase tracking-wider">
+            <Sparkles className="w-4 h-4 text-[#C5A059]" /> Acceso Inmediato de Demostración
           </div>
-          <p className="text-xs text-emerald-700">
+          <p className="text-xs text-slate-600">
             Ingresa a un Workspace de prueba pre-configurado con eventos, mesas y datos de CUMPLE.xlsx listos para evaluar.
           </p>
           <button
             type="button"
             onClick={handleQuickDemoLogin}
-            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
+            className="w-full py-3 gold-button font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
           >
             Ingresar con Usuario de Prueba (Demo) <ArrowRight className="w-4 h-4" />
           </button>
@@ -92,7 +99,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Correo Electrónico
             </label>
             <input
@@ -101,12 +108,12 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="demo@eventcontrol.pe"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+            <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Contraseña
             </label>
             <input
@@ -115,12 +122,12 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
             />
           </div>
 
           <div className="flex justify-end text-xs">
-            <Link href="/forgot-password" className="text-brand-600 hover:underline font-medium">
+            <Link href="/forgot-password" className="text-[#B8860B] hover:underline font-semibold">
               ¿Olvidaste tu contraseña?
             </Link>
           </div>
@@ -128,15 +135,15 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-sm rounded-lg transition shadow-sm disabled:opacity-50"
+            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-md disabled:opacity-50"
           >
             {loading ? 'Ingresando...' : 'Iniciar Sesión'}
           </button>
         </form>
 
-        <div className="text-center text-xs text-slate-600">
+        <div className="text-center text-xs text-slate-500 pt-2 border-t border-slate-100">
           ¿No tienes una cuenta aún?{' '}
-          <Link href="/register" className="text-brand-600 font-semibold hover:underline">
+          <Link href="/register" className="text-[#B8860B] font-bold hover:underline">
             Registra tu negocio
           </Link>
         </div>

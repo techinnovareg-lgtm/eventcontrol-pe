@@ -4,11 +4,12 @@ import { getEventCheckInLogs } from '@/lib/checkin';
 import { CheckIn } from '@/lib/supabase/types';
 
 export interface DashboardEventMetrics {
+  eventName: string;
   totalAuthorized: number;
   totalEntered: number;
   totalPending: number;
   occupancyPercentage: number;
-  completeGroupsCount: number;
+  completedGroupsCount: number;
   partialGroupsCount: number;
   pendingGroupsCount: number;
   totalGroupsCount: number;
@@ -24,12 +25,12 @@ export interface TableOccupancyStat {
   occupancyPercentage: number;
 }
 
-export function calculateDashboardMetrics(eventId: string): DashboardEventMetrics {
+export function calculateDashboardMetrics(eventId: string, workspaceId?: string): DashboardEventMetrics {
   const groups = getEventGuestGroups(eventId);
 
   let totalAuthorized = 0;
   let totalEntered = 0;
-  let completeGroupsCount = 0;
+  let completedGroupsCount = 0;
   let partialGroupsCount = 0;
   let pendingGroupsCount = 0;
 
@@ -41,7 +42,7 @@ export function calculateDashboardMetrics(eventId: string): DashboardEventMetric
     totalEntered += checked;
 
     if (g.status === 'COMPLETO') {
-      completeGroupsCount++;
+      completedGroupsCount++;
     } else if (g.status === 'PARCIAL') {
       partialGroupsCount++;
     } else {
@@ -53,11 +54,12 @@ export function calculateDashboardMetrics(eventId: string): DashboardEventMetric
   const occupancyPercentage = totalAuthorized > 0 ? Math.round((totalEntered / totalAuthorized) * 100) : 0;
 
   return {
+    eventName: 'Cumpleaños Tavo 60 Años',
     totalAuthorized,
     totalEntered,
     totalPending,
     occupancyPercentage,
-    completeGroupsCount,
+    completedGroupsCount,
     partialGroupsCount,
     pendingGroupsCount,
     totalGroupsCount: groups.length,

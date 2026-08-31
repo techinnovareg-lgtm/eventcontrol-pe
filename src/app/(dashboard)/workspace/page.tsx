@@ -2,140 +2,138 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Shield, UserPlus, Users, ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
+import Image from 'next/image';
+import { 
+  Building2, Users, ShieldCheck, UserPlus, Lock, Key, 
+  ArrowLeft, CheckCircle2, AlertTriangle, Play 
+} from 'lucide-react';
 import { testCrossWorkspaceIsolation } from '@/lib/workspace';
-import { UserRole } from '@/lib/supabase/types';
 
-interface MemberItem {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
-  status: 'ACTIVO' | 'PENDIENTE';
-}
+export default function WorkspaceManagementPage() {
+  const currentWorkspaceId = 'ws-a-1111';
+  const [isolationResult, setIsolationResult] = useState<{ passed: boolean; logs: string[] } | null>(null);
 
-export default function WorkspacePage() {
-  const [members, setMembers] = useState<MemberItem[]>([
-    { id: '1', name: 'Ana María García', email: 'ana@amgweddings.pe', role: 'OWNER', status: 'ACTIVO' },
-    { id: '2', name: 'Carlos Mendoza', email: 'carlos@amgweddings.pe', role: 'ADMIN', status: 'ACTIVO' },
-    { id: '3', name: 'Lucía Fernández', email: 'lucia@amgweddings.pe', role: 'COORDINADOR', status: 'ACTIVO' },
-    { id: '4', name: 'Puerta Principal - Guardia 01', email: 'seguridad01@amgweddings.pe', role: 'SEGURIDAD', status: 'ACTIVO' },
-  ]);
-
-  const [testResults, setTestResults] = useState<{ passed: boolean; logs: string[] } | null>(null);
-
-  const runIsolationTest = () => {
-    const results = testCrossWorkspaceIsolation();
-    setTestResults(results);
+  const handleRunIsolationTest = () => {
+    const res = testCrossWorkspaceIsolation();
+    setIsolationResult(res);
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Top Header */}
-        <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition">
+    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
+      {/* Top Navbar */}
+      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-3 group">
+            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
+              <Image 
+                src="/logo-eventcontrol.jpg" 
+                alt="EventControl.pe Logo" 
+                fill 
+                className="object-cover"
+              />
+            </div>
+            <div>
+              <span className="text-xl font-bold tracking-tight text-[#1A1A1A] font-serif">
+                EventControl<span className="text-[#C5A059]">.pe</span>
+              </span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
+                Configuración del Workspace
+              </span>
+            </div>
+          </Link>
+
+          <Link href="/dashboard" className="text-xs text-slate-600 hover:text-[#C5A059] font-bold flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
           </Link>
-          <span className="text-xs bg-emerald-100 text-emerald-800 font-bold px-3 py-1 rounded-full border border-emerald-200">
-            Aislamiento Multi-Tenant Activo
-          </span>
         </div>
+      </header>
 
-        {/* Workspace Info Card */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Workspace Activo</span>
-              <h1 className="text-2xl font-bold text-slate-900 mt-1">AMG Wedding Planners</h1>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">Plan Activo: <span className="font-bold text-slate-800 font-mono">Starter (S/ 29/mes)</span></p>
-            </div>
-            <button className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm self-start sm:self-auto">
-              <UserPlus className="w-4 h-4" /> Invitar Usuario
-            </button>
+      {/* Main Container */}
+      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto space-y-6 w-full">
+        {/* Title Bar */}
+        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Espacio de Trabajo</span>
+            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">AMG Wedding Planners</h1>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">Plan Activo: <span className="font-bold text-[#1A1A1A]">Starter (S/ 29/mes)</span></p>
           </div>
-        </div>
 
-        {/* Multi-tenant Isolation Test Battery */}
-        <div className="bg-slate-900 text-white rounded-2xl p-6 shadow-md">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Lock className="w-5 h-5 text-brand-400" />
-              <h2 className="text-base font-bold">Verificación de Aislamiento Multi-tenant (Caso 9)</h2>
-            </div>
-            <button
-              onClick={runIsolationTest}
-              className="px-3 py-1.5 bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs rounded-lg transition"
-            >
-              Ejecutar Pruebas de Aislamiento
-            </button>
-          </div>
-          <p className="text-xs text-slate-300 mb-4">
-            Demuestra que un usuario autenticado en Workspace A tiene acceso estrictamente denegado a datos de Workspace B (Prevención IDOR en backend y base de datos).
-          </p>
-
-          {testResults && (
-            <div className="p-4 bg-slate-800 rounded-xl border border-slate-700 space-y-2 text-xs font-mono">
-              <div className="font-bold text-brand-400 mb-2">
-                Resultado: {testResults.passed ? 'PASADO CON ÉXITO (100% AISLADO)' : 'FALLIDO'}
-              </div>
-              {testResults.logs.map((log, idx) => (
-                <div key={idx} className="text-slate-200">{log}</div>
-              ))}
-            </div>
-          )}
+          <button className="gold-button font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md flex items-center gap-2 self-start sm:self-auto">
+            <UserPlus className="w-4 h-4" /> Invitar Usuario al Equipo
+          </button>
         </div>
 
         {/* Team Members List */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
-          <h2 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-brand-600" /> Miembros del Workspace y Roles
-          </h2>
+        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
+          <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+            <Users className="w-5 h-5 text-[#B8860B]" /> Equipo y Permisos RBAC (5 Roles)
+          </h3>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600 uppercase">
                   <th className="py-3 px-4">Usuario</th>
-                  <th className="py-3 px-4">Correo</th>
-                  <th className="py-3 px-4">Rol</th>
-                  <th className="py-3 px-4">Permisos Clave</th>
+                  <th className="py-3 px-4">Rol Asignado</th>
+                  <th className="py-3 px-4">Alcance de Permisos</th>
                   <th className="py-3 px-4">Estado</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-sm">
-                {members.map((member) => (
-                  <tr key={member.id} className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-semibold text-slate-900">{member.name}</td>
-                    <td className="py-3 px-4 text-slate-600 text-xs">{member.email}</td>
-                    <td className="py-3 px-4">
-                      <span className={`inline-block px-2.5 py-1 text-xs font-bold rounded-full ${
-                        member.role === 'OWNER' ? 'bg-purple-100 text-purple-800' :
-                        member.role === 'ADMIN' ? 'bg-blue-100 text-blue-800' :
-                        member.role === 'SEGURIDAD' ? 'bg-amber-100 text-amber-800' :
-                        'bg-slate-100 text-slate-800'
-                      }`}>
-                        {member.role}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-xs text-slate-500">
-                      {member.role === 'OWNER' && 'Control total + Facturación'}
-                      {member.role === 'ADMIN' && 'Gestión eventos, QR y Mesas'}
-                      {member.role === 'COORDINADOR' && 'Administración de eventos'}
-                      {member.role === 'SEGURIDAD' && 'Solo escaneo QR en smartphone'}
-                    </td>
-                    <td className="py-3 px-4">
-                      <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Activo
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+              <tbody className="divide-y divide-slate-100">
+                <tr className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-bold text-slate-900">Ana María González (ana@amgweddings.pe)</td>
+                  <td className="py-3 px-4 font-bold text-emerald-700">OWNER (Propietario)</td>
+                  <td className="py-3 px-4 text-slate-600">Acceso total, facturación, usuarios y eventos</td>
+                  <td className="py-3 px-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Activo</span></td>
+                </tr>
+                <tr className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-bold text-slate-900">Carlos Pérez (carlos@amgweddings.pe)</td>
+                  <td className="py-3 px-4 font-bold text-indigo-700">COORDINADOR</td>
+                  <td className="py-3 px-4 text-slate-600">Edición de eventos, invitados, mesas y cortes</td>
+                  <td className="py-3 px-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Activo</span></td>
+                </tr>
+                <tr className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-bold text-slate-900">Operador Seguridad Puerta 1 (puerta1@amgweddings.pe)</td>
+                  <td className="py-3 px-4 font-bold text-amber-800">SEGURIDAD (Puerta)</td>
+                  <td className="py-3 px-4 text-slate-600">Escaneo de QR y registro de check-in únicamente</td>
+                  <td className="py-3 px-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Activo</span></td>
+                </tr>
               </tbody>
             </table>
           </div>
         </div>
-      </div>
+
+        {/* AUTOMATED MULTI-TENANT ISOLATION SECURITY AUDITOR */}
+        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div>
+              <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Seguridad Multi-Tenant (RLS)</span>
+              <h3 className="text-lg font-serif font-bold text-[#1A1A1A]">Prueba Automatizada de Aislamiento IDOR</h3>
+              <p className="text-xs text-slate-500">Verifica que un usuario del Workspace A no pueda acceder a datos del Workspace B.</p>
+            </div>
+
+            <button
+              onClick={handleRunIsolationTest}
+              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-2 shrink-0"
+            >
+              <Play className="w-4 h-4 text-emerald-400" /> Ejecutar Test de Aislamiento (Caso 9)
+            </button>
+          </div>
+
+          {isolationResult && (
+            <div className={`p-4 rounded-xl text-xs font-mono space-y-1 ${
+              isolationResult.passed ? 'bg-emerald-50 border border-emerald-300 text-emerald-900' : 'bg-red-50 border border-red-300 text-red-900'
+            }`}>
+              <div className="font-bold flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-emerald-700" /> {isolationResult.passed ? 'RESULTADO: 100% AISLADO (IDOR SAFE)' : 'FALLO DE SEGURIDAD'}
+              </div>
+              {isolationResult.logs.map((log, idx) => (
+                <p key={idx}>{log}</p>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
     </div>
   );
 }

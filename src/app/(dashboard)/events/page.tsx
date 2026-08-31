@@ -2,88 +2,114 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Plus, Calendar, MapPin, Users, FileSpreadsheet, ArrowLeft, CheckCircle, Clock, MessageSquare } from 'lucide-react';
 import { getWorkspaceEvents, createEvent } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 
-export default function EventsPage() {
+export default function EventsCrudPage() {
   const currentWorkspaceId = 'ws-a-1111';
-  const [events, setEvents] = useState<Event[]>(getWorkspaceEvents(currentWorkspaceId));
-  const [showModal, setShowModal] = useState(false);
+  const [events, setEvents] = useState<Event[]>(() => getWorkspaceEvents(currentWorkspaceId));
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [name, setName] = useState('');
-  const [eventType, setEventType] = useState('Boda');
-  const [eventDate, setEventDate] = useState('2026-11-15');
-  const [eventTime, setEventTime] = useState('17:00');
-  const [venueName, setVenueName] = useState('Hacienda Mamacona, Lurín');
+  const [date, setDate] = useState('');
+  const [location, setLocation] = useState('');
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreateEvent = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name || !date) return;
+
     const newEvt = createEvent({
       workspace_id: currentWorkspaceId,
       name,
-      event_type: eventType,
-      event_date: eventDate,
-      event_time: eventTime,
-      venue_name: venueName,
-      status: 'PREPARACION',
+      event_type: 'Boda / Gala',
+      event_date: date,
+      venue_name: location,
+      status: 'BORRADOR',
     });
 
-    setEvents([newEvt, ...events]);
-    setShowModal(false);
+    setEvents([...events, newEvt]);
     setName('');
+    setDate('');
+    setLocation('');
+    setIsModalOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Top Header */}
-        <div className="flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition">
+    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
+      {/* Top Navbar */}
+      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          <Link href="/dashboard" className="flex items-center gap-3 group">
+            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
+              <Image 
+                src="/logo-eventcontrol.jpg" 
+                alt="EventControl.pe Logo" 
+                fill 
+                className="object-cover"
+              />
+            </div>
+            <div>
+              <span className="text-xl font-bold tracking-tight text-[#1A1A1A] font-serif">
+                EventControl<span className="text-[#C5A059]">.pe</span>
+              </span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
+                Gestión de Eventos
+              </span>
+            </div>
+          </Link>
+
+          <Link href="/dashboard" className="text-xs text-slate-600 hover:text-[#C5A059] font-bold flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
           </Link>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
+        {/* Title Bar */}
+        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Catálogo de Bodas y Eventos</span>
+            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Eventos del Workspace</h1>
+            <p className="text-xs text-slate-500">Plan Starter (S/ 29/mes) • Hasta 3 eventos activos</p>
+          </div>
+
           <button
-            onClick={() => setShowModal(true)}
-            className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition shadow-sm"
+            onClick={() => setIsModalOpen(true)}
+            className="gold-button font-bold text-xs px-5 py-3 rounded-xl transition shadow-md flex items-center gap-2 self-start sm:self-auto"
           >
-            <Plus className="w-4 h-4" /> Crear Evento
+            <Plus className="w-4 h-4" /> Crear Nuevo Evento
           </button>
         </div>
 
-        {/* Page Title */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm">
-          <h1 className="text-2xl font-bold text-slate-900">Eventos Administrados</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Gestiona la lista de bodas y eventos sociales, importa invitados desde Excel y prepara los controles de ingreso.
-          </p>
-        </div>
-
         {/* Events Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((evt) => (
-            <div key={evt.id} className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <span className={`px-2.5 py-1 text-xs font-bold rounded-full ${
-                    evt.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800' :
-                    evt.status === 'PREPARACION' ? 'bg-amber-100 text-amber-800' :
-                    'bg-slate-100 text-slate-700'
+            <div key={evt.id} className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col justify-between space-y-4 hover-lift">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    evt.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                    evt.status === 'FINALIZADO' ? 'bg-slate-200 text-slate-700' :
+                    'bg-amber-100 text-amber-900 border border-amber-300'
                   }`}>
                     {evt.status}
                   </span>
-                  <span className="text-xs text-slate-500 font-medium">{evt.event_type}</span>
+                  <span className="text-[10px] text-slate-400 font-mono">ID: {evt.id}</span>
                 </div>
 
-                <h3 className="text-xl font-bold text-slate-900 mb-2">{evt.name}</h3>
+                <h3 className="text-lg font-serif font-bold text-[#1A1A1A]">{evt.name}</h3>
 
-                <div className="space-y-1.5 text-xs text-slate-600 mb-6">
+                <div className="space-y-1 text-xs text-slate-600">
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-brand-600" />
-                    <span>{evt.event_date} {evt.event_time && `• ${evt.event_time} hs`}</span>
+                    <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
+                    <span>{evt.event_date}</span>
                   </div>
                   {evt.venue_name && (
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-rose-500" />
+                      <MapPin className="w-3.5 h-3.5 text-purple-600" />
                       <span>{evt.venue_name}</span>
                     </div>
                   )}
@@ -94,31 +120,31 @@ export default function EventsPage() {
               <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-4 border-t border-slate-100 text-center">
                 <Link
                   href={`/events/${evt.id}/import`}
-                  className="py-2 px-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-brand-200"
+                  className="py-2 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-[#C5A059]/30"
                 >
                   <FileSpreadsheet className="w-3.5 h-3.5" /> Excel
                 </Link>
                 <Link
                   href={`/events/${evt.id}/qr`}
-                  className="py-2 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-indigo-200"
+                  className="py-2 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-indigo-200"
                 >
-                  <Users className="w-3.5 h-3.5" /> QR Tokens
+                  <Users className="w-3.5 h-3.5" /> QR
                 </Link>
                 <Link
                   href={`/events/${evt.id}/tables`}
-                  className="py-2 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-purple-200"
+                  className="py-2 px-2 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-purple-200"
                 >
                   <MapPin className="w-3.5 h-3.5" /> Mesas
                 </Link>
                 <Link
                   href={`/events/${evt.id}/whatsapp`}
-                  className="py-2 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-emerald-200"
+                  className="py-2 px-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-emerald-200"
                 >
                   <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
                 </Link>
                 <Link
                   href={`/events/${evt.id}/reports`}
-                  className="py-2 px-2 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 shadow-sm"
+                  className="py-2 px-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition flex items-center justify-center gap-1 shadow-sm"
                 >
                   <Clock className="w-3.5 h-3.5" /> Reportes
                 </Link>
@@ -126,83 +152,66 @@ export default function EventsPage() {
             </div>
           ))}
         </div>
-      </div>
+      </main>
 
-      {/* Create Event Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
-            <h2 className="text-xl font-bold text-slate-900 mb-4">Crear Nuevo Evento</h2>
+      {/* CREATE EVENT MODAL */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border border-[#C5A059]/40 space-y-4">
+            <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Crear Nuevo Evento</h3>
 
-            <form onSubmit={handleCreate} className="space-y-4">
+            <form onSubmit={handleCreateEvent} className="space-y-4 text-xs">
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Nombre del Evento
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nombre de la Boda / Evento
                 </label>
                 <input
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ej. Boda Sofia & Mateo"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                  placeholder="Ej. Boda Camila & Rodrigo"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                 />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Tipo de Evento
-                  </label>
-                  <select
-                    value={eventType}
-                    onChange={(e) => setEventType(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none bg-white"
-                  >
-                    <option value="Boda">Boda</option>
-                    <option value="Cumpleaños">Cumpleaños / Aniversario</option>
-                    <option value="Corporativo">Corporativo</option>
-                    <option value="Social">Social</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                    Fecha del Evento
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
-                  />
-                </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-                  Lugar / Recepción
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Fecha del Evento
                 </label>
                 <input
-                  type="text"
-                  value={venueName}
-                  onChange={(e) => setVenueName(e.target.value)}
-                  placeholder="Ej. Casa Hacienda San José"
-                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-brand-500 focus:outline-none"
+                  type="date"
+                  required
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Lugar / Local de Recepción
+                </label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Ej. Hacienda Mamacona, Lurín"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                  onClick={() => setIsModalOpen(false)}
+                  className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs rounded-lg transition shadow-sm"
+                  className="w-1/2 py-2.5 gold-button font-bold rounded-xl shadow-md"
                 >
                   Guardar Evento
                 </button>

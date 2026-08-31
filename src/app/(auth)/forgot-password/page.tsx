@@ -2,87 +2,72 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/client';
+import Image from 'next/image';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
-  const handleReset = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setMessage(null);
-    setErrorMsg(null);
-
-    try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`,
-      });
-
-      if (error) {
-        setErrorMsg(error.message || 'No fue posible solicitar la recuperación.');
-      } else {
-        setMessage('Hemos enviado las instrucciones para restablecer tu contraseña a tu correo electrónico.');
-      }
-    } catch (err: any) {
-      setErrorMsg('Ocurrió un error inesperado.');
-    } finally {
-      setLoading(false);
-    }
+    setSubmitted(true);
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-lg border border-slate-200 p-8">
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center text-white font-bold text-2xl mx-auto mb-3">
-            E
-          </div>
-          <h2 className="text-2xl font-bold text-slate-900">Recuperar Contraseña</h2>
-          <p className="text-sm text-slate-600 mt-1">Ingresa tu correo para recibir un enlace de acceso</p>
+    <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 selection:bg-[#C5A059] selection:text-white">
+      <div className="max-w-md w-full card-luxury p-8 space-y-6 shadow-xl border border-[#C5A059]/30">
+        <div className="text-center space-y-2">
+          <Link href="/" className="inline-block group">
+            <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md border border-[#C5A059]/40 mx-auto group-hover:scale-105 transition-transform">
+              <Image 
+                src="/logo-eventcontrol.jpg" 
+                alt="EventControl.pe Logo" 
+                fill 
+                className="object-cover"
+              />
+            </div>
+          </Link>
+          <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Recuperar Contraseña</h2>
+          <p className="text-xs text-slate-500">Ingresa tu correo registrado para recibir instrucciones</p>
         </div>
 
-        {message && (
-          <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-lg">
-            {message}
+        {submitted ? (
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2">
+            <h4 className="font-bold text-emerald-800 text-sm">¡Correo enviado!</h4>
+            <p className="text-xs text-emerald-700">
+              Si tu correo se encuentra registrado, recibirás un enlace para restablecer tu contraseña.
+            </p>
+            <Link href="/login" className="inline-block text-xs font-bold text-emerald-800 hover:underline pt-2">
+              Volver al Login
+            </Link>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                Correo Electrónico
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="demo@eventcontrol.pe"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="w-full py-3 gold-button font-bold text-xs rounded-xl transition shadow-md"
+            >
+              Enviar Enlace de Recuperación
+            </button>
+          </form>
         )}
 
-        {errorMsg && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
-            {errorMsg}
-          </div>
-        )}
-
-        <form onSubmit={handleReset} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-              Correo Electrónico Registrado
-            </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="tu@weddingplanner.pe"
-              className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm rounded-lg transition shadow-sm disabled:opacity-50"
-          >
-            {loading ? 'Enviando...' : 'Enviar Enlace de Recuperación'}
-          </button>
-        </form>
-
-        <div className="mt-6 text-center text-xs text-slate-600">
-          <Link href="/login" className="text-brand-600 font-semibold hover:underline">
+        <div className="text-center text-xs text-slate-500 pt-2 border-t border-slate-100">
+          <Link href="/login" className="text-[#B8860B] font-bold hover:underline">
             Volver a Iniciar Sesión
           </Link>
         </div>

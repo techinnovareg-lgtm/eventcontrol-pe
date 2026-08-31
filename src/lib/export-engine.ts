@@ -28,7 +28,7 @@ export function exportEventToExcel(eventId: string, workspaceId: string) {
     { Indicador: 'Personas Ingresadas (Presentes)', Valor: metrics.totalEntered },
     { Indicador: 'Pases Pendientes por Ingresar', Valor: metrics.totalPending },
     { Indicador: 'Porcentaje de Asistencia', Valor: `${metrics.occupancyPercentage}%` },
-    { Indicador: 'Grupos Completos', Valor: metrics.completeGroupsCount },
+    { Indicador: 'Grupos Completos', Valor: metrics.completedGroupsCount },
     { Indicador: 'Grupos Parciales', Valor: metrics.partialGroupsCount },
     { Indicador: 'Grupos Pendientes', Valor: metrics.pendingGroupsCount },
   ];

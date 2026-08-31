@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   Camera, QrCode, ShieldCheck, CheckCircle2, XCircle, AlertTriangle, 
   Users, MapPin, RefreshCw, ArrowLeft, Zap, Lock, Wifi, WifiOff, Download, CloudUpload
@@ -90,11 +91,9 @@ export default function MobileScanCheckInPage() {
     }
 
     if (isOnline) {
-      // Online execution
       const res = executeAtomicCheckIn(selectedTokenHash, passesRequested, 'operador-seguridad-01', eventId);
       setResultModal(res);
     } else {
-      // Offline execution against IndexedDB (Caso 6)
       const res = await executeOfflineCheckIn(selectedTokenHash, passesRequested, 'operador-seguridad-01', eventId);
       await checkPendingQueue();
       setResultModal(res);
@@ -108,15 +107,20 @@ export default function MobileScanCheckInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white p-4 max-w-md mx-auto flex flex-col justify-between">
+    <div className="min-h-screen bg-[#1A1A1A] text-white p-4 max-w-md mx-auto flex flex-col justify-between selection:bg-[#C5A059] selection:text-white">
       {/* Top Header Mobile */}
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <Link href="/dashboard" className="text-xs text-slate-400 hover:text-white flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> Salir
+          <Link href="/dashboard" className="flex items-center gap-2">
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#C5A059]/40">
+              <Image src="/logo-eventcontrol.jpg" alt="Logo" fill className="object-cover" />
+            </div>
+            <span className="text-xs text-slate-300 font-bold hover:text-white flex items-center gap-1">
+              <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+            </span>
           </Link>
 
-          {/* Network Mode Toggle (Online / Offline simulation) */}
+          {/* Network Mode Toggle */}
           <button
             onClick={() => setIsOnline(!isOnline)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
@@ -132,7 +136,7 @@ export default function MobileScanCheckInPage() {
 
         {/* Sync Status Banner */}
         {syncStatusMsg && (
-          <div className="p-3 bg-indigo-950 border border-indigo-800 text-indigo-200 text-xs rounded-xl text-center">
+          <div className="p-3 bg-amber-950 border border-amber-800 text-amber-200 text-xs rounded-xl text-center font-medium">
             {syncStatusMsg}
           </div>
         )}
@@ -141,9 +145,9 @@ export default function MobileScanCheckInPage() {
         <div className="flex gap-2 text-xs">
           <button
             onClick={handleDownloadManifest}
-            className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition flex items-center justify-center gap-1"
+            className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition flex items-center justify-center gap-1 font-semibold"
           >
-            <Download className="w-3.5 h-3.5 text-brand-400" /> {manifestDownloaded ? 'Caché Actualizado' : 'Descargar Manifiesto'}
+            <Download className="w-3.5 h-3.5 text-[#C5A059]" /> {manifestDownloaded ? 'Caché Actualizado' : 'Descargar Manifiesto'}
           </button>
 
           {pendingSyncCount > 0 && (
@@ -157,13 +161,13 @@ export default function MobileScanCheckInPage() {
         </div>
 
         {/* Camera Feed Simulation Box */}
-        <div className="bg-slate-900 border-2 border-dashed border-emerald-500/50 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden">
-          <div className="w-16 h-16 bg-emerald-600/20 rounded-full flex items-center justify-center mx-auto text-emerald-400 border border-emerald-500/40 animate-pulse">
+        <div className="bg-slate-900 border-2 border-dashed border-[#C5A059]/60 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden">
+          <div className="w-16 h-16 bg-[#C5A059]/20 rounded-full flex items-center justify-center mx-auto text-[#C5A059] border border-[#C5A059]/40 animate-pulse">
             <Camera className="w-8 h-8" />
           </div>
           <div>
-            <h2 className="text-sm font-bold text-slate-200">
-              Visor de Cámara ({isOnline ? 'Conectado a Servidor' : 'Operando en IndexedDB Local'})
+            <h2 className="text-sm font-bold text-slate-200 font-serif">
+              Visor de Escáner Puerta ({isOnline ? 'Servidor Conectado' : 'IndexedDB Local'})
             </h2>
             <p className="text-xs text-slate-400">Apunta el escáner al código QR del invitado</p>
           </div>
@@ -176,7 +180,7 @@ export default function MobileScanCheckInPage() {
             <select
               value={activeGroup ? activeGroup.id : ''}
               onChange={(e) => handleSelectGroup(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 text-white text-xs py-2 px-3 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none font-semibold"
+              className="w-full bg-slate-800 border border-slate-700 text-white text-xs py-2 px-3 rounded-xl focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-semibold"
             >
               <option value="" disabled>-- Seleccionar Grupo Invitado --</option>
               {groups.map((g) => (
@@ -190,11 +194,11 @@ export default function MobileScanCheckInPage() {
 
         {/* Scanned QR Info Section */}
         {activeGroup ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-800 pb-3">
               <div>
-                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block">Grupo Validado</span>
-                <h3 className="text-lg font-extrabold text-white">{activeGroup.group_name}</h3>
+                <span className="text-[10px] font-bold text-[#C5A059] uppercase tracking-widest block">Grupo Validado</span>
+                <h3 className="text-lg font-bold text-white font-serif">{activeGroup.group_name}</h3>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                 activeGroup.status === 'COMPLETO' ? 'bg-red-950 text-red-400 border border-red-800' :
@@ -236,7 +240,7 @@ export default function MobileScanCheckInPage() {
                       onClick={() => setPassesRequested(num)}
                       className={`py-3 text-base font-extrabold rounded-xl transition border ${
                         passesRequested === num
-                          ? 'bg-emerald-600 border-emerald-400 text-white shadow-lg shadow-emerald-900/50 scale-105'
+                          ? 'bg-[#C5A059] border-[#C5A059] text-slate-950 shadow-lg scale-105'
                           : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                       }`}
                     >
@@ -247,7 +251,7 @@ export default function MobileScanCheckInPage() {
 
                 <button
                   onClick={handleConfirmCheckIn}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-extrabold text-base rounded-2xl transition shadow-xl shadow-emerald-950/80 flex items-center justify-center gap-2 mt-4"
+                  className="w-full py-4 gold-button font-extrabold text-base rounded-2xl transition shadow-xl flex items-center justify-center gap-2 mt-4"
                 >
                   <CheckCircle2 className="w-6 h-6" /> CONFIRMAR INGRESO ({passesRequested})
                 </button>
@@ -255,7 +259,7 @@ export default function MobileScanCheckInPage() {
             ) : (
               <div className="p-4 bg-red-950/60 border border-red-800 rounded-xl text-center space-y-1">
                 <XCircle className="w-8 h-8 text-red-500 mx-auto" />
-                <h4 className="text-sm font-bold text-red-300">GRUPO COMPLETO</h4>
+                <h4 className="text-sm font-bold text-red-300 font-serif">GRUPO COMPLETO</h4>
                 <p className="text-xs text-red-400">Todos los pases autorizados han ingresado previamente.</p>
               </div>
             )}
@@ -292,7 +296,7 @@ export default function MobileScanCheckInPage() {
             </div>
 
             <div>
-              <h3 className={`text-xl font-extrabold ${resultModal.success ? 'text-emerald-400' : 'text-red-400'}`}>
+              <h3 className={`text-xl font-extrabold font-serif ${resultModal.success ? 'text-emerald-400' : 'text-red-400'}`}>
                 {resultModal.success ? 'INGRESO AUTORIZADO' : 'INGRESO RECHAZADO'}
               </h3>
               <p className="text-xs text-slate-300 mt-1 font-medium">{resultModal.message}</p>
@@ -357,7 +361,7 @@ export default function MobileScanCheckInPage() {
         </div>
       )}
 
-      <footer className="text-center text-[10px] text-slate-600 pt-4">
+      <footer className="text-center text-[10px] text-slate-500 pt-4">
         EventControl Security PWA Module • Dexie.js Offline Cache
       </footer>
     </div>

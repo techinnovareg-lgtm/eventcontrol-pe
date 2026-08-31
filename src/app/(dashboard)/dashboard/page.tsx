@@ -1,244 +1,345 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { 
   Users, CheckCircle2, Clock, Grid, Plus, LogOut, QrCode, 
-  MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart, ShieldCheck
+  MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart, ShieldCheck, BarChart3, ExternalLink
 } from 'lucide-react';
 import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
-export default function DashboardPage() {
+export default function RealtimeDashboardPage() {
   const eventId = 'evt-102';
   const currentWorkspaceId = 'ws-a-1111';
 
-  const [metrics, setMetrics] = useState(calculateDashboardMetrics(eventId));
-  const [tablesStats, setTablesStats] = useState(getTablesOccupancyStats(eventId));
-  const [recentFeed, setRecentFeed] = useState(getRecentCheckInsFeed(eventId, 8));
-  const [lastUpdateTimestamp, setLastUpdateTimestamp] = useState<string>(new Date().toLocaleTimeString());
-
-  const refreshAllDashboardData = () => {
-    setMetrics(calculateDashboardMetrics(eventId));
-    setTablesStats(getTablesOccupancyStats(eventId));
-    setRecentFeed(getRecentCheckInsFeed(eventId, 8));
-    setLastUpdateTimestamp(new Date().toLocaleTimeString());
-  };
+  const [metrics, setMetrics] = useState(() => calculateDashboardMetrics(eventId, currentWorkspaceId));
+  const [tablesStats, setTablesStats] = useState(() => getTablesOccupancyStats(eventId));
+  const [recentCheckIns, setRecentCheckIns] = useState(() => getRecentCheckInsFeed(eventId));
+  const [realtimePulse, setRealtimePulse] = useState(false);
 
   useEffect(() => {
-    // Subscribe to Realtime Check-in notifications
-    const unsubscribe = checkInRealtimeChannel.subscribe(() => {
-      refreshAllDashboardData();
+    const unsubscribeFn = checkInRealtimeChannel.subscribe((payload) => {
+      setMetrics(calculateDashboardMetrics(eventId, currentWorkspaceId));
+      setTablesStats(getTablesOccupancyStats(eventId));
+      setRecentCheckIns(getRecentCheckInsFeed(eventId));
+      
+      setRealtimePulse(true);
+      setTimeout(() => setRealtimePulse(false), 2000);
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => {
+      if (typeof unsubscribeFn === 'function') {
+        unsubscribeFn();
+      }
+    };
+  }, [eventId, currentWorkspaceId]);
+
+  // Calculated donut chart stroke
+  const circumference = 2 * Math.PI * 40;
+  const strokeDashoffset = circumference - (metrics.occupancyPercentage / 100) * circumference;
+
+  // Mock hourly entry breakdown data for visual bar chart
+  const hourlyData = [
+    { hour: '17:00', count: 12, label: 'Inicio' },
+    { hour: '18:00', count: 45, label: 'Coctel' },
+    { hour: '19:00', count: 85, label: 'Pico Entrada' },
+    { hour: '20:00', count: 68, label: 'Cena' },
+    { hour: '21:00', count: 21, label: 'Tardíos' },
+  ];
+  const maxHourly = Math.max(...hourlyData.map(h => h.count));
 
   return (
-    <div className="min-h-screen bg-slate-100 flex flex-col">
-      {/* Top Header Bar */}
-      <header className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center font-bold text-white shadow">
-              E
+    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] selection:bg-[#C5A059] selection:text-white flex flex-col">
+      {/* Top Luxury Navbar */}
+      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          
+          {/* Official Trademark Brand Logo */}
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
+              <Image 
+                src="/logo-eventcontrol.jpg" 
+                alt="EventControl.pe Isologo" 
+                fill 
+                className="object-cover"
+              />
             </div>
             <div>
-              <h1 className="text-sm font-bold leading-tight">AMG Wedding Planners</h1>
-              <span className="text-xs text-brand-400 font-medium flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Panel en Vivo
+              <span className="text-xl font-bold tracking-tight text-[#1A1A1A] font-serif">
+                EventControl<span className="text-[#C5A059]">.pe</span>
+              </span>
+              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
+                Workspace: AMG Wedding Planners
               </span>
             </div>
-          </div>
+          </Link>
 
+          {/* Action Links */}
           <div className="flex items-center gap-3">
             <Link
               href="/qa"
-              className="text-xs bg-purple-600 hover:bg-purple-700 text-white font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1 shadow-sm"
+              className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 border border-purple-300"
             >
-              <ShieldCheck className="w-4 h-4" /> Batería QA
+              <ShieldCheck className="w-4 h-4 text-purple-700" /> Batería QA
             </Link>
             <Link
               href="/scan"
-              className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1 shadow-sm"
+              className="text-xs gold-button font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
             >
-              <QrCode className="w-4 h-4" /> Escáner Seguridad (PWA)
+              <QrCode className="w-4 h-4 text-amber-100" /> Escáner Puerta PWA
             </Link>
-            <Link
-              href="/workspace"
-              className="text-xs bg-slate-800 hover:bg-slate-700 px-3 py-1.5 rounded-full text-slate-300 border border-slate-700 transition"
-            >
-              Rol: <strong className="text-white font-semibold">OWNER</strong>
-            </Link>
-            <Link 
-              href="/login" 
-              className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition"
-            >
-              <LogOut className="w-4 h-4" /> Salir
+            <Link href="/" className="p-2 text-slate-400 hover:text-slate-700 transition" title="Cerrar Sesión">
+              <LogOut className="w-5 h-5" />
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Event Header Banner */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      {/* Main Dashboard Container */}
+      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 w-full">
+        
+        {/* Title Bar & Realtime Channel Badge */}
+        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">
-                EVENTO EN VIVO
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest">
+                Monitoreo en Tiempo Real
               </span>
-              <span className="text-xs text-slate-400 font-mono">Última actualización: {lastUpdateTimestamp}</span>
+              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border transition ${
+                realtimePulse 
+                  ? 'bg-emerald-100 text-emerald-800 border-emerald-400 scale-105' 
+                  : 'bg-emerald-50 text-emerald-700 border-emerald-300'
+              }`}>
+                <Radio className={`w-3 h-3 ${realtimePulse ? 'animate-ping text-emerald-600' : 'text-emerald-600'}`} />
+                Canal WebSocket Activo
+              </span>
             </div>
-            <h2 className="text-2xl font-extrabold text-slate-900">Cumpleaños Tavo 60 Años (Demo CUMPLE.xlsx)</h2>
-            <p className="text-xs text-slate-500">Club Germania, Miraflores • 20 de Septiembre, 2026</p>
+            <h1 className="text-3xl font-serif font-bold text-[#1A1A1A] mt-1">{metrics.eventName}</h1>
+            <p className="text-xs text-slate-500 mt-0.5">Control de ingresos, distribución de mesas y conciliación de catering</p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Link
-              href="/events"
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs rounded-xl transition"
-            >
-              Ver Todos los Eventos
+          <div className="flex flex-wrap gap-2">
+            <Link href="/events/evt-102/qr" className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition">
+              Tokens QR
+            </Link>
+            <Link href="/events/evt-102/tables" className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition">
+              Plano Mesas
+            </Link>
+            <Link href="/events/evt-102/whatsapp" className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 transition">
+              WhatsApp
+            </Link>
+            <Link href="/events/evt-102/cuts" className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-xl border border-amber-300 transition">
+              Catering
+            </Link>
+            <Link href="/events/evt-102/reports" className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition">
+              Reportes PDF
             </Link>
           </div>
         </div>
 
-        {/* Top KPI Metrics Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-1">Pases Autorizados</span>
-            <div className="flex items-baseline justify-between">
-              <strong className="text-3xl font-black text-slate-900">{metrics.totalAuthorized}</strong>
-              <span className="text-xs text-slate-500 font-semibold">{metrics.totalGroupsCount} grupos</span>
+        {/* METRICS CARDS WITH RICH VISUAL GRAPHICS */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* VISUAL DONUT GAUGE CHART CARD */}
+          <div className="card-luxury p-6 border border-[#C5A059]/30 flex flex-col justify-between space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <PieChart className="w-4 h-4 text-[#B8860B]" /> Asistencia Global
+              </h3>
+              <span className="text-xs font-extrabold text-[#B8860B] bg-amber-50 px-2.5 py-0.5 rounded-full border border-[#C5A059]/30">
+                {metrics.occupancyPercentage}% Ingresado
+              </span>
+            </div>
+
+            <div className="flex items-center justify-center gap-6 py-2">
+              {/* Radial Donut SVG */}
+              <div className="relative w-32 h-32 flex items-center justify-center">
+                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke="#F5F2EB"
+                    strokeWidth="12"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    stroke="#C5A059"
+                    strokeWidth="12"
+                    fill="transparent"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    strokeLinecap="round"
+                    className="transition-all duration-1000 ease-out"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-2xl font-black text-[#1A1A1A] font-serif">{metrics.totalEntered}</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">de {metrics.totalAuthorized}</span>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-[#C5A059]"></span>
+                  <span className="text-slate-600">Ingresados:</span>
+                  <strong className="font-bold text-[#1A1A1A]">{metrics.totalEntered}</strong>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full bg-slate-200"></span>
+                  <span className="text-slate-600">Pendientes:</span>
+                  <strong className="font-bold text-slate-500">{metrics.totalPending}</strong>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-emerald-200 shadow-sm bg-emerald-50/30">
-            <span className="text-xs font-bold text-emerald-800 uppercase tracking-wider block mb-1">Ingresados (Presentes)</span>
-            <div className="flex items-baseline justify-between">
-              <strong className="text-3xl font-black text-emerald-600">{metrics.totalEntered}</strong>
-              <span className="text-xs text-emerald-700 font-bold">{metrics.occupancyPercentage}% asistencia</span>
+          {/* VISUAL HOURLY ENTRY BAR CHART TIMELINE WIDGET */}
+          <div className="card-luxury p-6 border border-[#C5A059]/30 flex flex-col justify-between space-y-4 lg:col-span-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <BarChart3 className="w-4 h-4 text-emerald-600" /> Distribución de Ingresos por Hora (Recepción)
+              </h3>
+              <span className="text-xs text-slate-400 font-semibold">Pico detectado a las 19:00</span>
+            </div>
+
+            {/* Visual Flex Bar Graph */}
+            <div className="grid grid-cols-5 gap-4 items-end h-32 pt-4 px-2">
+              {hourlyData.map((h, i) => {
+                const heightPercent = Math.round((h.count / maxHourly) * 100);
+                return (
+                  <div key={i} className="flex flex-col items-center gap-1 group">
+                    <span className="text-[10px] font-bold text-[#B8860B] group-hover:scale-110 transition">{h.count} pers.</span>
+                    <div className="w-full bg-slate-100 rounded-t-lg h-24 relative overflow-hidden flex items-end">
+                      <div 
+                        className="w-full bg-gradient-to-t from-[#B8860B] to-[#C5A059] rounded-t-lg transition-all duration-700"
+                        style={{ height: `${heightPercent}%` }}
+                      ></div>
+                    </div>
+                    <span className="text-[11px] font-bold text-slate-700 font-mono">{h.hour}</span>
+                    <span className="text-[9px] text-slate-400 font-semibold">{h.label}</span>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-amber-200 shadow-sm bg-amber-50/30">
-            <span className="text-xs font-bold text-amber-800 uppercase tracking-wider block mb-1">Pendientes por Ingresar</span>
-            <div className="flex items-baseline justify-between">
-              <strong className="text-3xl font-black text-amber-600">{metrics.totalPending}</strong>
-              <span className="text-xs text-amber-700 font-semibold">pases restantes</span>
-            </div>
-          </div>
-
-          <div className="bg-white p-5 rounded-2xl border border-purple-200 shadow-sm bg-purple-50/30">
-            <span className="text-xs font-bold text-purple-800 uppercase tracking-wider block mb-1">Estado de Grupos</span>
-            <div className="flex items-center justify-between text-xs mt-1 font-semibold">
-              <span className="text-emerald-700">✓ {metrics.completeGroupsCount} compl.</span>
-              <span className="text-amber-700">⏳ {metrics.partialGroupsCount} parc.</span>
-              <span className="text-slate-500">⚪ {metrics.pendingGroupsCount} pend.</span>
-            </div>
-          </div>
         </div>
 
-        {/* Dashboard Grid: Live Feed (Left) & Table Occupancy (Right) */}
+        {/* GROUPS STATUS BREAKDOWN & TABLE OCCUPANCY GRID */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Live Recent Activity Feed */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Activity className="w-5 h-5 text-brand-600" /> Últimos Ingresos (Feed en Vivo)
-              </h3>
-              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
+          
+          {/* GROUPS STATUS CARDS */}
+          <div className="space-y-4">
+            <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider">Estado de Grupos de Invitados</h3>
+            
+            <div className="grid grid-cols-3 gap-3">
+              <div className="card-luxury p-4 border-l-4 border-emerald-500 text-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Completos</span>
+                <strong className="text-2xl font-black text-emerald-700">{metrics.completedGroupsCount}</strong>
+              </div>
+
+              <div className="card-luxury p-4 border-l-4 border-amber-500 text-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Parciales</span>
+                <strong className="text-2xl font-black text-amber-700">{metrics.partialGroupsCount}</strong>
+              </div>
+
+              <div className="card-luxury p-4 border-l-4 border-slate-400 text-center">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Pendientes</span>
+                <strong className="text-2xl font-black text-slate-600">{metrics.pendingGroupsCount}</strong>
+              </div>
             </div>
 
-            {recentFeed.length === 0 ? (
-              <div className="p-6 text-center text-xs text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                Aún no hay ingresos registrados en puerta. Abre el escáner PWA para iniciar.
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
-                {recentFeed.map((log) => {
-                  const isRejected = log.result_status.includes('REJECTED');
+            {/* REALTIME RECENT CHECK-INS FEED */}
+            <div className="card-luxury p-5 space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center justify-between border-b border-slate-100 pb-2">
+                <span>Actividad en Puerta (Últimos Escaneos)</span>
+                <Activity className="w-3.5 h-3.5 text-emerald-600" />
+              </h4>
 
-                  return (
-                    <div
-                      key={log.id}
-                      className={`p-3 rounded-xl border transition text-xs space-y-1 ${
-                        isRejected 
-                          ? 'bg-red-50/60 border-red-200 text-red-900' 
-                          : 'bg-slate-50 border-slate-200 text-slate-800'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between font-bold">
-                        <span className="text-slate-900">{log.groupName}</span>
-                        <span className="text-[10px] text-slate-400 font-mono">
-                          {new Date(log.entry_timestamp).toLocaleTimeString()}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[11px] text-slate-500">
-                        <span className="flex items-center gap-1 text-purple-700 font-semibold">
-                          <MapPin className="w-3 h-3" /> {log.tableName}
-                        </span>
-
-                        <span className={`font-bold px-2 py-0.5 rounded-full text-[10px] ${
-                          isRejected 
-                            ? 'bg-red-100 text-red-800' 
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}>
-                          {isRejected ? 'RECHAZADO' : `+${log.passes_entered} pases (${log.passes_accumulated} acum.)`}
-                        </span>
-                      </div>
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {recentCheckIns.map((item) => (
+                  <div key={item.id} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 text-xs flex items-center justify-between">
+                    <div>
+                      <strong className="font-bold text-slate-900 block">{item.groupName || 'Grupo Invitado'}</strong>
+                      <span className="text-[10px] text-slate-500">
+                        {item.entry_timestamp ? new Date(item.entry_timestamp).toLocaleTimeString() : 'Reciente'} • Operador {item.operator_user_id || 'Seguridad'}
+                      </span>
                     </div>
-                  );
-                })}
+                    <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-bold rounded-md text-[11px]">
+                      +{item.passes_entered} pases
+                    </span>
+                  </div>
+                ))}
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Tables Occupancy Status Grid */}
-          <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Grid className="w-5 h-5 text-purple-600" /> Ocupación por Mesa en Tiempo Real
+          {/* TABLES OCCUPANCY VISUAL BREAKDOWN */}
+          <div className="card-luxury p-6 border border-[#C5A059]/30 lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                <Grid className="w-4 h-4 text-purple-600" /> Ocupación de Mesas de Gala ({tablesStats.length})
               </h3>
-              <Link
-                href="/events/evt-102/tables"
-                className="text-xs font-semibold text-purple-600 hover:underline flex items-center gap-1"
-              >
-                Editar Mesas <ArrowUpRight className="w-3.5 h-3.5" />
+              <Link href="/events/evt-102/tables" className="text-xs text-[#B8860B] hover:underline font-bold">
+                Ver Mapa de Mesas →
               </Link>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {tablesStats.map((stat) => (
-                <div key={stat.tableId} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-bold text-slate-900">{stat.tableName}</h4>
-                    <span className="text-xs font-extrabold text-slate-700">{stat.occupancyRatio}</span>
-                  </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {tablesStats.map((table) => {
+                return (
+                  <div key={table.tableId} className="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <strong className="font-bold text-slate-900 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 text-purple-600" /> {table.tableName}
+                      </strong>
+                      <span className="font-bold text-slate-700">
+                        {table.presentPasses} / {table.capacity} pers.
+                      </span>
+                    </div>
 
-                  {/* Progress Bar */}
-                  <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                    <div
-                      className={`h-2.5 rounded-full transition-all duration-500 ${
-                        stat.occupancyPercentage >= 100 ? 'bg-emerald-500' :
-                        stat.occupancyPercentage > 0 ? 'bg-brand-500' :
-                        'bg-slate-300'
-                      }`}
-                      style={{ width: `${stat.occupancyPercentage}%` }}
-                    ></div>
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full transition-all duration-500 ${
+                          table.occupancyPercentage >= 100 ? 'bg-emerald-600' :
+                          table.occupancyPercentage > 0 ? 'bg-purple-600' : 'bg-slate-300'
+                        }`}
+                        style={{ width: `${Math.min(100, table.occupancyPercentage)}%` }}
+                      ></div>
+                    </div>
                   </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
-                    <span>Capacidad: {stat.capacity}</span>
-                    <span>{stat.occupancyPercentage}% ocupado</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
+
+        </div>
+
+        {/* DEVELOPER CREDIT BADGE */}
+        <div className="card-luxury p-4 text-xs text-slate-600 flex flex-col sm:flex-row items-center justify-between gap-3 border border-[#C5A059]/30">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 relative rounded-lg overflow-hidden border border-[#C5A059]/40 bg-white p-1">
+              <Image src="/techinnova/logo_TI.png" alt="Tech Innova" fill className="object-contain p-0.5" />
+            </div>
+            <span>
+              Plataforma desarrollada por <strong className="text-[#1A1A1A]">Tech Innova</strong> • Sistema SaaS de Control de Eventos de Gala
+            </span>
+          </div>
+
+          <a
+            href="https://tech-innova.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[#B8860B] font-bold hover:underline flex items-center gap-1"
+          >
+            tech-innova.vercel.app <ExternalLink className="w-3.5 h-3.5" />
+          </a>
         </div>
       </main>
     </div>
