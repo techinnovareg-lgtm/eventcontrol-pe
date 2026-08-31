@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Calendar, MapPin, Users, FileSpreadsheet, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Plus, Calendar, MapPin, Users, FileSpreadsheet, ArrowLeft, CheckCircle, Clock } from 'lucide-react';
 import { getWorkspaceEvents, createEvent } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 
@@ -91,7 +91,7 @@ export default function EventsPage() {
               </div>
 
               {/* Actions Footer */}
-              <div className="grid grid-cols-3 gap-2 pt-4 border-t border-slate-100 text-center">
+              <div className="grid grid-cols-4 gap-2 pt-4 border-t border-slate-100 text-center">
                 <Link
                   href={`/events/${evt.id}/import`}
                   className="py-2 px-2 bg-brand-50 hover:bg-brand-100 text-brand-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-brand-200"
@@ -109,6 +109,12 @@ export default function EventsPage() {
                   className="py-2 px-2 bg-purple-50 hover:bg-purple-100 text-purple-700 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-purple-200"
                 >
                   <MapPin className="w-3.5 h-3.5" /> Mesas
+                </Link>
+                <Link
+                  href={`/events/${evt.id}/cuts`}
+                  className="py-2 px-2 bg-amber-50 hover:bg-amber-100 text-amber-800 font-semibold text-xs rounded-xl transition flex items-center justify-center gap-1 border border-amber-200"
+                >
+                  <Clock className="w-3.5 h-3.5" /> Cortes
                 </Link>
               </div>
             </div>
