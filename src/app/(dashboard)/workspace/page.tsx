@@ -48,7 +48,7 @@ export default function WorkspacePage() {
             <div>
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Workspace Activo</span>
               <h1 className="text-2xl font-bold text-slate-900 mt-1">AMG Wedding Planners</h1>
-              <p className="text-xs text-slate-500 mt-0.5">ID: ws-a-1111 • Plan: STARTER (S/39/mes)</p>
+              <p className="text-xs text-slate-500 font-medium mt-0.5">Plan Activo: <span className="font-bold text-slate-800 font-mono">Starter (S/ 29/mes)</span></p>
             </div>
             <button className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition shadow-sm self-start sm:self-auto">
               <UserPlus className="w-4 h-4" /> Invitar Usuario

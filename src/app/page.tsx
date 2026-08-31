@@ -69,7 +69,7 @@ export default function Home() {
               href="/pricing"
               className="px-6 py-3.5 bg-white hover:bg-slate-100 text-slate-800 font-bold text-sm rounded-xl border border-slate-300 transition"
             >
-              Ver Planes y Tarifas (Starter / Pro / Business)
+              Ver Planes (Starter S/29 • Pro S/59 • Business S/99)
             </Link>
           </div>
 
@@ -155,7 +155,7 @@ export default function Home() {
         {/* PRICING PREVIEW SECTION */}
         <section id="planes" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
           <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="text-xs font-bold text-brand-600 uppercase tracking-widest">Planes y Precios</span>
+            <span className="text-xs font-bold text-brand-600 uppercase tracking-widest">Planes y Precios Oficiales</span>
             <h2 className="text-3xl font-bold text-slate-900">Tarifas accesibles para todo tamaño de negocio</h2>
           </div>
 
@@ -165,7 +165,9 @@ export default function Home() {
               return (
                 <div key={code} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col justify-between">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900 mb-2">{plan.name}</h3>
+                    <h3 className="text-lg font-bold text-slate-900 mb-1">{plan.name}</h3>
+                    <p className="text-[11px] text-slate-500 min-h-[28px] mb-2">{plan.profile}</p>
+
                     <div className="my-3">
                       <span className="text-3xl font-extrabold text-slate-900">S/{plan.monthlyPricePEN}</span>
                       <span className="text-slate-500 text-xs font-medium"> / mes</span>

@@ -169,7 +169,10 @@ La arquitectura está diseñada para operar con **Costo S/ 0 de infraestructura 
 | **Vercel Web Hosting** | 100 GB Transferencia / 100k Function Execs | < 5 GB Transferencia mensual | **HOLGADO (S/ 0)** |
 | **WhatsApp Messaging** | Modo Asistido (`wa.me` links) | Sin límite (usa aplicación cliente del usuario) | **GRATIS (S/ 0)** |
 
-> **Regla de Escala**: Si la plataforma supera los 50,000 MAUs o 500 MB en base de datos, los ingresos por suscripciones pagadas (Planes Starter S/39, Pro S/79) cubrirán holgadamente los planes Pro de Supabase ($25/mes) y Vercel Pro ($20/mes).
+> **Regla de Escala**: Si la plataforma supera los 50,000 MAUs o:
+- **Starter**: S/ 29/mes (S/ 299/año) - 3 eventos activos, 150 pases/evento, 1 usuario workspace.
+- **Professional**: S/ 59/mes (S/ 599/año) - 10 eventos activos, 500 pases/evento, 5 usuarios workspace.
+- **Business**: S/ 99/mes (S/ 1,199/año) - Eventos ilimitados*, 1,000+ pases/evento, 10+ usuarios workspace.
 
 ---
 
