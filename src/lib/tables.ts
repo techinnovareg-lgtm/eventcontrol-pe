@@ -66,6 +66,18 @@ export function updateTablePosition(eventId: string, tableId: string, posX: numb
   }
 }
 
+export function updateTable(eventId: string, tableId: string, name: string, capacity: number): Table | null {
+  if (tablesStore[eventId]) {
+    const tbl = tablesStore[eventId].find(t => t.id === tableId);
+    if (tbl) {
+      tbl.name = name;
+      tbl.capacity = capacity;
+      return tbl;
+    }
+  }
+  return null;
+}
+
 export function getEventTableAssignments(eventId: string): TableAssignment[] {
   return assignmentsStore[eventId] || [];
 }

@@ -1,17 +1,17 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { 
   Grid, ArrowLeft, Plus, Users, AlertTriangle, CheckCircle2, 
   Trash2, Move, UserCheck, X, GripVertical, Disc, LayoutGrid, 
-  Sparkles, Compass, MapPin, ShieldAlert, Award, ZoomIn, ZoomOut, Maximize2, ChevronDown, ChevronUp, UserPlus
+  Sparkles, Compass, MapPin, ShieldAlert, Award, ZoomIn, ZoomOut, Maximize2, ChevronDown, ChevronUp, Edit3, Save, RotateCcw
 } from 'lucide-react';
 import { getEventById, getEventGuestGroups } from '@/lib/events';
 import { 
-  getEventTables, createTable, deleteTable, getEventTableAssignments, 
+  getEventTables, createTable, deleteTable, updateTable, getEventTableAssignments, 
   assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition 
 } from '@/lib/tables';
 import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
@@ -34,6 +34,12 @@ export default function TablesManagementPage() {
   const [canvasZoom, setCanvasZoom] = useState<number>(1);
   const [isCompactView, setIsCompactView] = useState<boolean>(true);
 
+  // Editable Zone Headers
+  const [zoneLeftHeader, setZoneLeftHeader] = useState('Zona Izquierda (Novia)');
+  const [zoneCenterHeader, setZoneCenterHeader] = useState('Escenario / Mesa de Honor VIP');
+  const [zoneRightHeader, setZoneRightHeader] = useState('Zona Derecha (Novio)');
+  const [editingZoneHeader, setEditingZoneHeader] = useState<'left' | 'center' | 'right' | null>(null);
+
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dragOverTableId, setDragOverTableId] = useState<string | null>(null);
 
@@ -43,8 +49,8 @@ export default function TablesManagementPage() {
     const tbls = getEventTables(eventId);
     tbls.forEach((t, i) => {
       initialPos[t.id] = {
-        x: t.pos_x || (140 + (i % 3) * 260),
-        y: t.pos_y || (100 + Math.floor(i / 3) * 180),
+        x: t.pos_x || (140 + (i % 4) * 280),
+        y: t.pos_y || (110 + Math.floor(i / 4) * 200),
         shape: i === 4 ? 'VIP_HONOR' : 'ROUND',
         zone: 'Centro'
       };
@@ -53,6 +59,7 @@ export default function TablesManagementPage() {
   });
 
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
+  const [editingTableObj, setEditingTableObj] = useState<Table | null>(null);
 
   const [tableName, setTableName] = useState('');
   const [tableCapacity, setTableCapacity] = useState(10);
@@ -68,8 +75,8 @@ export default function TablesManagementPage() {
     const updatedPos: Record<string, { x: number; y: number; shape: TableShape; zone: string }> = {};
     updatedTables.forEach((t, i) => {
       updatedPos[t.id] = tablePositions[t.id] || {
-        x: t.pos_x || (140 + (i % 3) * 260),
-        y: t.pos_y || (100 + Math.floor(i / 3) * 180),
+        x: t.pos_x || (140 + (i % 4) * 280),
+        y: t.pos_y || (110 + Math.floor(i / 4) * 200),
         shape: 'ROUND',
         zone: 'Centro'
       };
@@ -79,15 +86,24 @@ export default function TablesManagementPage() {
 
   const handleCreateTable = (e: React.FormEvent) => {
     e.preventDefault();
-    const newTbl = createTable(eventId, currentWorkspaceId, tableName, tableCapacity, 420, 220);
+    const newTbl = createTable(eventId, currentWorkspaceId, tableName, tableCapacity, 500, 250);
     
     setTablePositions(prev => ({
       ...prev,
-      [newTbl.id]: { x: 420, y: 220, shape: tableShape, zone: 'Centro' }
+      [newTbl.id]: { x: 500, y: 250, shape: tableShape, zone: 'Centro' }
     }));
 
     setTableName('');
     setShowAddModal(false);
+    refreshData();
+  };
+
+  const handleSaveEditTable = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTableObj) return;
+
+    updateTable(eventId, editingTableObj.id, editingTableObj.name, editingTableObj.capacity);
+    setEditingTableObj(null);
     refreshData();
   };
 
@@ -140,61 +156,86 @@ export default function TablesManagementPage() {
     }
   };
 
-  // Pixel-Exact 0ms Pointer Dragging for Table Nodes with Auto-Save Persistence
-  const activeDragRef = useRef<{ tableId: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
-  const canvasRef = useRef<HTMLDivElement>(null);
+  // Direct DOM Manipulation for 60FPS Dragging with Zero Delay and Exact Coordinates
+  const activePointerRef = useRef<{
+    tableId: string;
+    nodeEl: HTMLElement;
+    grabOffsetX: number;
+    grabOffsetY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
 
-  const handlePointerDownTable = (e: React.PointerEvent, tableId: string) => {
+  const canvasWorldRef = useRef<HTMLDivElement>(null);
+
+  const handlePointerDownTableNode = (e: React.PointerEvent, tableId: string) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const targetEl = e.currentTarget as HTMLElement;
-    targetEl.setPointerCapture(e.pointerId);
+    const nodeEl = e.currentTarget.closest('[data-table-node]') as HTMLElement;
+    if (!nodeEl || !canvasWorldRef.current) return;
 
-    const rect = targetEl.getBoundingClientRect();
-    const grabOffsetX = (e.clientX - rect.left) / canvasZoom;
-    const grabOffsetY = (e.clientY - rect.top) / canvasZoom;
+    nodeEl.setPointerCapture(e.pointerId);
 
-    activeDragRef.current = {
+    const canvasRect = canvasWorldRef.current.getBoundingClientRect();
+    const nodeRect = nodeEl.getBoundingClientRect();
+
+    const grabOffsetX = (e.clientX - nodeRect.left) / canvasZoom;
+    const grabOffsetY = (e.clientY - nodeRect.top) / canvasZoom;
+
+    const initialX = tablePositions[tableId]?.x || 100;
+    const initialY = tablePositions[tableId]?.y || 100;
+
+    activePointerRef.current = {
       tableId,
+      nodeEl,
       grabOffsetX,
       grabOffsetY,
+      currentX: initialX,
+      currentY: initialY,
     };
   };
 
-  const handlePointerMoveTable = (e: React.PointerEvent) => {
-    if (!activeDragRef.current || !canvasRef.current) return;
+  const handlePointerMoveTableNode = (e: React.PointerEvent) => {
+    if (!activePointerRef.current || !canvasWorldRef.current) return;
     e.preventDefault();
 
-    const canvasRect = canvasRef.current.getBoundingClientRect();
-    const { tableId, grabOffsetX, grabOffsetY } = activeDragRef.current;
+    const { nodeEl, grabOffsetX, grabOffsetY } = activePointerRef.current;
+    const canvasRect = canvasWorldRef.current.getBoundingClientRect();
 
     const mouseCanvasX = (e.clientX - canvasRect.left) / canvasZoom;
     const mouseCanvasY = (e.clientY - canvasRect.top) / canvasZoom;
 
-    const newX = Math.round(Math.max(10, Math.min(880, mouseCanvasX - grabOffsetX)));
-    const newY = Math.round(Math.max(10, Math.min(480, mouseCanvasY - grabOffsetY)));
+    const newX = Math.round(Math.max(10, Math.min(1300, mouseCanvasX - grabOffsetX)));
+    const newY = Math.round(Math.max(10, Math.min(820, mouseCanvasY - grabOffsetY)));
 
-    setTablePositions(prev => ({
-      ...prev,
-      [tableId]: {
-        ...(prev[tableId] || { shape: 'ROUND', zone: 'Centro' }),
-        x: newX,
-        y: newY,
-      }
-    }));
+    activePointerRef.current.currentX = newX;
+    activePointerRef.current.currentY = newY;
+
+    // Direct 0ms DOM manipulation for hardware-accelerated movement
+    nodeEl.style.left = `${newX}px`;
+    nodeEl.style.top = `${newY}px`;
   };
 
-  const handlePointerUpTable = (e: React.PointerEvent) => {
-    if (activeDragRef.current) {
-      const { tableId } = activeDragRef.current;
-      const finalPos = tablePositions[tableId];
-      if (finalPos) {
-        // Persist exact position in tablesStore!
-        updateTablePosition(eventId, tableId, finalPos.x, finalPos.y);
-      }
-      activeDragRef.current = null;
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+  const handlePointerUpTableNode = (e: React.PointerEvent) => {
+    if (activePointerRef.current) {
+      const { tableId, nodeEl, currentX, currentY } = activePointerRef.current;
+      nodeEl.releasePointerCapture(e.pointerId);
+
+      // Persist exact position in tablesStore
+      updateTablePosition(eventId, tableId, currentX, currentY);
+
+      // Update React state once on pointer release
+      setTablePositions(prev => ({
+        ...prev,
+        [tableId]: {
+          ...(prev[tableId] || { shape: 'ROUND', zone: 'Centro' }),
+          x: currentX,
+          y: currentY,
+        }
+      }));
+
+      activePointerRef.current = null;
     }
   };
 
@@ -252,7 +293,7 @@ export default function TablesManagementPage() {
             </span>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-0.5">Plano Virtual de Mesas y Distribución</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Arrastra familias (Drag & Drop) a las mesas. Mueve las mesas en el plano y los cambios se guardarán automáticamente.
+              Arrastra pases a las mesas (Drag & Drop). Mueve las mesas libremente en el salón amplio de 1400px sin saturar la pantalla.
             </p>
           </div>
 
@@ -362,7 +403,7 @@ export default function TablesManagementPage() {
                 <p>Todos los grupos de invitados están asignados a una mesa de gala.</p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[560px] overflow-y-auto pr-1">
                 {unassignedGroups.map((g) => (
                   <div
                     key={g.id}
@@ -396,188 +437,255 @@ export default function TablesManagementPage() {
             {/* SPATIAL 2D BLUEPRINT CANVAS */}
             {layoutMode !== 'GRID_CARDS' ? (
               <div className="space-y-3">
-                {/* Zoom & Canvas Scale Bar */}
-                <div className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-[#C5A059]/30 text-xs shadow-sm">
-                  <span className="text-slate-500 font-bold flex items-center gap-1">
-                    <Compass className="w-3.5 h-3.5 text-[#B8860B]" />
-                    Salón Virtual (Los cambios de posición se guardan automáticamente)
+                {/* Zoom Controls & Editable Zone Headers Bar */}
+                <div className="flex items-center justify-between px-4 py-2.5 bg-white rounded-xl border border-[#C5A059]/30 text-xs shadow-sm">
+                  <span className="text-slate-500 font-bold flex items-center gap-1.5">
+                    <Compass className="w-4 h-4 text-[#B8860B]" />
+                    Salón Amplio (1400px x 900px • Arrastre fluido a 60 FPS)
                   </span>
 
                   <div className="flex items-center gap-2">
                     <button 
-                      onClick={() => setCanvasZoom(z => Math.max(0.7, z - 0.1))} 
-                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600" 
+                      onClick={() => setCanvasZoom(z => Math.max(0.6, z - 0.1))} 
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 font-bold" 
                       title="Alejar Zoom"
                     >
                       <ZoomOut className="w-4 h-4" />
                     </button>
-                    <span className="font-mono font-bold text-slate-700">{Math.round(canvasZoom * 100)}%</span>
+                    <span className="font-mono font-bold text-slate-700 text-xs">{Math.round(canvasZoom * 100)}%</span>
                     <button 
-                      onClick={() => setCanvasZoom(z => Math.min(1.3, z + 0.1))} 
-                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600" 
+                      onClick={() => setCanvasZoom(z => Math.min(1.4, z + 0.1))} 
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 font-bold" 
                       title="Acercar Zoom"
                     >
                       <ZoomIn className="w-4 h-4" />
                     </button>
                     <button 
                       onClick={() => setCanvasZoom(1)} 
-                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600" 
-                      title="Restablecer"
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600 font-bold" 
+                      title="Restablecer (100%)"
                     >
                       <Maximize2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Interactive 2D Canvas Container */}
-                <div 
-                  ref={canvasRef}
-                  className="card-luxury p-6 border-2 border-[#C5A059]/40 shadow-xl min-h-[540px] relative overflow-hidden bg-gradient-to-br from-white via-[#FAF8F5] to-amber-50/20 select-none"
-                  style={{
-                    transform: `scale(${canvasZoom})`,
-                    transformOrigin: 'top left',
-                  }}
-                >
-                  {/* Central Feature Decorator based on Layout Mode */}
-                  {layoutMode === 'SPATIAL_CIRCULAR' ? (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 rounded-full border-2 border-dashed border-[#C5A059]/40 bg-amber-50/30 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
-                      <div className="w-14 h-14 rounded-full bg-amber-100/80 border border-[#C5A059]/50 flex items-center justify-center text-2xl mb-1 shadow-inner">
-                        💃🕺
+                {/* SCROLLABLE VIEWPORT CONTAINER FOR LARGE VENUES (20+ TABLES) */}
+                <div className="card-luxury border-2 border-[#C5A059]/40 shadow-xl max-h-[640px] overflow-auto relative rounded-2xl bg-[#FAF8F5]">
+                  
+                  {/* INNER CANVAS WORLD (1400px x 900px) */}
+                  <div 
+                    ref={canvasWorldRef}
+                    className="relative min-w-[1400px] min-h-[900px] p-6 bg-[radial-gradient(#C5A059_1px,transparent_1px)] [background-size:24px_24px] select-none"
+                    style={{
+                      transform: `scale(${canvasZoom})`,
+                      transformOrigin: 'top left',
+                    }}
+                  >
+                    {/* Central Feature Decorator based on Layout Mode */}
+                    {layoutMode === 'SPATIAL_CIRCULAR' ? (
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full border-2 border-dashed border-[#C5A059]/40 bg-amber-50/30 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
+                        <div className="w-20 h-20 rounded-full bg-amber-100/80 border border-[#C5A059]/50 flex items-center justify-center text-3xl mb-1 shadow-inner">
+                          💃🕺
+                        </div>
+                        <strong className="text-sm font-serif font-bold text-[#1A1A1A]">PISTA DE BAILE CENTRAL</strong>
+                        <span className="text-xs text-slate-500">Disposición Circular Anillo</span>
                       </div>
-                      <strong className="text-xs font-serif font-bold text-[#1A1A1A]">Pista de Baile Central</strong>
-                      <span className="text-[10px] text-slate-500">Salón Redondo</span>
-                    </div>
-                  ) : (
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xs h-32 rounded-2xl border-2 border-dashed border-purple-300 bg-purple-50/20 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
-                      <span className="text-xs font-serif font-bold text-purple-900">
-                        🎭 PISTA DE BAILE CENTRAL & ORQUESTA
-                      </span>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md h-40 rounded-2xl border-2 border-dashed border-purple-300 bg-purple-50/20 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
+                        <span className="text-sm font-serif font-bold text-purple-900">
+                          🎭 PISTA DE BAILE CENTRAL & ORQUESTA EN VIVO
+                        </span>
+                      </div>
+                    )}
 
-                  {/* Header Zone Indicators */}
-                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest pb-2 border-b border-slate-100">
-                    <span>Zona Izquierda (Novia)</span>
-                    <span className="text-[#B8860B]">Escenario VIP ★</span>
-                    <span>Zona Derecha (Novio)</span>
-                  </div>
-
-                  {/* RENDER COMPACT SLEEK TABLE BLUEPRINT NODES */}
-                  {tables.map((tbl, index) => {
-                    const stats = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
-                    const assignedToTbl = assignments.filter(a => a.table_id === tbl.id);
-                    const pos = tablePositions[tbl.id] || { 
-                      x: tbl.pos_x || (140 + (index % 3) * 260), 
-                      y: tbl.pos_y || (100 + Math.floor(index / 3) * 180),
-                      shape: index === 4 ? 'VIP_HONOR' : 'ROUND',
-                      zone: 'Centro'
-                    };
-
-                    const isHoveredDrop = dragOverTableId === tbl.id;
-                    const isSelected = selectedTableId === tbl.id;
-
-                    return (
-                      <div
-                        key={tbl.id}
-                        onDragOver={(e) => handleDragOverTable(e, tbl.id)}
-                        onDragLeave={handleDragLeaveTable}
-                        onDrop={(e) => handleDropGroupOnTable(e, tbl.id)}
-                        onClick={() => setSelectedTableId(tbl.id)}
-                        style={{
-                          position: 'absolute',
-                          left: `${pos.x}px`,
-                          top: `${pos.y}px`,
-                        }}
-                        className={`transition-all duration-150 cursor-pointer shadow-md select-none ${
-                          isCompactView ? 'w-44 p-3 rounded-2xl' : 'w-60 p-4 rounded-2xl'
-                        } ${
-                          isHoveredDrop
-                            ? 'border-2 border-emerald-500 bg-emerald-50 scale-110 shadow-2xl ring-4 ring-emerald-200'
-                            : isSelected
-                            ? 'border-2 border-[#C5A059] bg-amber-50/90 ring-4 ring-amber-100 shadow-xl'
-                            : stats.isOvercapacity
-                            ? 'border-2 border-red-400 bg-red-50/90'
-                            : pos.shape === 'VIP_HONOR'
-                            ? 'border border-[#C5A059] bg-gradient-to-b from-white to-amber-50/90'
-                            : 'border border-slate-300 bg-white hover:border-[#C5A059]'
-                        }`}
-                      >
-                        {/* Table Drag Handle Header */}
-                        <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                          <div 
-                            onPointerDown={(e) => handlePointerDownTable(e, tbl.id)}
-                            onPointerMove={handlePointerMoveTable}
-                            onPointerUp={handlePointerUpTable}
-                            className="cursor-move flex items-center gap-1"
-                            title="Arrastrar ubicación de mesa"
-                          >
-                            <GripVertical className="w-3.5 h-3.5 text-slate-400 hover:text-[#B8860B]" />
-                            {pos.shape === 'VIP_HONOR' ? (
-                              <span className="text-xs font-serif font-bold text-[#B8860B] truncate max-w-[100px]">
-                                ★ {tbl.name}
-                              </span>
-                            ) : (
-                              <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[100px]">{tbl.name}</strong>
-                            )}
-                          </div>
-
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleDeleteTable(tbl.id); }}
-                            className="text-slate-400 hover:text-red-600 p-0.5 transition"
-                            title="Eliminar mesa"
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-
-                        {/* Compact Blueprint Capacity Badge */}
-                        <div className="pt-2 flex items-center justify-between text-xs">
-                          <span className="text-[11px] text-slate-500 font-semibold">Ocupación:</span>
-                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
-                            stats.isOvercapacity ? 'bg-red-100 text-red-700 border border-red-300' :
-                            stats.occupancyPercentage >= 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
-                          }`}>
-                            {stats.occupancyRatio}
-                          </span>
-                        </div>
-
-                        {stats.isOvercapacity && (
-                          <span className="text-[10px] font-bold text-red-600 flex items-center gap-1 pt-1">
-                            <ShieldAlert className="w-3 h-3" /> SOBRECUPO (+{stats.overflowCount})
+                    {/* EDITABLE ZONE HEADERS BAR */}
+                    <div className="flex justify-between items-center text-xs font-bold text-slate-500 uppercase tracking-widest pb-3 border-b border-slate-200/80">
+                      {/* Left Zone Header */}
+                      <div className="flex items-center gap-1.5 cursor-pointer hover:text-[#B8860B]" onClick={() => setEditingZoneHeader('left')}>
+                        {editingZoneHeader === 'left' ? (
+                          <input 
+                            type="text" 
+                            value={zoneLeftHeader} 
+                            onChange={(e) => setZoneLeftHeader(e.target.value)}
+                            onBlur={() => setEditingZoneHeader(null)}
+                            onKeyDown={(e) => e.key === 'Enter' && setEditingZoneHeader(null)}
+                            autoFocus
+                            className="px-2 py-0.5 bg-white border border-[#C5A059] rounded text-xs text-slate-900 font-bold"
+                          />
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4 text-purple-600" /> {zoneLeftHeader} <Edit3 className="w-3 h-3 text-slate-400" />
                           </span>
                         )}
+                      </div>
 
-                        {/* Detailed Guest List (Only if Not Compact or Selected) */}
-                        {(!isCompactView || isSelected) && (
-                          <div className="space-y-1 pt-2 border-t border-slate-100 mt-2">
-                            {assignedToTbl.length === 0 ? (
-                              <div className="text-[10px] text-slate-400 italic text-center py-1">
-                                Soltar familia aquí (Drag & Drop)
-                              </div>
-                            ) : (
-                              assignedToTbl.map((a) => {
-                                const g = groups.find(grp => grp.id === a.group_id);
-                                return (
-                                  <div key={a.id} className="flex items-center justify-between p-1 bg-slate-50 rounded text-[10px]">
-                                    <span className="font-semibold text-slate-800 truncate max-w-[90px]">{g?.group_name || 'Grupo'}</span>
-                                    <div className="flex items-center gap-1">
-                                      <span className="font-bold text-[#B8860B]">+{a.assigned_passes}</span>
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); handleUnassign(a.group_id); }}
-                                        className="text-slate-400 hover:text-red-600"
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </button>
+                      {/* Center Zone Header */}
+                      <div className="flex items-center gap-1.5 cursor-pointer hover:text-[#B8860B]" onClick={() => setEditingZoneHeader('center')}>
+                        {editingZoneHeader === 'center' ? (
+                          <input 
+                            type="text" 
+                            value={zoneCenterHeader} 
+                            onChange={(e) => setZoneCenterHeader(e.target.value)}
+                            onBlur={() => setEditingZoneHeader(null)}
+                            onKeyDown={(e) => e.key === 'Enter' && setEditingZoneHeader(null)}
+                            autoFocus
+                            className="px-2 py-0.5 bg-white border border-[#C5A059] rounded text-xs text-slate-900 font-bold"
+                          />
+                        ) : (
+                          <span className="text-[#B8860B] flex items-center gap-1 font-serif">
+                            ★ {zoneCenterHeader} <Edit3 className="w-3 h-3 text-slate-400" />
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Right Zone Header */}
+                      <div className="flex items-center gap-1.5 cursor-pointer hover:text-[#B8860B]" onClick={() => setEditingZoneHeader('right')}>
+                        {editingZoneHeader === 'right' ? (
+                          <input 
+                            type="text" 
+                            value={zoneRightHeader} 
+                            onChange={(e) => setZoneRightHeader(e.target.value)}
+                            onBlur={() => setEditingZoneHeader(null)}
+                            onKeyDown={(e) => e.key === 'Enter' && setEditingZoneHeader(null)}
+                            autoFocus
+                            className="px-2 py-0.5 bg-white border border-[#C5A059] rounded text-xs text-slate-900 font-bold"
+                          />
+                        ) : (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-4 h-4 text-emerald-600" /> {zoneRightHeader} <Edit3 className="w-3 h-3 text-slate-400" />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* RENDER COMPACT SLEEK TABLE BLUEPRINT NODES */}
+                    {tables.map((tbl, index) => {
+                      const stats = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
+                      const assignedToTbl = assignments.filter(a => a.table_id === tbl.id);
+                      const pos = tablePositions[tbl.id] || { 
+                        x: tbl.pos_x || (140 + (index % 4) * 280), 
+                        y: tbl.pos_y || (110 + Math.floor(index / 4) * 200),
+                        shape: index === 4 ? 'VIP_HONOR' : 'ROUND',
+                        zone: 'Centro'
+                      };
+
+                      const isHoveredDrop = dragOverTableId === tbl.id;
+                      const isSelected = selectedTableId === tbl.id;
+
+                      return (
+                        <div
+                          key={tbl.id}
+                          data-table-node
+                          onDragOver={(e) => handleDragOverTable(e, tbl.id)}
+                          onDragLeave={handleDragLeaveTable}
+                          onDrop={(e) => handleDropGroupOnTable(e, tbl.id)}
+                          onClick={() => setSelectedTableId(tbl.id)}
+                          style={{
+                            position: 'absolute',
+                            left: `${pos.x}px`,
+                            top: `${pos.y}px`,
+                          }}
+                          className={`transition-shadow duration-150 cursor-pointer shadow-md select-none ${
+                            isCompactView ? 'w-48 p-3 rounded-2xl' : 'w-64 p-4 rounded-2xl'
+                          } ${
+                            isHoveredDrop
+                              ? 'border-2 border-emerald-500 bg-emerald-50 scale-105 shadow-2xl ring-4 ring-emerald-200'
+                              : isSelected
+                              ? 'border-2 border-[#C5A059] bg-amber-50/90 ring-4 ring-amber-100 shadow-xl'
+                              : stats.isOvercapacity
+                              ? 'border-2 border-red-400 bg-red-50/90'
+                              : pos.shape === 'VIP_HONOR'
+                              ? 'border border-[#C5A059] bg-gradient-to-b from-white to-amber-50/90'
+                              : 'border border-slate-300 bg-white hover:border-[#C5A059]'
+                          }`}
+                        >
+                          {/* Table Drag Handle Header */}
+                          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                            <div 
+                              onPointerDown={(e) => handlePointerDownTableNode(e, tbl.id)}
+                              onPointerMove={handlePointerMoveTableNode}
+                              onPointerUp={handlePointerUpTableNode}
+                              className="cursor-move flex items-center gap-1"
+                              title="Arrastrar ubicación de mesa (60 FPS Exacto)"
+                            >
+                              <GripVertical className="w-4 h-4 text-slate-400 hover:text-[#B8860B]" />
+                              {pos.shape === 'VIP_HONOR' ? (
+                                <span className="text-xs font-serif font-bold text-[#B8860B] truncate max-w-[110px]">
+                                  ★ {tbl.name}
+                                </span>
+                              ) : (
+                                <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[110px]">{tbl.name}</strong>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingTableObj(tbl); }}
+                                className="text-slate-400 hover:text-[#B8860B] p-0.5 transition"
+                                title="Editar nombre / capacidad"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteTable(tbl.id); }}
+                                className="text-slate-400 hover:text-red-600 p-0.5 transition"
+                                title="Eliminar mesa"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Compact Blueprint Capacity Badge */}
+                          <div className="pt-2 flex items-center justify-between text-xs">
+                            <span className="text-[11px] text-slate-500 font-semibold">Ocupación:</span>
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
+                              stats.isOvercapacity ? 'bg-red-100 text-red-700 border border-red-300' :
+                              stats.occupancyPercentage >= 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
+                            }`}>
+                              {stats.occupancyRatio}
+                            </span>
+                          </div>
+
+                          {stats.isOvercapacity && (
+                            <span className="text-[10px] font-bold text-red-600 flex items-center gap-1 pt-1">
+                              <ShieldAlert className="w-3 h-3" /> SOBRECUPO (+{stats.overflowCount})
+                            </span>
+                          )}
+
+                          {/* Detailed Guest List (Only if Not Compact or Selected) */}
+                          {(!isCompactView || isSelected) && (
+                            <div className="space-y-1 pt-2 border-t border-slate-100 mt-2">
+                              {assignedToTbl.length === 0 ? (
+                                <div className="text-[10px] text-slate-400 italic text-center py-1">
+                                  Soltar familia aquí (Drag & Drop)
+                                </div>
+                              ) : (
+                                assignedToTbl.map((a) => {
+                                  const g = groups.find(grp => grp.id === a.group_id);
+                                  return (
+                                    <div key={a.id} className="flex items-center justify-between p-1 bg-slate-50 rounded text-[10px]">
+                                      <span className="font-semibold text-slate-800 truncate max-w-[100px]">{g?.group_name || 'Grupo'}</span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-bold text-[#B8860B]">+{a.assigned_passes}</span>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleUnassign(a.group_id); }}
+                                          className="text-slate-400 hover:text-red-600"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
                                     </div>
-                                  </div>
-                                );
-                              })
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                                  );
+                                })
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -605,13 +713,22 @@ export default function TablesManagementPage() {
                           <span className="text-xs text-slate-500">Capacidad: {tbl.capacity} personas</span>
                         </div>
 
-                        <button
-                          onClick={() => handleDeleteTable(tbl.id)}
-                          className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"
-                          title="Eliminar mesa"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setEditingTableObj(tbl)}
+                            className="text-slate-400 hover:text-[#B8860B] p-1.5 rounded-lg hover:bg-amber-50 transition"
+                            title="Editar mesa"
+                          >
+                            <Edit3 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteTable(tbl.id)}
+                            className="text-slate-400 hover:text-red-600 p-1.5 rounded-lg hover:bg-red-50 transition"
+                            title="Eliminar mesa"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="p-3 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
@@ -656,9 +773,14 @@ export default function TablesManagementPage() {
                     <span className="text-[10px] text-[#B8860B] uppercase font-bold tracking-widest block">Detalle de Mesa Seleccionada</span>
                     <h3 className="text-lg font-serif font-bold text-slate-900">{selectedTableObj.name}</h3>
                   </div>
-                  <button onClick={() => setSelectedTableId(null)} className="text-slate-400 hover:text-slate-700">
-                    <X className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setEditingTableObj(selectedTableObj)} className="text-xs text-[#B8860B] font-bold hover:underline flex items-center gap-1">
+                      <Edit3 className="w-3.5 h-3.5" /> Editar Mesa
+                    </button>
+                    <button onClick={() => setSelectedTableId(null)} className="text-slate-400 hover:text-slate-700">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-2 text-xs">
@@ -690,6 +812,61 @@ export default function TablesManagementPage() {
           </div>
         </div>
       </main>
+
+      {/* EDIT EXISTING TABLE MODAL */}
+      {editingTableObj && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border border-[#C5A059]/40 space-y-4">
+            <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Editar Mesa de Gala</h3>
+
+            <form onSubmit={handleSaveEditTable} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nombre o Número de Mesa
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editingTableObj.name}
+                  onChange={(e) => setEditingTableObj({ ...editingTableObj, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Capacidad Máxima de Personas (Sillas)
+                </label>
+                <input
+                  type="number"
+                  required
+                  min={1}
+                  max={50}
+                  value={editingTableObj.capacity}
+                  onChange={(e) => setEditingTableObj({ ...editingTableObj, capacity: Number(e.target.value) })}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingTableObj(null)}
+                  className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 py-2.5 gold-button font-bold rounded-xl shadow-md"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* CREATE NEW TABLE MODAL */}
       {showAddModal && (
@@ -729,7 +906,7 @@ export default function TablesManagementPage() {
 
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Capacidad Máxima de Personas
+                  Capacidad Máxima de Personas (Sillas)
                 </label>
                 <input
                   type="number"
