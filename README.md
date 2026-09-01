@@ -51,7 +51,7 @@ El desarrollador humano o evaluador puede probar la aplicación completa de prin
    - Ingresar a `/dashboard` para ver las métricas en vivo.
 3. **Gestión de Eventos & Importación de Excel**:
    - Ir a `/events` e ingresar a la opción **Importar Excel** en el evento de demostración (*Cumpleaños Tavo 60 Años*).
-   - Hacer clic en **"Cargar Ejemplo CUMPLE.xlsx"** para probar el archivo real de referencia.
+   - Hacer clic en **"Cargar Lista Ejemplo (.xlsx)"** para probar el archivo de referencia.
    - Completar el asistente de mapeo de columnas y verificar la detección de errores de filas vacías/negativas (Caso 10).
 4. **Criptografía de Códigos QR**:
    - Navegar a `/events/evt-102/qr` para inspeccionar los códigos QR vectoriales generados. Probar el copiado de enlace o regeneración de token.

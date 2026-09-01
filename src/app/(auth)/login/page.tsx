@@ -74,7 +74,7 @@ export default function LoginPage() {
             <Sparkles className="w-4 h-4 text-[#C5A059]" /> Acceso Inmediato de Demostración
           </div>
           <p className="text-xs text-slate-600">
-            Ingresa a un Workspace de prueba pre-configurado con eventos, mesas y datos de CUMPLE.xlsx listos para evaluar.
+            Ingresa a un Workspace de prueba pre-configurado con eventos, mesas y datos de lista de invitados listos para evaluar.
           </p>
           <button
             type="button"

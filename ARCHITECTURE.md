@@ -62,7 +62,7 @@ sequenceDiagram
     participant IDB as Dexie.js (IndexedDB)
     participant API as Supabase BaaS (Postgres RLS)
 
-    WP->>APP: Carga archivo CUMPLE.xlsx
+    WP->>APP: Carga archivo lista_invitados.xlsx
     APP->>APP: Mapea columnas y valida filas
     APP->>API: Guarda GuestGroups y genera QRTokens aleatorios
     WP->>APP: Crea Mesas y asigna Grupos

@@ -14,7 +14,7 @@ Fase 1: Estructura Base, UI & Autenticación
 Fase 2: Multi-Tenant (Workspace, Roles & RLS)
    │
    ▼
-Fase 3: Gestión de Eventos e Importación Excel (CUMPLE.xlsx)
+Fase 3: Gestión de Eventos e Importación Excel (lista_invitados.xlsx)
    │
    ▼
 Fase 4: Motor Criptográfico QR y Plano de Mesas Visual
@@ -69,7 +69,7 @@ Fase 13: Despliegue a Producción (Vercel + Supabase), Backup y Cierre
 * **Validación**: Prueba de aislamiento (Usuario de Workspace A no puede ver recursos de Workspace B).
 
 ### Fase 3 — Gestión de Eventos e Importación de Excel
-* **Entregables**: CRUD de eventos, parser interactivo de archivos XLSX/CSV (Wizard de mapeo de columnas), soporte directo del formato real `CUMPLE.xlsx`, detector de errores y vista previa.
+* **Entregables**: CRUD de eventos, parser interactivo de archivos XLSX/CSV (Wizard de mapeo de columnas), soporte directo del formato real `lista_invitados.xlsx`, detector de errores y vista previa.
 * **Validación**: Carga exitosa de 250+ filas clasificadas en validas e inválidas con reporte de errores descargable.
 
 ### Fase 4 — Generación de QR y Plano Virtual de Mesas

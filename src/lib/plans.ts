@@ -32,7 +32,7 @@ export const PLAN_LIMITS: Record<PlanCode, PlanDefinition> = {
       'Hasta 3 Eventos Activos',
       'Hasta 150 pases por evento',
       '1 Usuario (Workspace)',
-      'Importación Excel (CUMPLE.xlsx)',
+      'Importación desde Excel (.xlsx / .csv)',
       'Generación de códigos QR únicos por grupo',
       'Plano de Mesas Interactivo',
       'Check-in atómico en tiempo real',
