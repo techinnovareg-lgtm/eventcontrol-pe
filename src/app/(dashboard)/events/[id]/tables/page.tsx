@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { 
   Grid, ArrowLeft, Plus, Users, AlertTriangle, CheckCircle2, 
   Trash2, Move, UserCheck, X, GripVertical, Disc, LayoutGrid, 
-  Sparkles, Compass, MapPin, ShieldAlert, Award
+  Sparkles, Compass, MapPin, ShieldAlert, Award, ZoomIn, ZoomOut, Maximize2, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { getEventById, getEventGuestGroups } from '@/lib/events';
 import { 
@@ -18,14 +18,6 @@ import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
 
 type LayoutMode = 'SPATIAL_CIRCULAR' | 'SPATIAL_MULTI_ZONE' | 'GRID_CARDS';
 type TableShape = 'ROUND' | 'RECTANGULAR' | 'VIP_HONOR';
-
-interface TablePos {
-  id: string;
-  x: number;
-  y: number;
-  shape: TableShape;
-  zone?: string;
-}
 
 export default function TablesManagementPage() {
   const params = useParams();
@@ -39,17 +31,22 @@ export default function TablesManagementPage() {
   const [assignments, setAssignments] = useState<TableAssignment[]>(() => getEventTableAssignments(eventId));
 
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('SPATIAL_CIRCULAR');
+  const [canvasZoom, setCanvasZoom] = useState<number>(1);
+  const [isCompactView, setIsCompactView] = useState<boolean>(true);
+
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dragOverTableId, setDragOverTableId] = useState<string | null>(null);
 
   // Table positions on the 2D Spatial Canvas
   const [tablePositions, setTablePositions] = useState<Record<string, { x: number; y: number; shape: TableShape; zone: string }>>({
-    'tbl-1': { x: 140, y: 110, shape: 'ROUND', zone: 'Zona Novia (Izquierda)' },
-    'tbl-2': { x: 140, y: 310, shape: 'ROUND', zone: 'Zona Novia (Izquierda)' },
-    'tbl-3': { x: 440, y: 60, shape: 'VIP_HONOR', zone: 'Escenario / Mesa de Honor' },
-    'tbl-4': { x: 740, y: 110, shape: 'ROUND', zone: 'Zona Novio (Derecha)' },
-    'tbl-5': { x: 740, y: 310, shape: 'ROUND', zone: 'Zona Novio (Derecha)' },
+    'tbl-1': { x: 120, y: 90, shape: 'ROUND', zone: 'Zona Novia' },
+    'tbl-2': { x: 120, y: 280, shape: 'ROUND', zone: 'Zona Novia' },
+    'tbl-3': { x: 420, y: 40, shape: 'VIP_HONOR', zone: 'Escenario VIP' },
+    'tbl-4': { x: 720, y: 90, shape: 'ROUND', zone: 'Zona Novio' },
+    'tbl-5': { x: 720, y: 280, shape: 'ROUND', zone: 'Zona Novio' },
   });
+
+  const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
 
   const [tableName, setTableName] = useState('');
   const [tableCapacity, setTableCapacity] = useState(10);
@@ -65,10 +62,9 @@ export default function TablesManagementPage() {
     e.preventDefault();
     const newTbl = createTable(eventId, currentWorkspaceId, tableName, tableCapacity);
     
-    // Add position for new table
     setTablePositions(prev => ({
       ...prev,
-      [newTbl.id]: { x: 440, y: 220, shape: tableShape, zone: 'Centro' }
+      [newTbl.id]: { x: 420, y: 220, shape: tableShape, zone: 'Centro' }
     }));
 
     setTableName('');
@@ -79,6 +75,7 @@ export default function TablesManagementPage() {
   const handleDeleteTable = (tableId: string) => {
     if (confirm('¿Eliminar esta mesa y liberar sus asignaciones?')) {
       deleteTable(eventId, tableId);
+      if (selectedTableId === tableId) setSelectedTableId(null);
       refreshData();
     }
   };
@@ -93,7 +90,7 @@ export default function TablesManagementPage() {
     refreshData();
   };
 
-  // Drag and Drop Handlers for Groups -> Tables
+  // Drag and Drop Handlers for Guest Groups -> Table Nodes
   const handleDragStartGroup = (e: React.DragEvent, groupId: string) => {
     e.dataTransfer.setData('text/plain', groupId);
     setDraggedGroupId(groupId);
@@ -124,32 +121,66 @@ export default function TablesManagementPage() {
     }
   };
 
-  // Dragging Table Nodes on the 2D Spatial Canvas
-  const [movingTableId, setMovingTableId] = useState<string | null>(null);
+  // 60FPS Hardware-Accelerated Pointer Dragging for Table Nodes
+  const draggingState = useRef<{ tableId: string; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const rafId = useRef<number | null>(null);
 
-  const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    if (!movingTableId || !canvasRef.current) return;
-    const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(20, Math.min(850, e.clientX - rect.left - 60));
-    const y = Math.max(20, Math.min(480, e.clientY - rect.top - 40));
+  const handlePointerDownTable = (e: React.PointerEvent, tableId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-    setTablePositions(prev => ({
-      ...prev,
-      [movingTableId]: {
-        ...prev[movingTableId],
-        x,
-        y
-      }
-    }));
+    const pos = tablePositions[tableId] || { x: 100, y: 100, shape: 'ROUND', zone: 'Centro' };
+    draggingState.current = {
+      tableId,
+      startX: e.clientX,
+      startY: e.clientY,
+      initialX: pos.x,
+      initialY: pos.y,
+    };
+  };
+
+  const handlePointerMoveTable = (e: React.PointerEvent) => {
+    if (!draggingState.current) return;
+    e.preventDefault();
+
+    const { tableId, startX, startY, initialX, initialY } = draggingState.current;
+    const dx = (e.clientX - startX) / canvasZoom;
+    const dy = (e.clientY - startY) / canvasZoom;
+
+    const newX = Math.max(10, Math.min(880, initialX + dx));
+    const newY = Math.max(10, Math.min(480, initialY + dy));
+
+    if (rafId.current) cancelAnimationFrame(rafId.current);
+    rafId.current = requestAnimationFrame(() => {
+      setTablePositions(prev => ({
+        ...prev,
+        [tableId]: {
+          ...(prev[tableId] || { shape: 'ROUND', zone: 'Centro' }),
+          x: Math.round(newX),
+          y: Math.round(newY),
+        }
+      }));
+    });
+  };
+
+  const handlePointerUpTable = (e: React.PointerEvent) => {
+    if (draggingState.current) {
+      draggingState.current = null;
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    }
   };
 
   // Filter unassigned groups
   const assignedGroupIds = new Set(assignments.map(a => a.group_id));
   const unassignedGroups = groups.filter(g => !assignedGroupIds.has(g.id));
 
+  const selectedTableObj = tables.find(t => t.id === selectedTableId);
+  const selectedTableAssignments = assignments.filter(a => a.table_id === selectedTableId);
+
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
+    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white select-none">
       {/* Top Navbar */}
       <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -179,52 +210,61 @@ export default function TablesManagementPage() {
       </header>
 
       {/* Main Container */}
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
+      <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4 w-full">
         {/* Title Bar & Mode Switcher */}
-        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div className="card-luxury p-5 border border-[#C5A059]/30 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">
-              Organización Espacial e Interactiva
+              Plano de Distribución Ágil
             </span>
-            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Plano Virtual de Mesas y Distribución</h1>
+            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-0.5">Plano Virtual de Mesas y Distribución</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Arrastra familias (Drag & Drop) a las mesas y distribuye el espacio libremente en geometrías circulares, divididas o por zonas.
+              Arrastra pases a las mesas (Drag & Drop). Haz clic en una mesa para ver/editar su detalle sin saturar el plano.
             </p>
           </div>
 
-          {/* Mode Switcher Buttons */}
+          {/* Mode & Scale Switchers */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setLayoutMode('SPATIAL_CIRCULAR')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
                 layoutMode === 'SPATIAL_CIRCULAR' 
                   ? 'gold-button shadow-md' 
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
               }`}
             >
-              <Disc className="w-4 h-4" /> Salón Redondo (Circular)
+              <Disc className="w-4 h-4" /> Salón Redondo
             </button>
 
             <button
               onClick={() => setLayoutMode('SPATIAL_MULTI_ZONE')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
                 layoutMode === 'SPATIAL_MULTI_ZONE' 
                   ? 'gold-button shadow-md' 
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
               }`}
             >
-              <Compass className="w-4 h-4" /> Dividido (Multi-Zona)
+              <Compass className="w-4 h-4" /> Multi-Zona
             </button>
 
             <button
               onClick={() => setLayoutMode('GRID_CARDS')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
                 layoutMode === 'GRID_CARDS' 
                   ? 'gold-button shadow-md' 
                   : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
               }`}
             >
-              <LayoutGrid className="w-4 h-4" /> Listado (Tarjetas)
+              <LayoutGrid className="w-4 h-4" /> Tarjetas
+            </button>
+
+            {/* View Mode Toggle */}
+            <button
+              onClick={() => setIsCompactView(!isCompactView)}
+              className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-[#C5A059]/40 font-bold text-xs rounded-xl transition flex items-center gap-1"
+            >
+              {isCompactView ? <ChevronDown className="w-4 h-4 text-[#B8860B]" /> : <ChevronUp className="w-4 h-4 text-[#B8860B]" />}
+              {isCompactView ? 'Modo Plano Compacto' : 'Modo Desplegado'}
             </button>
 
             <button
@@ -236,11 +276,11 @@ export default function TablesManagementPage() {
           </div>
         </div>
 
-        {/* Main Grid: Unassigned Drawer (Left) & Canvas Area (Right) */}
+        {/* Main Grid: Draggable Groups Drawer (Left) & 2D Canvas / Inspector (Right) */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
           {/* DRAGGABLE UNASSIGNED GROUPS DRAWER */}
-          <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
+          <div className="card-luxury p-5 border border-[#C5A059]/30 shadow-md space-y-3">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
                 <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
@@ -260,13 +300,13 @@ export default function TablesManagementPage() {
                 <p>Todos los grupos de invitados están asignados a una mesa de gala.</p>
               </div>
             ) : (
-              <div className="space-y-3 max-h-[580px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[520px] overflow-y-auto pr-1">
                 {unassignedGroups.map((g) => (
                   <div
                     key={g.id}
                     draggable
                     onDragStart={(e) => handleDragStartGroup(e, g.id)}
-                    className="p-3.5 bg-white hover:bg-amber-50/50 rounded-xl border border-slate-200 hover:border-[#C5A059] transition text-xs space-y-2 cursor-grab active:cursor-grabbing shadow-sm group hover-lift"
+                    className="p-3 bg-white hover:bg-amber-50/60 rounded-xl border border-slate-200 hover:border-[#C5A059] transition text-xs space-y-1.5 cursor-grab active:cursor-grabbing shadow-sm group hover-lift select-none"
                   >
                     <div className="flex items-center justify-between">
                       <strong className="font-bold text-slate-900 flex items-center gap-1.5">
@@ -278,8 +318,8 @@ export default function TablesManagementPage() {
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 text-[11px] text-slate-400">
-                      <span>Contacto: {g.responsible_phone || 'N/A'}</span>
+                    <div className="flex items-center justify-between pt-1 text-[10px] text-slate-400">
+                      <span>Tel: {g.responsible_phone || 'N/A'}</span>
                       <span className="text-[#B8860B] font-bold group-hover:underline">Arrastrar a Mesa →</span>
                     </div>
                   </div>
@@ -291,117 +331,152 @@ export default function TablesManagementPage() {
           {/* SPATIAL 2D CANVAS OR GRID CARDS VIEW */}
           <div className="lg:col-span-2 space-y-4">
             
-            {/* VIEW MODE 1 & 2: SPATIAL 2D CANVAS */}
+            {/* SPATIAL 2D BLUEPRINT CANVAS */}
             {layoutMode !== 'GRID_CARDS' ? (
-              <div 
-                ref={canvasRef}
-                onMouseMove={handleCanvasMouseMove}
-                onMouseUp={() => setMovingTableId(null)}
-                className="card-luxury p-6 border-2 border-[#C5A059]/40 shadow-xl min-h-[620px] relative overflow-hidden bg-gradient-to-br from-white via-[#FAF8F5] to-amber-50/20"
-              >
-                {/* Central Feature Decorator based on Layout Mode */}
-                {layoutMode === 'SPATIAL_CIRCULAR' ? (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full border-2 border-dashed border-[#C5A059]/40 bg-amber-50/40 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
-                    <div className="w-16 h-16 rounded-full bg-amber-100/80 border border-[#C5A059]/50 flex items-center justify-center text-2xl mb-1 shadow-inner">
-                      💃🕺
-                    </div>
-                    <strong className="text-xs font-serif font-bold text-[#1A1A1A]">Pista de Baile Central</strong>
-                    <span className="text-[10px] text-slate-500">Salón Redondo • Disposición Anillo</span>
-                  </div>
-                ) : (
-                  <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-sm h-36 rounded-2xl border-2 border-dashed border-purple-300 bg-purple-50/30 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
-                    <span className="text-xs font-serif font-bold text-purple-900">
-                      🎭 PISTA DE BAILE CENTRAL & ORQUESTA EN VIVO
-                    </span>
-                    <span className="text-[10px] text-purple-600 mt-1">
-                      Separación: Zona Izquierda (Familia Novia) • Zona Derecha (Familia Novio)
-                    </span>
-                  </div>
-                )}
+              <div className="space-y-3">
+                {/* Zoom & Canvas Scale Bar */}
+                <div className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-[#C5A059]/30 text-xs shadow-sm">
+                  <span className="text-slate-500 font-bold flex items-center gap-1">
+                    <Compass className="w-3.5 h-3.5 text-[#B8860B]" />
+                    Salón Virtual (Arrastra mesas libremente)
+                  </span>
 
-                {/* Header Zone Indicators */}
-                <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 uppercase tracking-widest pb-4 border-b border-slate-100">
-                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-purple-600" /> Zona Izquierda</span>
-                  <span className="text-[#B8860B]">Escenario / Mesa de Honor VIP ★</span>
-                  <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-emerald-600" /> Zona Derecha</span>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => setCanvasZoom(z => Math.max(0.7, z - 0.1))} 
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600" 
+                      title="Alejar Zoom"
+                    >
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="font-mono font-bold text-slate-700">{Math.round(canvasZoom * 100)}%</span>
+                    <button 
+                      onClick={() => setCanvasZoom(z => Math.min(1.3, z + 0.1))} 
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600" 
+                      title="Acercar Zoom"
+                    >
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => setCanvasZoom(1)} 
+                      className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-600" 
+                      title="Restablecer"
+                    >
+                      <Maximize2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
 
-                {/* Render Interactive Table Nodes on 2D Canvas */}
-                {tables.map((tbl, index) => {
-                  const stats = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
-                  const assignedToTbl = assignments.filter(a => a.table_id === tbl.id);
-                  const pos = tablePositions[tbl.id] || { 
-                    x: 100 + (index % 3) * 260, 
-                    y: 100 + Math.floor(index / 3) * 180,
-                    shape: index === 2 ? 'VIP_HONOR' : 'ROUND',
-                    zone: 'Centro'
-                  };
-
-                  const isHoveredDrop = dragOverTableId === tbl.id;
-
-                  return (
-                    <div
-                      key={tbl.id}
-                      onDragOver={(e) => handleDragOverTable(e, tbl.id)}
-                      onDragLeave={handleDragLeaveTable}
-                      onDrop={(e) => handleDropGroupOnTable(e, tbl.id)}
-                      style={{
-                        position: 'absolute',
-                        left: `${pos.x}px`,
-                        top: `${pos.y}px`,
-                      }}
-                      className={`w-60 p-4 rounded-2xl border transition-all duration-300 shadow-md ${
-                        isHoveredDrop
-                          ? 'border-2 border-emerald-500 bg-emerald-50 scale-105 shadow-2xl ring-4 ring-emerald-200'
-                          : stats.isOvercapacity
-                          ? 'border-red-400 bg-red-50/90 shadow-red-100'
-                          : pos.shape === 'VIP_HONOR'
-                          ? 'border-[#C5A059] bg-gradient-to-b from-white to-amber-50/80 shadow-lg'
-                          : 'border-slate-300 bg-white hover:border-[#C5A059]'
-                      }`}
-                    >
-                      {/* Table Drag Handle Header */}
-                      <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                        <div 
-                          onMouseDown={() => setMovingTableId(tbl.id)}
-                          className="cursor-move flex items-center gap-1.5"
-                          title="Arrastrar posición de mesa"
-                        >
-                          <GripVertical className="w-4 h-4 text-slate-400 hover:text-[#B8860B]" />
-                          {pos.shape === 'VIP_HONOR' ? (
-                            <span className="text-xs font-bold text-[#B8860B] flex items-center gap-1 font-serif">
-                              <Award className="w-3.5 h-3.5 text-[#C5A059]" /> {tbl.name}
-                            </span>
-                          ) : (
-                            <strong className="text-xs font-bold text-slate-900 font-serif">{tbl.name}</strong>
-                          )}
-                        </div>
-
-                        <button
-                          onClick={() => handleDeleteTable(tbl.id)}
-                          className="text-slate-400 hover:text-red-600 p-1 transition"
-                          title="Eliminar mesa"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
+                {/* Interactive 2D Canvas Container */}
+                <div 
+                  ref={canvasRef}
+                  className="card-luxury p-6 border-2 border-[#C5A059]/40 shadow-xl min-h-[540px] relative overflow-hidden bg-gradient-to-br from-white via-[#FAF8F5] to-amber-50/20 select-none"
+                  style={{
+                    transform: `scale(${canvasZoom})`,
+                    transformOrigin: 'top left',
+                  }}
+                >
+                  {/* Central Feature Decorator based on Layout Mode */}
+                  {layoutMode === 'SPATIAL_CIRCULAR' ? (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-60 h-60 rounded-full border-2 border-dashed border-[#C5A059]/40 bg-amber-50/30 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
+                      <div className="w-14 h-14 rounded-full bg-amber-100/80 border border-[#C5A059]/50 flex items-center justify-center text-2xl mb-1 shadow-inner">
+                        💃🕺
                       </div>
+                      <strong className="text-xs font-serif font-bold text-[#1A1A1A]">Pista de Baile Central</strong>
+                      <span className="text-[10px] text-slate-500">Salón Redondo</span>
+                    </div>
+                  ) : (
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-xs h-32 rounded-2xl border-2 border-dashed border-purple-300 bg-purple-50/20 flex flex-col items-center justify-center text-center p-4 pointer-events-none">
+                      <span className="text-xs font-serif font-bold text-purple-900">
+                        🎭 PISTA DE BAILE CENTRAL & ORQUESTA
+                      </span>
+                    </div>
+                  )}
 
-                      {/* Capacity Ratio Progress Bar */}
-                      <div className="py-2 space-y-1">
-                        <div className="flex justify-between items-center text-[11px]">
-                          <span className="text-slate-500 font-semibold">Asignación:</span>
-                          <strong className={`font-bold ${stats.isOvercapacity ? 'text-red-600' : 'text-slate-900'}`}>
-                            {stats.occupancyRatio} pers.
-                          </strong>
-                        </div>
-                        <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
+                  {/* Header Zone Indicators */}
+                  <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-widest pb-2 border-b border-slate-100">
+                    <span>Zona Izquierda (Novia)</span>
+                    <span className="text-[#B8860B]">Escenario VIP ★</span>
+                    <span>Zona Derecha (Novio)</span>
+                  </div>
+
+                  {/* RENDER COMPACT SLEEK TABLE BLUEPRINT NODES */}
+                  {tables.map((tbl, index) => {
+                    const stats = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
+                    const assignedToTbl = assignments.filter(a => a.table_id === tbl.id);
+                    const pos = tablePositions[tbl.id] || { 
+                      x: 100 + (index % 3) * 260, 
+                      y: 100 + Math.floor(index / 3) * 180,
+                      shape: index === 2 ? 'VIP_HONOR' : 'ROUND',
+                      zone: 'Centro'
+                    };
+
+                    const isHoveredDrop = dragOverTableId === tbl.id;
+                    const isSelected = selectedTableId === tbl.id;
+
+                    return (
+                      <div
+                        key={tbl.id}
+                        onDragOver={(e) => handleDragOverTable(e, tbl.id)}
+                        onDragLeave={handleDragLeaveTable}
+                        onDrop={(e) => handleDropGroupOnTable(e, tbl.id)}
+                        onClick={() => setSelectedTableId(tbl.id)}
+                        style={{
+                          position: 'absolute',
+                          left: `${pos.x}px`,
+                          top: `${pos.y}px`,
+                        }}
+                        className={`transition-all duration-200 cursor-pointer shadow-md select-none ${
+                          isCompactView ? 'w-44 p-3 rounded-2xl' : 'w-60 p-4 rounded-2xl'
+                        } ${
+                          isHoveredDrop
+                            ? 'border-2 border-emerald-500 bg-emerald-50 scale-110 shadow-2xl ring-4 ring-emerald-200'
+                            : isSelected
+                            ? 'border-2 border-[#C5A059] bg-amber-50/90 ring-4 ring-amber-100 shadow-xl'
+                            : stats.isOvercapacity
+                            ? 'border-2 border-red-400 bg-red-50/90'
+                            : pos.shape === 'VIP_HONOR'
+                            ? 'border border-[#C5A059] bg-gradient-to-b from-white to-amber-50/90'
+                            : 'border border-slate-300 bg-white hover:border-[#C5A059]'
+                        }`}
+                      >
+                        {/* Table Drag Handle Header */}
+                        <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
                           <div 
-                            className={`h-full transition-all duration-500 ${
-                              stats.isOvercapacity ? 'bg-red-500' :
-                              stats.occupancyPercentage >= 100 ? 'bg-emerald-600' : 'bg-[#C5A059]'
-                            }`}
-                            style={{ width: `${Math.min(100, stats.occupancyPercentage)}%` }}
-                          ></div>
+                            onPointerDown={(e) => handlePointerDownTable(e, tbl.id)}
+                            onPointerMove={handlePointerMoveTable}
+                            onPointerUp={handlePointerUpTable}
+                            className="cursor-move flex items-center gap-1"
+                            title="Arrastrar ubicación de mesa"
+                          >
+                            <GripVertical className="w-3.5 h-3.5 text-slate-400 hover:text-[#B8860B]" />
+                            {pos.shape === 'VIP_HONOR' ? (
+                              <span className="text-xs font-serif font-bold text-[#B8860B] truncate max-w-[100px]">
+                                ★ {tbl.name}
+                              </span>
+                            ) : (
+                              <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[100px]">{tbl.name}</strong>
+                            )}
+                          </div>
+
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteTable(tbl.id); }}
+                            className="text-slate-400 hover:text-red-600 p-0.5 transition"
+                            title="Eliminar mesa"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* Compact Blueprint Capacity Badge */}
+                        <div className="pt-2 flex items-center justify-between text-xs">
+                          <span className="text-[11px] text-slate-500 font-semibold">Ocupación:</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-extrabold ${
+                            stats.isOvercapacity ? 'bg-red-100 text-red-700 border border-red-300' :
+                            stats.occupancyPercentage >= 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-900'
+                          }`}>
+                            {stats.occupancyRatio}
+                          </span>
                         </div>
 
                         {stats.isOvercapacity && (
@@ -409,40 +484,39 @@ export default function TablesManagementPage() {
                             <ShieldAlert className="w-3 h-3" /> SOBRECUPO (+{stats.overflowCount})
                           </span>
                         )}
-                      </div>
 
-                      {/* Assigned Groups inside Table */}
-                      <div className="space-y-1.5 pt-1">
-                        {assignedToTbl.length === 0 ? (
-                          <div className="text-[11px] text-slate-400 italic text-center py-2 border border-dashed border-slate-200 rounded-lg">
-                            Soltar familia aquí (Drag & Drop)
-                          </div>
-                        ) : (
-                          assignedToTbl.map((a) => {
-                            const g = groups.find(grp => grp.id === a.group_id);
-                            return (
-                              <div key={a.id} className="flex items-center justify-between p-1.5 bg-slate-50 rounded-lg text-[11px] border border-slate-200/80">
-                                <span className="font-semibold text-slate-800 truncate max-w-[120px]">{g?.group_name || 'Grupo'}</span>
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-bold text-[#B8860B] bg-amber-50 px-1.5 py-0.5 rounded text-[10px] border border-[#C5A059]/30">
-                                    +{a.assigned_passes}
-                                  </span>
-                                  <button
-                                    onClick={() => handleUnassign(a.group_id)}
-                                    className="text-slate-400 hover:text-red-600 transition"
-                                    title="Quitar de la mesa"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
+                        {/* Detailed Guest List (Only if Not Compact or Selected) */}
+                        {(!isCompactView || isSelected) && (
+                          <div className="space-y-1 pt-2 border-t border-slate-100 mt-2">
+                            {assignedToTbl.length === 0 ? (
+                              <div className="text-[10px] text-slate-400 italic text-center py-1">
+                                Soltar familia aquí (Drag & Drop)
                               </div>
-                            );
-                          })
+                            ) : (
+                              assignedToTbl.map((a) => {
+                                const g = groups.find(grp => grp.id === a.group_id);
+                                return (
+                                  <div key={a.id} className="flex items-center justify-between p-1 bg-slate-50 rounded text-[10px]">
+                                    <span className="font-semibold text-slate-800 truncate max-w-[90px]">{g?.group_name || 'Grupo'}</span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="font-bold text-[#B8860B]">+{a.assigned_passes}</span>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleUnassign(a.group_id); }}
+                                        className="text-slate-400 hover:text-red-600"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })
+                            )}
+                          </div>
                         )}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             ) : (
               /* VIEW MODE 3: GRID CARDS LISTING */
@@ -511,6 +585,46 @@ export default function TablesManagementPage() {
                 })}
               </div>
             )}
+
+            {/* QUICK TABLE INSPECTOR POPOVER / PANEL */}
+            {selectedTableObj && (
+              <div className="card-luxury p-5 border border-[#C5A059]/40 shadow-xl space-y-3 bg-white animate-fade-in-up">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                  <div>
+                    <span className="text-[10px] text-[#B8860B] uppercase font-bold tracking-widest block">Detalle de Mesa Seleccionada</span>
+                    <h3 className="text-lg font-serif font-bold text-slate-900">{selectedTableObj.name}</h3>
+                  </div>
+                  <button onClick={() => setSelectedTableId(null)} className="text-slate-400 hover:text-slate-700">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-xs">
+                  <span className="font-bold text-slate-700 block">Familias e Invitados Asignados ({selectedTableAssignments.length}):</span>
+                  {selectedTableAssignments.length === 0 ? (
+                    <p className="text-slate-400 italic">Mesa sin familias asignadas. Arrastra una familia desde el panel izquierdo.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {selectedTableAssignments.map(a => {
+                        const g = groups.find(grp => grp.id === a.group_id);
+                        return (
+                          <div key={a.id} className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                            <span className="font-bold text-slate-800">{g?.group_name || 'Grupo'}</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-[#B8860B]">{a.assigned_passes} pases</span>
+                              <button onClick={() => handleUnassign(a.group_id)} className="text-slate-400 hover:text-red-600">
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </main>
