@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCode, ArrowLeft, RefreshCw, ShieldAlert, Download, Phone, Check, Copy } from 'lucide-react';
+import EventNavHeader from '@/components/EventNavHeader';
 import { getEventById, getEventGuestGroups } from '@/lib/events';
 import { getOrCreateGroupQRToken, revokeAndRegenerateQRToken } from '@/lib/qr-engine';
 
@@ -34,17 +35,9 @@ export default function QRManagementPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto space-y-6">
-        {/* Navigation Bar */}
-        <div className="flex items-center justify-between">
-          <Link href="/events" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition">
-            <ArrowLeft className="w-4 h-4" /> Volver a Eventos
-          </Link>
-          <span className="text-xs bg-slate-200 text-slate-700 font-semibold px-3 py-1 rounded-full">
-            {event?.name || 'Evento'}
-          </span>
-        </div>
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+      <EventNavHeader currentTab="qr" eventId={eventId} eventName={event?.name} />
+      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
 
         {/* Page Title */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -121,7 +114,7 @@ export default function QRManagementPage() {
             );
           })}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

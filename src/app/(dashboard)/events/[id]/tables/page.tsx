@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import EventNavHeader from '@/components/EventNavHeader';
 import { useParams } from 'next/navigation';
 import { 
   Grid, ArrowLeft, Plus, Users, AlertTriangle, CheckCircle2, 
@@ -272,33 +273,7 @@ export default function TablesManagementPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white select-none">
-      {/* Top Navbar */}
-      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
-              <Image 
-                src="/logo-eventcontrol.jpg" 
-                alt="EventControl.pe Logo" 
-                fill 
-                className="object-cover"
-              />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-[#1A1A1A] font-serif">
-                EventControl<span className="text-[#C5A059]">.pe</span>
-              </span>
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
-                {event?.name || 'Evento'}
-              </span>
-            </div>
-          </Link>
-
-          <Link href="/dashboard" className="text-xs text-slate-600 hover:text-[#C5A059] font-bold flex items-center gap-1">
-            <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
-          </Link>
-        </div>
-      </header>
+      <EventNavHeader currentTab="tables" eventId={eventId} eventName={event?.name} />
 
       {/* Main Container */}
       <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4 w-full">

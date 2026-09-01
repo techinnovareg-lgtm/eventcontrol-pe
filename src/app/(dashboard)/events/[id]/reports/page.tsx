@@ -7,12 +7,13 @@ import {
   FileSpreadsheet, FileText, Printer, ArrowLeft, Download, 
   CheckCircle2, Utensils, Users, Grid, ShieldCheck, Clock
 } from 'lucide-react';
+import EventNavHeader from '@/components/EventNavHeader';
 import { getEventById, getEventGuestGroups } from '@/lib/events';
 import { calculateDashboardMetrics, getTablesOccupancyStats } from '@/lib/dashboard-stats';
 import { calculateCateringDiff } from '@/lib/cuts';
 import { exportEventToExcel } from '@/lib/export-engine';
 
-export default function ReportsPage() {
+export default function EventReportsPage() {
   const params = useParams();
   const eventId = String(params.id || 'evt-102');
   const currentWorkspaceId = 'ws-a-1111';
@@ -32,9 +33,8 @@ export default function ReportsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
-      {/* Printable CSS style rules */}
-      <style jsx global>{`
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+      <style>{`
         @media print {
           body {
             background: white !important;
@@ -54,7 +54,11 @@ export default function ReportsPage() {
         }
       `}</style>
 
-      <div className="max-w-5xl mx-auto space-y-6">
+      <div className="no-print">
+        <EventNavHeader currentTab="reports" eventId={eventId} eventName={event?.name} />
+      </div>
+      
+      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
         {/* Navigation & Action Bar (Hidden on Print) */}
         <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <Link href="/events" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition">
@@ -236,7 +240,7 @@ export default function ReportsPage() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

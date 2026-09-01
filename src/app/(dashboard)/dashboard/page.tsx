@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import EventNavHeader from '@/components/EventNavHeader';
 import { 
   Users, CheckCircle2, Clock, Grid, Plus, LogOut, QrCode, 
   MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart, ShieldCheck, BarChart3, ExternalLink
@@ -52,50 +53,7 @@ export default function RealtimeDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] selection:bg-[#C5A059] selection:text-white flex flex-col">
-      {/* Top Luxury Navbar */}
-      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          
-          {/* Official Trademark Brand Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
-              <Image 
-                src="/logo-eventcontrol.jpg" 
-                alt="EventControl.pe Isologo" 
-                fill 
-                className="object-cover"
-              />
-            </div>
-            <div>
-              <span className="text-xl font-bold tracking-tight text-[#1A1A1A] font-serif">
-                EventControl<span className="text-[#C5A059]">.pe</span>
-              </span>
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
-                Workspace: AMG Wedding Planners
-              </span>
-            </div>
-          </Link>
-
-          {/* Action Links */}
-          <div className="flex items-center gap-3">
-            <Link
-              href="/qa"
-              className="text-xs bg-purple-100 hover:bg-purple-200 text-purple-900 font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 border border-purple-300"
-            >
-              <ShieldCheck className="w-4 h-4 text-purple-700" /> Batería QA
-            </Link>
-            <Link
-              href="/scan"
-              className="text-xs gold-button font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-md"
-            >
-              <QrCode className="w-4 h-4 text-amber-100" /> Escáner Puerta PWA
-            </Link>
-            <Link href="/" className="p-2 text-slate-400 hover:text-slate-700 transition" title="Cerrar Sesión">
-              <LogOut className="w-5 h-5" />
-            </Link>
-          </div>
-        </div>
-      </header>
+      <EventNavHeader currentTab="dashboard" eventId={eventId} eventName={metrics.eventName} />
 
       {/* Main Dashboard Container */}
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8 w-full">

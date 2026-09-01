@@ -12,8 +12,11 @@ import {
   RawExcelSheet, ColumnMapping, ImportValidationResult 
 } from '@/lib/excel-parser';
 import { getEventById, saveEventGuestGroups } from '@/lib/events';
+import EventNavHeader from '@/components/EventNavHeader';
 
-export default function ImportExcelPage() {
+type WizardStep = 1 | 2 | 3;
+
+export default function ExcelImportWizardPage() {
   const router = useRouter();
   const params = useParams();
   const eventId = String(params.id || 'evt-102');
@@ -22,7 +25,7 @@ export default function ImportExcelPage() {
   const event = getEventById(eventId, currentWorkspaceId);
 
   // Wizard Steps: 1 = Upload, 2 = Map, 3 = Validate & Import
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<WizardStep>(1);
   const [fileName, setFileName] = useState<string>('');
   const [sheets, setSheets] = useState<RawExcelSheet[]>([]);
   const [selectedSheetIndex, setSelectedSheetIndex] = useState<number>(0);
@@ -53,10 +56,10 @@ export default function ImportExcelPage() {
       { INVITADOS: 'Miguel , Nicol', Pases: '2', _rowNum: 10 },
       { INVITADOS: 'Claudia , Jorge Matias', Pases: '3', _rowNum: 11 },
       { INVITADOS: 'Lapo , Gasdy', Pases: '2', _rowNum: 12 },
-      { INVITADOS: 'Opal , Yovana', Pases: '2', _rowNum: 13 },
-      { INVITADOS: 'Shen, Esposa', Pases: '2', _rowNum: 14 },
-      { INVITADOS: 'Tato, Gardenia', Pases: '2', _rowNum: 15 },
-      { INVITADOS: 'Gorky , Lucy', Pases: '2', _rowNum: 16 },
+      { INVITADOS: 'Tavo', Pases: '1', _rowNum: 13 },
+      { INVITADOS: 'Maritza , Sra Ernestina', Pases: '2', _rowNum: 14 },
+      { INVITADOS: 'Panchito', Pases: '1', _rowNum: 15 },
+      { INVITADOS: 'Fila Vacía Errada', Pases: '-2', _rowNum: 16 }, // intentional invalid row for testing
       { INVITADOS: 'Helsby, Mary', Pases: '2', _rowNum: 17 },
       { INVITADOS: 'Renan, Eli', Pases: '2', _rowNum: 18 },
       { INVITADOS: 'Melcocha, Yovana', Pases: '2', _rowNum: 19 },
@@ -158,17 +161,9 @@ export default function ImportExcelPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 p-4 sm:p-6 lg:p-8">
-      <div className="max-w-5xl mx-auto space-y-6">
-        {/* Navigation Bar */}
-        <div className="flex items-center justify-between">
-          <Link href="/events" className="flex items-center gap-2 text-sm text-slate-600 hover:text-slate-900 transition">
-            <ArrowLeft className="w-4 h-4" /> Volver a Eventos
-          </Link>
-          <span className="text-xs bg-slate-200 text-slate-700 font-semibold px-3 py-1 rounded-full">
-            Evento: {event?.name || 'Boda / Evento Social'}
-          </span>
-        </div>
+    <div className="min-h-screen bg-[#FAF8F5] flex flex-col">
+      <EventNavHeader currentTab="import" eventId={eventId} eventName={event?.name} />
+      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
 
         {/* Header Title */}
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -407,7 +402,7 @@ export default function ImportExcelPage() {
             </div>
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
