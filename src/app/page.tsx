@@ -332,7 +332,7 @@ export default function Home() {
               return (
                 <div 
                   key={code} 
-                  className={`card-luxury pt-10 p-8 flex flex-col justify-between relative hover-lift ${
+                  className={`card-luxury pt-12 p-8 flex flex-col justify-between relative hover-lift ${
                     isRecommended 
                       ? 'border-2 border-[#C5A059] shadow-2xl ring-2 ring-[#C5A059]/30' 
                       : 'border border-[#C5A059]/40'
@@ -342,8 +342,8 @@ export default function Home() {
                   <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
 
                   {isRecommended && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#B8860B] text-white font-bold text-[11px] uppercase tracking-widest px-4 py-1 rounded-full shadow-md z-20">
-                      Recomendado
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#B8860B] text-white font-extrabold text-[11px] uppercase tracking-widest px-4 py-1 rounded-full shadow-lg border border-amber-200 z-30 flex items-center gap-1.5 whitespace-nowrap">
+                      <span className="text-amber-200">★</span> RECOMENDADO
                     </div>
                   )}
 
