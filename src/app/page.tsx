@@ -6,36 +6,96 @@ import {
 } from 'lucide-react';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
-/* Decorative Baroque Floral SVG Flourish Component */
-function FloralCornerSVG({ className = "w-8 h-8 text-[#C5A059]/40" }: { className?: string }) {
+/* Highly Detailed Baroque Filigree Floral Corner SVG Ornament */
+function BaroqueCornerSVG({ className = "w-12 h-12 text-[#C5A059]" }: { className?: string }) {
   return (
-    <svg className={className} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="3">
-      <path d="M 10 10 Q 50 10 50 50 Q 10 50 10 10 Z" fill="none" />
-      <path d="M 10 10 Q 10 50 50 50" />
-      <circle cx="25" cy="25" r="4" fill="currentColor" />
-      <path d="M 5 5 L 35 5 M 5 5 L 5 35" strokeWidth="4" />
-      <path d="M 15 35 C 25 25, 35 25, 45 35" />
+    <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      {/* Outer corner frame border */}
+      <path d="M 5 5 L 95 5 M 5 5 L 5 95" stroke="#C5A059" strokeWidth="3" strokeLinecap="round" />
+      <path d="M 12 12 L 75 12 M 12 12 L 12 75" stroke="#B8860B" strokeWidth="1.5" strokeLinecap="round" opacity="0.7" />
+      
+      {/* Baroque Filigree Swirls & Leaves */}
+      <path d="M 5 35 C 15 35, 35 15, 35 5 C 25 15, 15 25, 5 35 Z" fill="#C5A059" opacity="0.6" />
+      <path d="M 5 50 C 25 50, 50 25, 50 5 C 35 20, 20 35, 5 50 Z" fill="#B8860B" opacity="0.4" />
+      
+      {/* Floral Rosette Center Curve */}
+      <circle cx="24" cy="24" r="5" fill="#D4AF37" />
+      <path d="M 24 12 Q 36 24 24 36 Q 12 24 24 12 Z" stroke="#C5A059" strokeWidth="1.5" fill="none" />
+      
+      {/* Delicate Leaf Flourish Trails */}
+      <path d="M 5 65 Q 35 65 65 35 Q 65 5 65 5" stroke="#C5A059" strokeWidth="2" fill="none" strokeDasharray="3 3" />
+      <circle cx="45" cy="18" r="2.5" fill="#B8860B" />
+      <circle cx="18" cy="45" r="2.5" fill="#B8860B" />
     </svg>
+  );
+}
+
+/* Centered Baroque Floral Crest Divider between Sections */
+function BaroqueFloralCrestDivider() {
+  return (
+    <div className="flex items-center justify-center gap-4 py-8 max-w-xl mx-auto opacity-90">
+      <div className="h-[1.5px] flex-1 bg-gradient-to-r from-transparent via-[#C5A059] to-[#C5A059]"></div>
+      
+      <svg className="w-16 h-8 text-[#B8860B]" viewBox="0 0 160 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Left Leaf Scroll */}
+        <path d="M 10 20 C 30 5, 50 35, 70 20 C 50 15, 30 25, 10 20 Z" fill="#C5A059" />
+        {/* Center Diamond & Petals */}
+        <polygon points="80,5 90,20 80,35 70,20" fill="#D4AF37" />
+        <circle cx="80" cy="20" r="4" fill="#FAF8F5" />
+        {/* Right Leaf Scroll */}
+        <path d="M 150 20 C 130 5, 110 35, 90 20 C 110 15, 130 25, 150 20 Z" fill="#C5A059" />
+      </svg>
+
+      <div className="h-[1.5px] flex-1 bg-gradient-to-l from-transparent via-[#C5A059] to-[#C5A059]"></div>
+    </div>
+  );
+}
+
+/* Floating Golden Granular Sparkles Background Component */
+function FloatingGoldSparklesOverlay() {
+  const sparkles = [
+    { top: '8%', left: '8%', size: 'w-5 h-5', delay: '0s' },
+    { top: '14%', right: '12%', size: 'w-6 h-6', delay: '1.2s' },
+    { top: '28%', left: '4%', size: 'w-4 h-4', delay: '2.4s' },
+    { top: '35%', right: '6%', size: 'w-5 h-5', delay: '0.8s' },
+    { top: '48%', left: '10%', size: 'w-6 h-6', delay: '3.1s' },
+    { top: '56%', right: '14%', size: 'w-4 h-4', delay: '1.7s' },
+    { top: '68%', left: '6%', size: 'w-5 h-5', delay: '2.9s' },
+    { top: '78%', right: '8%', size: 'w-6 h-6', delay: '0.5s' },
+    { top: '88%', left: '12%', size: 'w-4 h-4', delay: '2.1s' },
+  ];
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-20 overflow-hidden">
+      {sparkles.map((sp, idx) => (
+        <div
+          key={idx}
+          className={`gold-floating-sparkle ${sp.size}`}
+          style={{ top: sp.top, left: sp.left, right: sp.right, animationDelay: sp.delay }}
+        >
+          <svg viewBox="0 0 24 24" fill="#D4AF37" className="w-full h-full filter drop-shadow-[0_0_8px_rgba(197,160,89,0.9)]">
+            <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z" />
+          </svg>
+        </div>
+      ))}
+    </div>
   );
 }
 
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-[#1A1A1A] selection:bg-[#C5A059] selection:text-white relative overflow-hidden">
+    <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-[#1A1A1A] selection:bg-[#C5A059] selection:text-white relative">
       
-      {/* Background Granular Sparkles Particles */}
-      <div className="sparkle-particle top-24 left-[15%] w-2 h-2"></div>
-      <div className="sparkle-particle top-48 right-[20%] w-3 h-3 [animation-delay:1.5s]"></div>
-      <div className="sparkle-particle top-[600px] left-[8%] w-2.5 h-2.5 [animation-delay:2.5s]"></div>
-      <div className="sparkle-particle top-[900px] right-[10%] w-2 h-2 [animation-delay:0.8s]"></div>
+      {/* Unmissable Animated Floating Gold Sparkles Overlay */}
+      <FloatingGoldSparklesOverlay />
 
       {/* Luxury Editorial Header */}
-      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-50 transition-all">
+      <header className="border-b border-[#C5A059]/30 bg-white/95 backdrop-blur-md sticky top-0 z-50 transition-all shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
           {/* Official Trademark Brand Logo */}
           <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
+            <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 group-hover:scale-105 transition-transform">
               <Image 
                 src="/logo-eventcontrol.jpg" 
                 alt="EventControl.pe Isologo" 
@@ -80,12 +140,12 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 space-y-24 pb-20">
+      <main className="flex-1 space-y-16 pb-20">
         
         {/* HERO SECTION - ELEGANT EDITORIAL STYLE */}
-        <section className="relative pt-16 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center space-y-8 animate-fade-in-up">
+        <section className="relative pt-16 pb-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center space-y-8 animate-fade-in-up">
           
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-[#C5A059]/40 text-[#B8860B] text-xs font-extrabold uppercase tracking-widest shadow-sm">
+          <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-white border border-[#C5A059]/50 text-[#B8860B] text-xs font-extrabold uppercase tracking-widest shadow-md">
             <ShieldCheck className="w-4 h-4 text-[#C5A059]" /> Plataforma SaaS para Wedding Planners y Eventos de Gala
           </div>
 
@@ -106,17 +166,20 @@ export default function Home() {
             </Link>
             <Link
               href="/pricing"
-              className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-50 text-slate-800 font-extrabold text-sm rounded-2xl border border-[#C5A059]/40 transition shadow-sm"
+              className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-50 text-slate-800 font-extrabold text-sm rounded-2xl border border-[#C5A059]/50 transition shadow-sm"
             >
               Ver Planes (Starter S/29 • Pro S/59 • Business S/99)
             </Link>
           </div>
 
-          {/* ELEGANT HERO BANNER ILLUSTRATION (WARM CREAM & GOLD PALETTE MATCH) */}
+          {/* HERO BANNER FRAME WITH BAROQUE CORNERS */}
           <div className="pt-8 max-w-5xl mx-auto">
-            <div className="relative rounded-3xl overflow-hidden border border-[#C5A059]/30 shadow-2xl hover-lift bg-white">
-              <div className="floral-corner-tl"><FloralCornerSVG /></div>
-              <div className="floral-corner-tr"><FloralCornerSVG /></div>
+            <div className="relative rounded-3xl overflow-hidden border-2 border-[#C5A059]/40 shadow-2xl hover-lift bg-white">
+              {/* Baroque Filigree Corner Flourishes */}
+              <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+              <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
+              <div className="baroque-corner-bl"><BaroqueCornerSVG /></div>
+              <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
 
               <Image 
                 src="/banner-hero-eventcontrol.jpg" 
@@ -130,8 +193,11 @@ export default function Home() {
           </div>
         </section>
 
+        {/* BAROQUE FLORAL CREST DIVIDER */}
+        <BaroqueFloralCrestDivider />
+
         {/* PROPOSAL VALUE PILLARS SECTION */}
-        <section id="propuesta" className="py-16 bg-white border-y border-[#C5A059]/20 relative">
+        <section id="propuesta" className="py-12 bg-white border-y border-[#C5A059]/30 relative">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
             <div className="text-center max-w-3xl mx-auto space-y-3">
               <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest">Lo que ofrecemos a tu negocio</span>
@@ -139,9 +205,13 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="card-luxury p-8 space-y-4 hover-lift">
-                <div className="floral-corner-tl"><FloralCornerSVG /></div>
-                <div className="w-12 h-12 bg-amber-50 text-[#B8860B] rounded-2xl border border-[#C5A059]/40 flex items-center justify-center font-bold text-lg">
+              
+              {/* Pillar Card 1 */}
+              <div className="card-luxury p-8 space-y-4 hover-lift relative">
+                <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+                <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
+
+                <div className="w-12 h-12 bg-amber-50 text-[#B8860B] rounded-2xl border border-[#C5A059]/50 flex items-center justify-center font-bold text-lg shadow-sm">
                   1
                 </div>
                 <h3 className="text-xl font-serif text-[#1A1A1A]">1. Importación e Invitación</h3>
@@ -150,9 +220,12 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="card-luxury p-8 space-y-4 hover-lift">
-                <div className="floral-corner-tl"><FloralCornerSVG /></div>
-                <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-300 flex items-center justify-center font-bold text-lg">
+              {/* Pillar Card 2 */}
+              <div className="card-luxury p-8 space-y-4 hover-lift relative">
+                <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+                <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
+
+                <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-300 flex items-center justify-center font-bold text-lg shadow-sm">
                   2
                 </div>
                 <h3 className="text-xl font-serif text-[#1A1A1A]">2. Recepción & Check-in QR</h3>
@@ -161,9 +234,12 @@ export default function Home() {
                 </p>
               </div>
 
-              <div className="card-luxury p-8 space-y-4 hover-lift">
-                <div className="floral-corner-tl"><FloralCornerSVG /></div>
-                <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-2xl border border-purple-300 flex items-center justify-center font-bold text-lg">
+              {/* Pillar Card 3 */}
+              <div className="card-luxury p-8 space-y-4 hover-lift relative">
+                <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+                <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
+
+                <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-2xl border border-purple-300 flex items-center justify-center font-bold text-lg shadow-sm">
                   3
                 </div>
                 <h3 className="text-xl font-serif text-[#1A1A1A]">3. Control en Vivo & Catering</h3>
@@ -171,15 +247,21 @@ export default function Home() {
                   Monitoreo de ocupación en tiempo real con gráficos visuales, mapa interactivo de mesas de gala y congelamiento inmutable de platos de comida servidos.
                 </p>
               </div>
+
             </div>
           </div>
         </section>
 
+        {/* BAROQUE FLORAL CREST DIVIDER */}
+        <BaroqueFloralCrestDivider />
+
         {/* VISUAL WORKFLOW ILLUSTRATION FOR NON-TECH USERS */}
         <section id="flujo" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="card-luxury-gold p-8 sm:p-10 text-center space-y-8">
-            <div className="floral-corner-tl"><FloralCornerSVG /></div>
-            <div className="floral-corner-tr"><FloralCornerSVG /></div>
+          <div className="card-luxury-gold p-8 sm:p-12 text-center space-y-8 relative">
+            <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+            <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
+            <div className="baroque-corner-bl"><BaroqueCornerSVG /></div>
+            <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
 
             <div>
               <span className="text-xs font-extrabold text-[#B8860B] uppercase tracking-widest block">
@@ -194,7 +276,7 @@ export default function Home() {
             </div>
 
             {/* 3D INFOGRAPHIC WORKFLOW ILLUSTRATION EMBED */}
-            <div className="relative rounded-2xl overflow-hidden border border-[#C5A059]/30 shadow-xl hover-lift bg-white">
+            <div className="relative rounded-2xl overflow-hidden border-2 border-[#C5A059]/40 shadow-xl hover-lift bg-white">
               <Image 
                 src="/illustration-flow.jpg" 
                 alt="Diagrama Infográfico del Flujo Operativo en 4 Pasos" 
@@ -205,37 +287,40 @@ export default function Home() {
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 pt-4">
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/30 hover-lift">
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/40 hover-lift shadow-sm">
                 <FileSpreadsheet className="w-8 h-8 text-emerald-600 mb-2" />
                 <span className="text-xs font-bold text-slate-800">1. Excel</span>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/30 hover-lift">
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/40 hover-lift shadow-sm">
                 <Users className="w-8 h-8 text-blue-600 mb-2" />
                 <span className="text-xs font-bold text-slate-800">2. Grupos</span>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/30 hover-lift">
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/40 hover-lift shadow-sm">
                 <QrCode className="w-8 h-8 text-indigo-600 mb-2" />
                 <span className="text-xs font-bold text-slate-800">3. QR Único</span>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/30 hover-lift">
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/40 hover-lift shadow-sm">
                 <Grid className="w-8 h-8 text-purple-600 mb-2" />
                 <span className="text-xs font-bold text-slate-800">4. Mesas</span>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/30 hover-lift">
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/40 hover-lift shadow-sm">
                 <Calendar className="w-8 h-8 text-pink-600 mb-2" />
                 <span className="text-xs font-bold text-slate-800">5. Check-in</span>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/30 hover-lift">
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/40 hover-lift shadow-sm">
                 <Clock className="w-8 h-8 text-amber-600 mb-2" />
                 <span className="text-xs font-bold text-slate-800">6. Dashboard</span>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-emerald-50 border border-emerald-300 hover-lift">
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-emerald-50 border border-emerald-300 hover-lift shadow-sm">
                 <Utensils className="w-8 h-8 text-emerald-700 mb-2" />
                 <span className="text-xs font-bold text-emerald-900">7. Catering</span>
               </div>
             </div>
           </div>
         </section>
+
+        {/* BAROQUE FLORAL CREST DIVIDER */}
+        <BaroqueFloralCrestDivider />
 
         {/* PRICING SECTION */}
         <section id="planes" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
@@ -254,14 +339,15 @@ export default function Home() {
                   key={code} 
                   className={`card-luxury p-8 flex flex-col justify-between relative hover-lift ${
                     isRecommended 
-                      ? 'border-[#C5A059] shadow-2xl ring-2 ring-[#C5A059]/30' 
-                      : 'border-[#C5A059]/30'
+                      ? 'border-2 border-[#C5A059] shadow-2xl ring-2 ring-[#C5A059]/30' 
+                      : 'border border-[#C5A059]/40'
                   }`}
                 >
-                  <div className="floral-corner-tl"><FloralCornerSVG /></div>
+                  <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+                  <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
 
                   {isRecommended && (
-                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#B8860B] text-white font-bold text-[11px] uppercase tracking-widest px-4 py-1 rounded-full shadow-md">
+                    <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#B8860B] text-white font-bold text-[11px] uppercase tracking-widest px-4 py-1 rounded-full shadow-md z-20">
                       Recomendado
                     </div>
                   )}
@@ -298,13 +384,18 @@ export default function Home() {
           </div>
         </section>
 
+        {/* BAROQUE FLORAL CREST DIVIDER */}
+        <BaroqueFloralCrestDivider />
+
         {/* DEVELOPER BRAND BRANDING SECTION: TECH INNOVA */}
         <section id="techinnova" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="card-luxury-gold p-8 sm:p-10 border border-[#C5A059]/40 shadow-xl space-y-6">
-            <div className="floral-corner-tl"><FloralCornerSVG /></div>
-            <div className="floral-corner-tr"><FloralCornerSVG /></div>
+          <div className="card-luxury-gold p-8 sm:p-12 border-2 border-[#C5A059]/50 shadow-xl space-y-6 relative">
+            <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+            <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
+            <div className="baroque-corner-bl"><BaroqueCornerSVG /></div>
+            <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
 
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-[#C5A059]/20 pb-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-[#C5A059]/30 pb-6">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 relative rounded-2xl overflow-hidden bg-white border border-[#C5A059]/40 shrink-0 p-2 shadow-sm">
                   <Image 
@@ -341,7 +432,7 @@ export default function Home() {
                 href="https://tech-innova.vercel.app/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-4 bg-white rounded-2xl border border-[#C5A059]/30 hover:border-[#C5A059] transition flex items-center gap-3 group shadow-sm"
+                className="p-4 bg-white rounded-2xl border border-[#C5A059]/40 hover:border-[#C5A059] transition flex items-center gap-3 group shadow-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-amber-50 text-[#B8860B] flex items-center justify-center font-bold">
                   🌐
@@ -356,7 +447,7 @@ export default function Home() {
                 href="https://www.tiktok.com/@techinnova1"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-4 bg-white rounded-2xl border border-[#C5A059]/30 hover:border-pink-500 transition flex items-center gap-3 group shadow-sm"
+                className="p-4 bg-white rounded-2xl border border-[#C5A059]/40 hover:border-pink-500 transition flex items-center gap-3 group shadow-sm"
               >
                 <div className="w-8 h-8 rounded-lg bg-pink-50 text-pink-600 flex items-center justify-center font-bold">
                   🎵
@@ -383,10 +474,10 @@ export default function Home() {
       </main>
 
       {/* Footer */}
-      <footer className="bg-white text-slate-600 py-10 text-xs border-t border-[#C5A059]/20">
+      <footer className="bg-white text-slate-600 py-10 text-xs border-t border-[#C5A059]/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 relative rounded-lg overflow-hidden border border-[#C5A059]/30">
+            <div className="w-8 h-8 relative rounded-lg overflow-hidden border border-[#C5A059]/40">
               <Image src="/logo-eventcontrol.jpg" alt="EventControl" fill className="object-cover" />
             </div>
             <span className="font-bold text-slate-900">EventControl.pe © 2026</span>
