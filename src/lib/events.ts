@@ -30,9 +30,16 @@ let eventsStore: Event[] = [
 
 let guestGroupsStore: Record<string, GuestGroup[]> = {
   'evt-102': [
-    { id: 'gg-1', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Mamami', max_passes: 1, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'gg-2', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Lili, Lucho, Moico, Enamorada, Gaby, Sra. Ernestina', max_passes: 6, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'gg-3', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Nathali, German, Lula, Tati', max_passes: 4, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-001', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Mamami', max_passes: 1, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-002', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Lili, Lucho, Moico, Gaby, Sra. Ernestina', max_passes: 6, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-003', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Nathali, German, Lula, Tati', max_passes: 4, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-004', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Nidia, Emo', max_passes: 2, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-005', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Pepe', max_passes: 1, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-006', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Melo, Nidia, Enamorado, Nico', max_passes: 4, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-007', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Miguel, Nicol', max_passes: 2, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-008', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Claudia, Jorge Matias', max_passes: 3, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-009', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Familia Lapo & Gasdy', max_passes: 5, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: 'grp-010', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Tavo & Amigos VIP', max_passes: 6, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
   ]
 };
 

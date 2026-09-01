@@ -261,7 +261,7 @@ export default function TablesManagementPage() {
   const totalAssignedPasses = assignments.reduce((sum, a) => sum + a.assigned_passes, 0);
   const totalUnassignedPasses = Math.max(0, totalAuthorizedPasses - totalAssignedPasses);
   const totalTableCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
-  const assignedPercentage = totalAuthorizedPasses > 0 ? Math.round((totalAssignedPasses / totalAuthorizedPasses) * 100) : 0;
+  const assignedPercentage = totalAuthorizedPasses > 0 ? Math.min(100, Math.round((totalAssignedPasses / totalAuthorizedPasses) * 100)) : 0;
 
   // Filter unassigned groups
   const assignedGroupIds = new Set(assignments.map(a => a.group_id));
