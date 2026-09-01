@@ -77,24 +77,6 @@ export default function RealtimeDashboardPage() {
             <h1 className="text-3xl font-serif font-bold text-[#1A1A1A] mt-1">{metrics.eventName}</h1>
             <p className="text-xs text-slate-500 mt-0.5">Control de ingresos, distribución de mesas y conciliación de catering</p>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Link href="/events/evt-102/qr" className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition">
-              Tokens QR
-            </Link>
-            <Link href="/events/evt-102/tables" className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 text-xs font-bold rounded-xl border border-slate-300 transition">
-              Plano Mesas
-            </Link>
-            <Link href="/events/evt-102/whatsapp" className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-300 transition">
-              WhatsApp
-            </Link>
-            <Link href="/events/evt-102/cuts" className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-xl border border-amber-300 transition">
-              Catering
-            </Link>
-            <Link href="/events/evt-102/reports" className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-sm transition">
-              Reportes PDF
-            </Link>
-          </div>
         </div>
 
         {/* METRICS CARDS WITH RICH VISUAL GRAPHICS */}
