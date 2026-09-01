@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
 import { 
   Grid, ArrowLeft, Plus, Users, AlertTriangle, CheckCircle2, 
   Trash2, Move, UserCheck, X, GripVertical, Disc, LayoutGrid, 
-  Sparkles, Compass, MapPin, ShieldAlert, Award, ZoomIn, ZoomOut, Maximize2, ChevronDown, ChevronUp
+  Sparkles, Compass, MapPin, ShieldAlert, Award, ZoomIn, ZoomOut, Maximize2, ChevronDown, ChevronUp, UserPlus
 } from 'lucide-react';
 import { getEventById, getEventGuestGroups } from '@/lib/events';
 import { 
   getEventTables, createTable, deleteTable, getEventTableAssignments, 
-  assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy 
+  assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition 
 } from '@/lib/tables';
 import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
 
@@ -37,13 +37,19 @@ export default function TablesManagementPage() {
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dragOverTableId, setDragOverTableId] = useState<string | null>(null);
 
-  // Table positions on the 2D Spatial Canvas
-  const [tablePositions, setTablePositions] = useState<Record<string, { x: number; y: number; shape: TableShape; zone: string }>>({
-    'tbl-1': { x: 120, y: 90, shape: 'ROUND', zone: 'Zona Novia' },
-    'tbl-2': { x: 120, y: 280, shape: 'ROUND', zone: 'Zona Novia' },
-    'tbl-3': { x: 420, y: 40, shape: 'VIP_HONOR', zone: 'Escenario VIP' },
-    'tbl-4': { x: 720, y: 90, shape: 'ROUND', zone: 'Zona Novio' },
-    'tbl-5': { x: 720, y: 280, shape: 'ROUND', zone: 'Zona Novio' },
+  // Table positions initialized from persistent tablesStore pos_x / pos_y
+  const [tablePositions, setTablePositions] = useState<Record<string, { x: number; y: number; shape: TableShape; zone: string }>>(() => {
+    const initialPos: Record<string, { x: number; y: number; shape: TableShape; zone: string }> = {};
+    const tbls = getEventTables(eventId);
+    tbls.forEach((t, i) => {
+      initialPos[t.id] = {
+        x: t.pos_x || (140 + (i % 3) * 260),
+        y: t.pos_y || (100 + Math.floor(i / 3) * 180),
+        shape: i === 4 ? 'VIP_HONOR' : 'ROUND',
+        zone: 'Centro'
+      };
+    });
+    return initialPos;
   });
 
   const [selectedTableId, setSelectedTableId] = useState<string | null>(null);
@@ -54,13 +60,26 @@ export default function TablesManagementPage() {
   const [showAddModal, setShowAddModal] = useState(false);
 
   const refreshData = () => {
-    setTables([...getEventTables(eventId)]);
+    const updatedTables = getEventTables(eventId);
+    setTables([...updatedTables]);
     setAssignments([...getEventTableAssignments(eventId)]);
+
+    // Sync positions from store
+    const updatedPos: Record<string, { x: number; y: number; shape: TableShape; zone: string }> = {};
+    updatedTables.forEach((t, i) => {
+      updatedPos[t.id] = tablePositions[t.id] || {
+        x: t.pos_x || (140 + (i % 3) * 260),
+        y: t.pos_y || (100 + Math.floor(i / 3) * 180),
+        shape: 'ROUND',
+        zone: 'Centro'
+      };
+    });
+    setTablePositions(updatedPos);
   };
 
   const handleCreateTable = (e: React.FormEvent) => {
     e.preventDefault();
-    const newTbl = createTable(eventId, currentWorkspaceId, tableName, tableCapacity);
+    const newTbl = createTable(eventId, currentWorkspaceId, tableName, tableCapacity, 420, 220);
     
     setTablePositions(prev => ({
       ...prev,
@@ -121,56 +140,70 @@ export default function TablesManagementPage() {
     }
   };
 
-  // 60FPS Hardware-Accelerated Pointer Dragging for Table Nodes
-  const draggingState = useRef<{ tableId: string; startX: number; startY: number; initialX: number; initialY: number } | null>(null);
+  // Pixel-Exact 0ms Pointer Dragging for Table Nodes with Auto-Save Persistence
+  const activeDragRef = useRef<{ tableId: string; grabOffsetX: number; grabOffsetY: number } | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const rafId = useRef<number | null>(null);
 
   const handlePointerDownTable = (e: React.PointerEvent, tableId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-    const pos = tablePositions[tableId] || { x: 100, y: 100, shape: 'ROUND', zone: 'Centro' };
-    draggingState.current = {
+    const targetEl = e.currentTarget as HTMLElement;
+    targetEl.setPointerCapture(e.pointerId);
+
+    const rect = targetEl.getBoundingClientRect();
+    const grabOffsetX = (e.clientX - rect.left) / canvasZoom;
+    const grabOffsetY = (e.clientY - rect.top) / canvasZoom;
+
+    activeDragRef.current = {
       tableId,
-      startX: e.clientX,
-      startY: e.clientY,
-      initialX: pos.x,
-      initialY: pos.y,
+      grabOffsetX,
+      grabOffsetY,
     };
   };
 
   const handlePointerMoveTable = (e: React.PointerEvent) => {
-    if (!draggingState.current) return;
+    if (!activeDragRef.current || !canvasRef.current) return;
     e.preventDefault();
 
-    const { tableId, startX, startY, initialX, initialY } = draggingState.current;
-    const dx = (e.clientX - startX) / canvasZoom;
-    const dy = (e.clientY - startY) / canvasZoom;
+    const canvasRect = canvasRef.current.getBoundingClientRect();
+    const { tableId, grabOffsetX, grabOffsetY } = activeDragRef.current;
 
-    const newX = Math.max(10, Math.min(880, initialX + dx));
-    const newY = Math.max(10, Math.min(480, initialY + dy));
+    const mouseCanvasX = (e.clientX - canvasRect.left) / canvasZoom;
+    const mouseCanvasY = (e.clientY - canvasRect.top) / canvasZoom;
 
-    if (rafId.current) cancelAnimationFrame(rafId.current);
-    rafId.current = requestAnimationFrame(() => {
-      setTablePositions(prev => ({
-        ...prev,
-        [tableId]: {
-          ...(prev[tableId] || { shape: 'ROUND', zone: 'Centro' }),
-          x: Math.round(newX),
-          y: Math.round(newY),
-        }
-      }));
-    });
+    const newX = Math.round(Math.max(10, Math.min(880, mouseCanvasX - grabOffsetX)));
+    const newY = Math.round(Math.max(10, Math.min(480, mouseCanvasY - grabOffsetY)));
+
+    setTablePositions(prev => ({
+      ...prev,
+      [tableId]: {
+        ...(prev[tableId] || { shape: 'ROUND', zone: 'Centro' }),
+        x: newX,
+        y: newY,
+      }
+    }));
   };
 
   const handlePointerUpTable = (e: React.PointerEvent) => {
-    if (draggingState.current) {
-      draggingState.current = null;
-      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    if (activeDragRef.current) {
+      const { tableId } = activeDragRef.current;
+      const finalPos = tablePositions[tableId];
+      if (finalPos) {
+        // Persist exact position in tablesStore!
+        updateTablePosition(eventId, tableId, finalPos.x, finalPos.y);
+      }
+      activeDragRef.current = null;
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
     }
   };
+
+  // CALCULATE GLOBAL SEATING METRICS BAR
+  const totalAuthorizedPasses = groups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
+  const totalAssignedPasses = assignments.reduce((sum, a) => sum + a.assigned_passes, 0);
+  const totalUnassignedPasses = Math.max(0, totalAuthorizedPasses - totalAssignedPasses);
+  const totalTableCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
+  const assignedPercentage = totalAuthorizedPasses > 0 ? Math.round((totalAssignedPasses / totalAuthorizedPasses) * 100) : 0;
 
   // Filter unassigned groups
   const assignedGroupIds = new Set(assignments.map(a => a.group_id));
@@ -215,11 +248,11 @@ export default function TablesManagementPage() {
         <div className="card-luxury p-5 border border-[#C5A059]/30 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">
-              Plano de Distribución Ágil
+              Organización Espacial e Interactiva
             </span>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-0.5">Plano Virtual de Mesas y Distribución</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Arrastra pases a las mesas (Drag & Drop). Haz clic en una mesa para ver/editar su detalle sin saturar el plano.
+              Arrastra familias (Drag & Drop) a las mesas. Mueve las mesas en el plano y los cambios se guardarán automáticamente.
             </p>
           </div>
 
@@ -258,7 +291,6 @@ export default function TablesManagementPage() {
               <LayoutGrid className="w-4 h-4" /> Tarjetas
             </button>
 
-            {/* View Mode Toggle */}
             <button
               onClick={() => setIsCompactView(!isCompactView)}
               className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-[#C5A059]/40 font-bold text-xs rounded-xl transition flex items-center gap-1"
@@ -273,6 +305,36 @@ export default function TablesManagementPage() {
             >
               <Plus className="w-4 h-4 text-[#C5A059]" /> Nueva Mesa
             </button>
+          </div>
+        </div>
+
+        {/* GLOBAL SEATING METRICS BAR */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="card-luxury p-4 border border-[#C5A059]/30 text-center">
+            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Invitados Autorizados</span>
+            <strong className="text-xl font-serif font-bold text-slate-900 mt-0.5 block">{totalAuthorizedPasses} pases</strong>
+          </div>
+
+          <div className="card-luxury p-4 border border-emerald-300 bg-emerald-50/40 text-center">
+            <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">Asignados a Mesa</span>
+            <div className="flex items-center justify-center gap-1.5 mt-0.5">
+              <strong className="text-xl font-serif font-bold text-emerald-700">{totalAssignedPasses} pases</strong>
+              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-full">
+                {assignedPercentage}%
+              </span>
+            </div>
+          </div>
+
+          <div className="card-luxury p-4 border border-amber-300 bg-amber-50/40 text-center">
+            <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block">Pendientes por Asignar</span>
+            <strong className="text-xl font-serif font-bold text-amber-900 mt-0.5 block">{totalUnassignedPasses} pases</strong>
+          </div>
+
+          <div className="card-luxury p-4 border border-purple-300 bg-purple-50/40 text-center">
+            <span className="text-[10px] text-purple-800 font-bold uppercase tracking-wider block">Aforo Total en Mesas</span>
+            <strong className="text-xl font-serif font-bold text-purple-900 mt-0.5 block">
+              {tables.length} Mesas ({totalTableCapacity} sillas)
+            </strong>
           </div>
         </div>
 
@@ -338,7 +400,7 @@ export default function TablesManagementPage() {
                 <div className="flex items-center justify-between px-3 py-2 bg-white rounded-xl border border-[#C5A059]/30 text-xs shadow-sm">
                   <span className="text-slate-500 font-bold flex items-center gap-1">
                     <Compass className="w-3.5 h-3.5 text-[#B8860B]" />
-                    Salón Virtual (Arrastra mesas libremente)
+                    Salón Virtual (Los cambios de posición se guardan automáticamente)
                   </span>
 
                   <div className="flex items-center gap-2">
@@ -405,9 +467,9 @@ export default function TablesManagementPage() {
                     const stats = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
                     const assignedToTbl = assignments.filter(a => a.table_id === tbl.id);
                     const pos = tablePositions[tbl.id] || { 
-                      x: 100 + (index % 3) * 260, 
-                      y: 100 + Math.floor(index / 3) * 180,
-                      shape: index === 2 ? 'VIP_HONOR' : 'ROUND',
+                      x: tbl.pos_x || (140 + (index % 3) * 260), 
+                      y: tbl.pos_y || (100 + Math.floor(index / 3) * 180),
+                      shape: index === 4 ? 'VIP_HONOR' : 'ROUND',
                       zone: 'Centro'
                     };
 
@@ -426,7 +488,7 @@ export default function TablesManagementPage() {
                           left: `${pos.x}px`,
                           top: `${pos.y}px`,
                         }}
-                        className={`transition-all duration-200 cursor-pointer shadow-md select-none ${
+                        className={`transition-all duration-150 cursor-pointer shadow-md select-none ${
                           isCompactView ? 'w-44 p-3 rounded-2xl' : 'w-60 p-4 rounded-2xl'
                         } ${
                           isHoveredDrop

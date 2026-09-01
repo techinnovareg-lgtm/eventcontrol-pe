@@ -56,6 +56,16 @@ export function deleteTable(eventId: string, tableId: string): void {
   }
 }
 
+export function updateTablePosition(eventId: string, tableId: string, posX: number, posY: number): void {
+  if (tablesStore[eventId]) {
+    const tbl = tablesStore[eventId].find(t => t.id === tableId);
+    if (tbl) {
+      tbl.pos_x = posX;
+      tbl.pos_y = posY;
+    }
+  }
+}
+
 export function getEventTableAssignments(eventId: string): TableAssignment[] {
   return assignmentsStore[eventId] || [];
 }
