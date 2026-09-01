@@ -62,6 +62,21 @@ export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'
   return newEvt;
 }
 
+export function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'created_at'>>): Event | undefined {
+  const evt = eventsStore.find(e => e.id === eventId);
+  if (evt) {
+    Object.assign(evt, data, { updated_at: new Date().toISOString() });
+  }
+  return evt;
+}
+
+export function deleteEvent(eventId: string): void {
+  const idx = eventsStore.findIndex(e => e.id === eventId);
+  if (idx !== -1) {
+    eventsStore.splice(idx, 1);
+  }
+}
+
 export function getEventGuestGroups(eventId: string): GuestGroup[] {
   return guestGroupsStore[eventId] || [];
 }
