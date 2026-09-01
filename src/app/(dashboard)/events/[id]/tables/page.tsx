@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
@@ -156,26 +156,25 @@ export default function TablesManagementPage() {
     }
   };
 
-  // Direct DOM Manipulation for 60FPS Dragging with Zero Delay and Exact Coordinates
-  const activePointerRef = useRef<{
+  // WINDOW-LEVEL POINTER DRAGGING (100% UNTRAPPABLE & 60FPS FLUID)
+  const canvasWorldRef = useRef<HTMLDivElement>(null);
+  const activeDragRef = useRef<{
     tableId: string;
     nodeEl: HTMLElement;
     grabOffsetX: number;
     grabOffsetY: number;
     currentX: number;
     currentY: number;
+    hasMoved: boolean;
   } | null>(null);
 
-  const canvasWorldRef = useRef<HTMLDivElement>(null);
-
-  const handlePointerDownTableNode = (e: React.PointerEvent, tableId: string) => {
+  const handlePointerDownGrip = (e: React.PointerEvent, tableId: string) => {
     e.preventDefault();
     e.stopPropagation();
 
-    const nodeEl = e.currentTarget.closest('[data-table-node]') as HTMLElement;
+    const gripEl = e.currentTarget as HTMLElement;
+    const nodeEl = gripEl.closest('[data-table-node]') as HTMLElement;
     if (!nodeEl || !canvasWorldRef.current) return;
-
-    nodeEl.setPointerCapture(e.pointerId);
 
     const canvasRect = canvasWorldRef.current.getBoundingClientRect();
     const nodeRect = nodeEl.getBoundingClientRect();
@@ -183,49 +182,58 @@ export default function TablesManagementPage() {
     const grabOffsetX = (e.clientX - nodeRect.left) / canvasZoom;
     const grabOffsetY = (e.clientY - nodeRect.top) / canvasZoom;
 
-    const initialX = tablePositions[tableId]?.x || 100;
-    const initialY = tablePositions[tableId]?.y || 100;
+    const initialX = tablePositions[tableId]?.x || 140;
+    const initialY = tablePositions[tableId]?.y || 110;
 
-    activePointerRef.current = {
+    activeDragRef.current = {
       tableId,
       nodeEl,
       grabOffsetX,
       grabOffsetY,
       currentX: initialX,
       currentY: initialY,
+      hasMoved: false,
     };
+
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
   };
 
-  const handlePointerMoveTableNode = (e: React.PointerEvent) => {
-    if (!activePointerRef.current || !canvasWorldRef.current) return;
+  const handleGlobalPointerMove = (e: PointerEvent) => {
+    if (!activeDragRef.current || !canvasWorldRef.current) return;
     e.preventDefault();
 
-    const { nodeEl, grabOffsetX, grabOffsetY } = activePointerRef.current;
-    const canvasRect = canvasWorldRef.current.getBoundingClientRect();
+    const drag = activeDragRef.current;
+    drag.hasMoved = true;
 
+    const canvasRect = canvasWorldRef.current.getBoundingClientRect();
     const mouseCanvasX = (e.clientX - canvasRect.left) / canvasZoom;
     const mouseCanvasY = (e.clientY - canvasRect.top) / canvasZoom;
 
-    const newX = Math.round(Math.max(10, Math.min(1300, mouseCanvasX - grabOffsetX)));
-    const newY = Math.round(Math.max(10, Math.min(820, mouseCanvasY - grabOffsetY)));
+    const newX = Math.round(Math.max(10, Math.min(1250, mouseCanvasX - drag.grabOffsetX)));
+    const newY = Math.round(Math.max(10, Math.min(800, mouseCanvasY - drag.grabOffsetY)));
 
-    activePointerRef.current.currentX = newX;
-    activePointerRef.current.currentY = newY;
+    drag.currentX = newX;
+    drag.currentY = newY;
 
-    // Direct 0ms DOM manipulation for hardware-accelerated movement
-    nodeEl.style.left = `${newX}px`;
-    nodeEl.style.top = `${newY}px`;
+    // Direct 0ms DOM manipulation
+    drag.nodeEl.style.left = `${newX}px`;
+    drag.nodeEl.style.top = `${newY}px`;
   };
 
-  const handlePointerUpTableNode = (e: React.PointerEvent) => {
-    if (activePointerRef.current) {
-      const { tableId, nodeEl, currentX, currentY } = activePointerRef.current;
-      nodeEl.releasePointerCapture(e.pointerId);
+  const handleGlobalPointerUp = (e: PointerEvent) => {
+    window.removeEventListener('pointermove', handleGlobalPointerMove);
+    window.removeEventListener('pointerup', handleGlobalPointerUp);
+    window.removeEventListener('pointercancel', handleGlobalPointerUp);
 
-      // Persist exact position in tablesStore
+    if (activeDragRef.current) {
+      const { tableId, currentX, currentY } = activeDragRef.current;
+
+      // Save position to persistent store
       updateTablePosition(eventId, tableId, currentX, currentY);
 
-      // Update React state once on pointer release
+      // Update React state once
       setTablePositions(prev => ({
         ...prev,
         [tableId]: {
@@ -235,9 +243,18 @@ export default function TablesManagementPage() {
         }
       }));
 
-      activePointerRef.current = null;
+      activeDragRef.current = null;
     }
   };
+
+  // Clean up global listeners on unmount if any
+  useEffect(() => {
+    return () => {
+      window.removeEventListener('pointermove', handleGlobalPointerMove);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
+    };
+  }, []);
 
   // CALCULATE GLOBAL SEATING METRICS BAR
   const totalAuthorizedPasses = groups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
@@ -293,7 +310,7 @@ export default function TablesManagementPage() {
             </span>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-0.5">Plano Virtual de Mesas y Distribución</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Arrastra pases a las mesas (Drag & Drop). Mueve las mesas libremente en el salón amplio de 1400px sin saturar la pantalla.
+              Arrastra pases a las mesas (Drag & Drop). Mueve las mesas desde su manija (Grip) en el salón amplio de 1400px sin trabas ni bloqueos.
             </p>
           </div>
 
@@ -441,7 +458,7 @@ export default function TablesManagementPage() {
                 <div className="flex items-center justify-between px-4 py-2.5 bg-white rounded-xl border border-[#C5A059]/30 text-xs shadow-sm">
                   <span className="text-slate-500 font-bold flex items-center gap-1.5">
                     <Compass className="w-4 h-4 text-[#B8860B]" />
-                    Salón Amplio (1400px x 900px • Arrastre fluido a 60 FPS)
+                    Salón Amplio (1400px x 900px • Arrastre de ventana sin bloqueo)
                   </span>
 
                   <div className="flex items-center gap-2">
@@ -580,7 +597,11 @@ export default function TablesManagementPage() {
                           onDragOver={(e) => handleDragOverTable(e, tbl.id)}
                           onDragLeave={handleDragLeaveTable}
                           onDrop={(e) => handleDropGroupOnTable(e, tbl.id)}
-                          onClick={() => setSelectedTableId(tbl.id)}
+                          onClick={() => {
+                            if (!activeDragRef.current?.hasMoved) {
+                              setSelectedTableId(tbl.id);
+                            }
+                          }}
                           style={{
                             position: 'absolute',
                             left: `${pos.x}px`,
@@ -603,19 +624,17 @@ export default function TablesManagementPage() {
                           {/* Table Drag Handle Header */}
                           <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
                             <div 
-                              onPointerDown={(e) => handlePointerDownTableNode(e, tbl.id)}
-                              onPointerMove={handlePointerMoveTableNode}
-                              onPointerUp={handlePointerUpTableNode}
-                              className="cursor-move flex items-center gap-1"
-                              title="Arrastrar ubicación de mesa (60 FPS Exacto)"
+                              onPointerDown={(e) => handlePointerDownGrip(e, tbl.id)}
+                              className="cursor-grab active:cursor-grabbing flex items-center gap-1.5 py-0.5 px-1 hover:bg-slate-100 rounded transition"
+                              title="Mantén presionado y arrastra para mover la mesa"
                             >
                               <GripVertical className="w-4 h-4 text-slate-400 hover:text-[#B8860B]" />
                               {pos.shape === 'VIP_HONOR' ? (
-                                <span className="text-xs font-serif font-bold text-[#B8860B] truncate max-w-[110px]">
+                                <span className="text-xs font-serif font-bold text-[#B8860B] truncate max-w-[100px]">
                                   ★ {tbl.name}
                                 </span>
                               ) : (
-                                <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[110px]">{tbl.name}</strong>
+                                <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[100px]">{tbl.name}</strong>
                               )}
                             </div>
 
