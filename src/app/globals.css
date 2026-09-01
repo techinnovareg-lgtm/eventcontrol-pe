@@ -6,9 +6,10 @@
   /* Classic Luxury Editorial Cards */
   .card-luxury {
     background-color: #ffffff;
-    border: 1px solid rgba(197, 160, 89, 0.25);
+    border: 1px solid rgba(197, 160, 89, 0.3);
     box-shadow: 0 10px 30px -10px rgba(26, 26, 26, 0.05);
     border-radius: 1.25rem;
+    position: relative;
   }
 
   .card-luxury-gold {
@@ -16,14 +17,7 @@
     border: 1px solid rgba(197, 160, 89, 0.5);
     box-shadow: 0 15px 35px -10px rgba(197, 160, 89, 0.15);
     border-radius: 1.5rem;
-  }
-
-  .card-luxury-dark {
-    background-color: #1A1A1A;
-    border: 1px solid rgba(197, 160, 89, 0.3);
-    color: #FAF8F5;
-    box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.3);
-    border-radius: 1.5rem;
+    position: relative;
   }
 
   /* Editorial Borders & Accents */
@@ -56,12 +50,58 @@
     transform: translateY(-4px);
     box-shadow: 0 20px 30px -10px rgba(197, 160, 89, 0.2);
   }
+
+  /* Floral Baroque Ornament Flourish Classes */
+  .floral-corner-tl {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 36px;
+    height: 36px;
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  .floral-corner-tr {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 36px;
+    height: 36px;
+    pointer-events: none;
+    opacity: 0.35;
+    transform: scaleX(-1);
+  }
 }
 
-/* Base Body Styling */
+/* Base Body Styling with Granular Sparkles Canvas */
 body {
   background-color: #FAF8F5;
   color: #1A1A1A;
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(197, 160, 89, 0.05) 0%, transparent 40%),
+    radial-gradient(circle at 80% 60%, rgba(197, 160, 89, 0.04) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+/* Subtle Granular Sparkle Keyframes */
+@keyframes glimmer {
+  0%, 100% {
+    opacity: 0.2;
+    transform: scale(0.8) translateY(0);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2) translateY(-6px);
+  }
+}
+
+.sparkle-particle {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(197, 160, 89, 0.8) 0%, rgba(255, 255, 255, 0) 70%);
+  animation: glimmer 4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 /* Animations */

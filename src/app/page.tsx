@@ -6,10 +6,29 @@ import {
 } from 'lucide-react';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
+/* Decorative Baroque Floral SVG Flourish Component */
+function FloralCornerSVG({ className = "w-8 h-8 text-[#C5A059]/40" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 100 100" fill="none" stroke="currentColor" strokeWidth="3">
+      <path d="M 10 10 Q 50 10 50 50 Q 10 50 10 10 Z" fill="none" />
+      <path d="M 10 10 Q 10 50 50 50" />
+      <circle cx="25" cy="25" r="4" fill="currentColor" />
+      <path d="M 5 5 L 35 5 M 5 5 L 5 35" strokeWidth="4" />
+      <path d="M 15 35 C 25 25, 35 25, 45 35" />
+    </svg>
+  );
+}
+
 export default function Home() {
   return (
-    <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-[#1A1A1A] selection:bg-[#C5A059] selection:text-white">
+    <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-[#1A1A1A] selection:bg-[#C5A059] selection:text-white relative overflow-hidden">
       
+      {/* Background Granular Sparkles Particles */}
+      <div className="sparkle-particle top-24 left-[15%] w-2 h-2"></div>
+      <div className="sparkle-particle top-48 right-[20%] w-3 h-3 [animation-delay:1.5s]"></div>
+      <div className="sparkle-particle top-[600px] left-[8%] w-2.5 h-2.5 [animation-delay:2.5s]"></div>
+      <div className="sparkle-particle top-[900px] right-[10%] w-2 h-2 [animation-delay:0.8s]"></div>
+
       {/* Luxury Editorial Header */}
       <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-50 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -61,10 +80,10 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 space-y-20 pb-20">
+      <main className="flex-1 space-y-24 pb-20">
         
         {/* HERO SECTION - ELEGANT EDITORIAL STYLE */}
-        <section className="pt-16 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center space-y-8 animate-fade-in-up">
+        <section className="relative pt-16 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto text-center space-y-8 animate-fade-in-up">
           
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white border border-[#C5A059]/40 text-[#B8860B] text-xs font-extrabold uppercase tracking-widest shadow-sm">
             <ShieldCheck className="w-4 h-4 text-[#C5A059]" /> Plataforma SaaS para Wedding Planners y Eventos de Gala
@@ -75,7 +94,7 @@ export default function Home() {
           </h1>
 
           <p className="text-base sm:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-normal">
-            El software especializado que elimina el caos en puerta. Importa la lista de Excel, emite pases QR por familias, organiza la distribución de mesas y congela los platos de catering al instante.
+            El software especializado que elimina el caos en puerta. Importa la lista de invitados desde Excel, emite pases QR por familias, organiza la distribución de mesas y congela los platos de catering al instante.
           </p>
 
           <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -93,12 +112,15 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* ELEGANT HERO BANNER ILLUSTRATION */}
+          {/* ELEGANT HERO BANNER ILLUSTRATION (WARM CREAM & GOLD PALETTE MATCH) */}
           <div className="pt-8 max-w-5xl mx-auto">
             <div className="relative rounded-3xl overflow-hidden border border-[#C5A059]/30 shadow-2xl hover-lift bg-white">
+              <div className="floral-corner-tl"><FloralCornerSVG /></div>
+              <div className="floral-corner-tr"><FloralCornerSVG /></div>
+
               <Image 
                 src="/banner-hero-eventcontrol.jpg" 
-                alt="EventControl SaaS Visual Banner" 
+                alt="EventControl SaaS Visual Banner Editorial Palette" 
                 width={1280} 
                 height={720} 
                 className="w-full h-auto object-cover"
@@ -109,7 +131,7 @@ export default function Home() {
         </section>
 
         {/* PROPOSAL VALUE PILLARS SECTION */}
-        <section id="propuesta" className="py-16 bg-white border-y border-[#C5A059]/20">
+        <section id="propuesta" className="py-16 bg-white border-y border-[#C5A059]/20 relative">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
             <div className="text-center max-w-3xl mx-auto space-y-3">
               <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest">Lo que ofrecemos a tu negocio</span>
@@ -118,16 +140,18 @@ export default function Home() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="card-luxury p-8 space-y-4 hover-lift">
+                <div className="floral-corner-tl"><FloralCornerSVG /></div>
                 <div className="w-12 h-12 bg-amber-50 text-[#B8860B] rounded-2xl border border-[#C5A059]/40 flex items-center justify-center font-bold text-lg">
                   1
                 </div>
                 <h3 className="text-xl font-serif text-[#1A1A1A]">1. Importación e Invitación</h3>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Carga fácilmente tu lista de invitados desde Excel (`CUMPLE.xlsx`) y envía pases QR grupales por WhatsApp asistido (`wa.me`) sin costo por mensaje.
+                  Carga fácilmente tu lista de invitados desde Excel (`.xlsx` / `.csv`) y envía pases QR grupales por WhatsApp asistido (`wa.me`) sin costo por mensaje.
                 </p>
               </div>
 
               <div className="card-luxury p-8 space-y-4 hover-lift">
+                <div className="floral-corner-tl"><FloralCornerSVG /></div>
                 <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-300 flex items-center justify-center font-bold text-lg">
                   2
                 </div>
@@ -138,6 +162,7 @@ export default function Home() {
               </div>
 
               <div className="card-luxury p-8 space-y-4 hover-lift">
+                <div className="floral-corner-tl"><FloralCornerSVG /></div>
                 <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-2xl border border-purple-300 flex items-center justify-center font-bold text-lg">
                   3
                 </div>
@@ -150,14 +175,36 @@ export default function Home() {
           </div>
         </section>
 
-        {/* VISUAL WORKFLOW DIAGRAM */}
+        {/* VISUAL WORKFLOW ILLUSTRATION FOR NON-TECH USERS */}
         <section id="flujo" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="card-luxury-gold p-8 sm:p-10 text-center space-y-6">
-            <span className="text-xs font-extrabold text-[#B8860B] uppercase tracking-widest block">
-              Flujo Operativo Integrado de 7 Pasos (Cero Apps para el Invitado)
-            </span>
+          <div className="card-luxury-gold p-8 sm:p-10 text-center space-y-8">
+            <div className="floral-corner-tl"><FloralCornerSVG /></div>
+            <div className="floral-corner-tr"><FloralCornerSVG /></div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            <div>
+              <span className="text-xs font-extrabold text-[#B8860B] uppercase tracking-widest block">
+                Flujo Operativo Sencillo e Intuitivo (Sin Apps Complejas para el Invitado)
+              </span>
+              <h2 className="text-2xl sm:text-3xl font-serif text-[#1A1A1A] mt-1">
+                ¿Cómo funciona EventControl.pe?
+              </h2>
+              <p className="text-xs text-slate-600 mt-1 max-w-2xl mx-auto">
+                Diseñado para que cualquier coordinador o personal de puerta pueda operar el sistema en segundos sin curva de aprendizaje.
+              </p>
+            </div>
+
+            {/* 3D INFOGRAPHIC WORKFLOW ILLUSTRATION EMBED */}
+            <div className="relative rounded-2xl overflow-hidden border border-[#C5A059]/30 shadow-xl hover-lift bg-white">
+              <Image 
+                src="/illustration-flow.jpg" 
+                alt="Diagrama Infográfico del Flujo Operativo en 4 Pasos" 
+                width={1280} 
+                height={720} 
+                className="w-full h-auto object-cover"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 pt-4">
               <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#C5A059]/30 hover-lift">
                 <FileSpreadsheet className="w-8 h-8 text-emerald-600 mb-2" />
                 <span className="text-xs font-bold text-slate-800">1. Excel</span>
@@ -211,6 +258,8 @@ export default function Home() {
                       : 'border-[#C5A059]/30'
                   }`}
                 >
+                  <div className="floral-corner-tl"><FloralCornerSVG /></div>
+
                   {isRecommended && (
                     <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 bg-[#B8860B] text-white font-bold text-[11px] uppercase tracking-widest px-4 py-1 rounded-full shadow-md">
                       Recomendado
@@ -252,6 +301,9 @@ export default function Home() {
         {/* DEVELOPER BRAND BRANDING SECTION: TECH INNOVA */}
         <section id="techinnova" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="card-luxury-gold p-8 sm:p-10 border border-[#C5A059]/40 shadow-xl space-y-6">
+            <div className="floral-corner-tl"><FloralCornerSVG /></div>
+            <div className="floral-corner-tr"><FloralCornerSVG /></div>
+
             <div className="flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-[#C5A059]/20 pb-6">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 relative rounded-2xl overflow-hidden bg-white border border-[#C5A059]/40 shrink-0 p-2 shadow-sm">
