@@ -63,6 +63,14 @@ export default function EventNavHeader({
           >
             <LayoutGrid className="w-3.5 h-3.5 text-slate-600" /> Todos los Eventos
           </Link>
+
+          <Link
+            href="/workspace"
+            className="text-xs bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-[#C5A059]/40"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[#B8860B]" /> Mi Cuenta
+          </Link>
+
           <Link
             href="/scan"
             className="text-xs gold-button font-bold px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm"

@@ -4,8 +4,9 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { setActiveSession } from '@/lib/superadmin-store';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -19,6 +20,20 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMsg(null);
 
+    // Super Admin direct login check
+    if (email.toLowerCase().includes('superadmin')) {
+      setActiveSession({
+        user: {
+          id: 'usr-super-admin',
+          email: 'superadmin@eventcontrol.pe',
+          name: 'Super User (Admin de Admins)',
+          role: 'SUPER_USER',
+        },
+      });
+      router.push('/superadmin');
+      return;
+    }
+
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({
@@ -27,11 +42,17 @@ export default function LoginPage() {
       });
 
       if (error) {
-        if (email === 'demo@eventcontrol.pe' || email === 'ana@amgweddings.pe' || email) {
-          router.push('/dashboard');
-          return;
-        }
-        setErrorMsg(error.message || 'No fue posible iniciar sesión. Verifica tus credenciales.');
+        // Fallback demo access for event planner accounts
+        setActiveSession({
+          user: {
+            id: 'usr-admin-01',
+            email: email || 'ana@amgweddings.pe',
+            name: 'Ana María Gamarra (AMG Weddings)',
+            role: 'ADMIN',
+            workspaceId: 'ws-a-1111',
+          },
+        });
+        router.push('/dashboard');
       } else {
         router.push('/dashboard');
       }
@@ -45,7 +66,30 @@ export default function LoginPage() {
   const handleQuickDemoLogin = () => {
     setEmail('demo@eventcontrol.pe');
     setPassword('demo123456');
+    setActiveSession({
+      user: {
+        id: 'usr-admin-01',
+        email: 'demo@eventcontrol.pe',
+        name: 'AMG Wedding Planners (Demo)',
+        role: 'ADMIN',
+        workspaceId: 'ws-a-1111',
+      },
+    });
     router.push('/dashboard');
+  };
+
+  const handleSuperAdminLogin = () => {
+    setEmail('superadmin@eventcontrol.pe');
+    setPassword('superadmin123');
+    setActiveSession({
+      user: {
+        id: 'usr-super-admin',
+        email: 'superadmin@eventcontrol.pe',
+        name: 'Super User (Admin de Admins)',
+        role: 'SUPER_USER',
+      },
+    });
+    router.push('/superadmin');
   };
 
   return (
@@ -68,21 +112,33 @@ export default function LoginPage() {
           <p className="text-xs text-slate-500">Accede a tu Workspace de EventControl.pe</p>
         </div>
 
-        {/* QUICK DEMO ACCESS BUTTON */}
-        <div className="p-4 bg-amber-50/80 border border-[#C5A059]/40 rounded-2xl space-y-2 text-center shadow-sm">
-          <div className="flex items-center justify-center gap-1.5 text-[#B8860B] text-xs font-bold uppercase tracking-wider">
-            <Sparkles className="w-4 h-4 text-[#C5A059]" /> Acceso Inmediato de Demostración
+        {/* QUICK ACCESS DEMO BUTTONS */}
+        <div className="space-y-2">
+          <div className="p-3.5 bg-amber-50/80 border border-[#C5A059]/40 rounded-2xl text-center shadow-sm space-y-2">
+            <div className="flex items-center justify-center gap-1.5 text-[#B8860B] text-xs font-bold uppercase tracking-wider">
+              <Sparkles className="w-4 h-4 text-[#C5A059]" /> Demostración de Event Planner
+            </div>
+            <button
+              type="button"
+              onClick={handleQuickDemoLogin}
+              className="w-full py-2.5 gold-button font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
+            >
+              Ingresar como Administrador de Evento <ArrowRight className="w-4 h-4" />
+            </button>
           </div>
-          <p className="text-xs text-slate-600">
-            Ingresa a un Workspace de prueba pre-configurado con eventos, mesas y datos de lista de invitados listos para evaluar.
-          </p>
-          <button
-            type="button"
-            onClick={handleQuickDemoLogin}
-            className="w-full py-3 gold-button font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
-          >
-            Ingresar con Usuario de Prueba (Demo) <ArrowRight className="w-4 h-4" />
-          </button>
+
+          <div className="p-3.5 bg-slate-900 text-white rounded-2xl text-center shadow-sm space-y-2 border border-slate-800">
+            <div className="flex items-center justify-center gap-1.5 text-[#DBBB6E] text-xs font-bold uppercase tracking-wider">
+              <ShieldCheck className="w-4 h-4 text-[#DBBB6E]" /> Control Super Admin
+            </div>
+            <button
+              type="button"
+              onClick={handleSuperAdminLogin}
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center gap-2"
+            >
+              Ingresar como Super User (Admin de Admins) <ShieldCheck className="w-4 h-4 text-[#DBBB6E]" />
+            </button>
+          </div>
         </div>
 
         <div className="relative flex py-1 items-center">
@@ -107,7 +163,7 @@ export default function LoginPage() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="demo@eventcontrol.pe"
+              placeholder="ana@amgweddings.pe o superadmin@eventcontrol.pe"
               className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
             />
           </div>
@@ -140,13 +196,6 @@ export default function LoginPage() {
             {loading ? 'Ingresando...' : 'Iniciar Sesión'}
           </button>
         </form>
-
-        <div className="text-center text-xs text-slate-500 pt-2 border-t border-slate-100">
-          ¿No tienes una cuenta aún?{' '}
-          <Link href="/register" className="text-[#B8860B] font-bold hover:underline">
-            Registra tu negocio
-          </Link>
-        </div>
       </div>
     </div>
   );
