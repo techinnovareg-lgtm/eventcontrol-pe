@@ -10,26 +10,14 @@ import {
 } from 'lucide-react';
 import { testCrossWorkspaceIsolation } from '@/lib/workspace';
 import { PLAN_LIMITS } from '@/lib/plans';
-import { getActiveSession, calculateRemainingDays, changeUserPassword } from '@/lib/superadmin-store';
+import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
 
 export default function AccountProfilePage() {
   const session = getActiveSession();
-  const currentWorkspaceId = session?.user.workspaceId || 'ws-a-1111';
-
-  // Demo contract data
-  const contractInfo = {
-    companyName: session?.user.name || 'AMG Wedding Planners',
-    adminName: 'Ana María Gamarra',
-    contactEmail: session?.user.email || 'ana@amgweddings.pe',
-    contactPhone: '+51 987 654 321',
-    planCode: 'PROFESSIONAL' as const,
-    startDate: '2026-08-01T00:00:00.000Z',
-    endDate: '2027-08-01T23:59:59.000Z',
-    status: 'ACTIVA',
-  };
+  const contractInfo = getAccountForSession();
 
   const plan = PLAN_LIMITS[contractInfo.planCode];
-  const remainingDays = calculateRemainingDays(contractInfo.endDate);
+  const remainingDays = calculateRemainingDays(contractInfo.contractEndDate);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'team'>('profile');
 
@@ -168,7 +156,7 @@ export default function AccountProfilePage() {
               <div className="card-luxury p-5 border border-slate-200">
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Fecha de Contratación</span>
                 <strong className="text-lg font-bold text-slate-900 mt-2 block font-mono">
-                  {new Date(contractInfo.startDate).toLocaleDateString()}
+                  {new Date(contractInfo.contractStartDate).toLocaleDateString()}
                 </strong>
                 <span className="text-[10px] text-slate-400 block">Fecha oficial de inicio</span>
               </div>
@@ -176,7 +164,7 @@ export default function AccountProfilePage() {
               <div className="card-luxury p-5 border border-slate-200">
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Fecha de Vencimiento</span>
                 <strong className="text-lg font-bold text-slate-900 mt-2 block font-mono">
-                  {new Date(contractInfo.endDate).toLocaleDateString()}
+                  {new Date(contractInfo.contractEndDate).toLocaleDateString()}
                 </strong>
                 <span className="text-[10px] text-slate-400 block">Término de la suscripción</span>
               </div>

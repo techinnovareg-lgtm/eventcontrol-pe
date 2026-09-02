@@ -17,7 +17,7 @@ let eventsStore: Event[] = [
   {
     id: 'evt-102',
     workspace_id: 'ws-a-1111',
-    name: 'Cumpleaños Tavo 60 Años (Evento Demo)',
+    name: 'Cumpleaños Tavo 60 Años',
     event_type: 'Cumpleaños',
     event_date: '2026-09-20',
     event_time: '19:00',

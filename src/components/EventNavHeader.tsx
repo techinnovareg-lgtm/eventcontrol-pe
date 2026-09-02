@@ -6,7 +6,7 @@ import {
   BarChart3, MapPin, QrCode, MessageSquare, FileSpreadsheet, 
   Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle
 } from 'lucide-react';
-import { calculateRemainingDays } from '@/lib/superadmin-store';
+import { calculateRemainingDays, getAccountForSession } from '@/lib/superadmin-store';
 
 interface EventNavHeaderProps {
   currentTab: 'dashboard' | 'tables' | 'qr' | 'whatsapp' | 'import' | 'reports' | 'cuts';
@@ -20,8 +20,9 @@ export default function EventNavHeader({
   eventName = 'Cumpleaños Tavo 60 Años',
 }: EventNavHeaderProps) {
 
-  // Demo contract expiration check: 6 days remaining triggers alert
-  const remainingDays = 6;
+  // Dynamic contract expiration check from active session account
+  const contractAccount = getAccountForSession();
+  const remainingDays = calculateRemainingDays(contractAccount.contractEndDate);
   const isExpiringSoon = remainingDays <= 7;
 
   const tabs = [

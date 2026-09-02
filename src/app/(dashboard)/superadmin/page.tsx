@@ -10,11 +10,14 @@ import {
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
-  triggerPasswordReset, calculateRemainingDays, extendAdminContract, AdminAccount 
+  triggerPasswordReset, calculateRemainingDays, extendAdminContract, AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL 
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
 export default function SuperAdminPage() {
+  const session = getActiveSession();
+  const isAuthorized = session?.user?.role === 'SUPER_USER' || session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL.toLowerCase();
+
   const [accounts, setAccounts] = useState<AdminAccount[]>(() => getAllAdminAccounts());
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
@@ -25,6 +28,27 @@ export default function SuperAdminPage() {
   const [selectedExtensionPlan, setSelectedExtensionPlan] = useState<PlanCode>('PROFESSIONAL');
   
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 text-center selection:bg-[#C5A059] selection:text-white">
+        <div className="card-luxury p-8 max-w-md w-full space-y-4 border border-[#C5A059]/40 shadow-xl">
+          <ShieldAlert className="w-12 h-12 text-red-600 mx-auto" />
+          <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Acceso Restringido</h2>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            No posees los privilegios de Super Administrador para acceder a esta consola global. Por favor inicia sesión con las credenciales autorizadas.
+          </p>
+          <Link
+            href="/dashboard"
+            style={{ backgroundColor: '#DBBB6E' }}
+            className="w-full py-3 text-white font-extrabold text-xs rounded-xl inline-block shadow-md hover:brightness-110"
+          >
+            Volver al Dashboard de Eventos
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   // New Account Form State
   const [companyName, setCompanyName] = useState('');

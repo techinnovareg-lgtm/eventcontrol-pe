@@ -38,7 +38,7 @@ const adminAccountsStore: AdminAccount[] = [
     contactPhone: '+51 987 654 321',
     planCode: 'STARTER',
     contractStartDate: '2026-08-01T00:00:00.000Z',
-    contractEndDate: '2026-09-08T23:59:59.000Z', // Expiring in 6 days for testing 1-week alert
+    contractEndDate: '2026-09-08T23:59:59.000Z', // 6 days remaining for expiration alert
     status: 'ACTIVA',
     mustChangePassword: false,
     passwordHashMasked: '••••••••••••',
@@ -85,9 +85,7 @@ export const SUPER_ADMIN_EMAIL = 'tech.innova.reg@gmail.com';
 let currentGenerated2FAPin = '8492';
 
 export function generateAndSendSuperAdmin2FAPin(): { sentTo: string } {
-  // Generate random 4-digit code in memory
   currentGenerated2FAPin = Math.floor(1000 + Math.random() * 9000).toString();
-  // Simulate dispatching email to tech.innova.reg@gmail.com
   console.log(`[2FA SMTP Service] Security PIN ${currentGenerated2FAPin} dispatched to ${SUPER_ADMIN_EMAIL}`);
   return { sentTo: SUPER_ADMIN_EMAIL };
 }
@@ -115,6 +113,21 @@ export function checkAccountExpirations(): void {
 export function getAllAdminAccounts(): AdminAccount[] {
   checkAccountExpirations();
   return [...adminAccountsStore];
+}
+
+/**
+ * Get active account for the current logged in session
+ */
+export function getAccountForSession(): AdminAccount {
+  checkAccountExpirations();
+  const session = getActiveSession();
+  if (session && session.user) {
+    const found = adminAccountsStore.find(
+      a => a.workspaceId === session.user.workspaceId || a.contactEmail === session.user.email
+    );
+    if (found) return found;
+  }
+  return adminAccountsStore[0]; // fallback to first active client account
 }
 
 /**
@@ -207,7 +220,7 @@ export function createAdminAccount(data: {
 }
 
 /**
- * Super Admin: Update ALL Account Attributes (company, admin name, email, phone, plan, status, end date)
+ * Super Admin: Update ALL Account Attributes
  */
 export function updateAdminAccount(
   accountId: string, 
