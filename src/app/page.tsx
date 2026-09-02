@@ -218,14 +218,16 @@ export default function Home() {
 
                   <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">1. Importación e Invitación</h3>
                   
-                  {/* Card 1 Image */}
-                  <div className="relative h-48 w-full rounded-xl overflow-hidden border border-[#DBBB6E]/40 shadow-sm my-3">
+                  {/* Card 1 Image: Lista_invitados.png with LoveStory Inner White Border Frame */}
+                  <div className="relative h-56 w-full rounded-lg overflow-hidden border border-[#DBBB6E]/40 shadow-md my-3 group bg-slate-100">
                     <Image 
-                      src="/1.jpeg" 
-                      alt="Importación desde Excel y Pases QR por WhatsApp" 
+                      src="/Lista_invitados.png" 
+                      alt="Lista de Invitados e Importación Excel" 
                       fill 
-                      className="object-cover hover:scale-105 transition-transform duration-500"
+                      className="object-cover object-top group-hover:scale-105 transition-transform duration-700"
                     />
+                    {/* Inner White Margin Frame (Estilo Invitaciones de Boda) */}
+                    <div className="absolute inset-3 border-2 border-white pointer-events-none z-10 shadow-sm"></div>
                   </div>
 
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
@@ -264,14 +266,16 @@ export default function Home() {
 
                   <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">2. Recepción & Check-in QR</h3>
                   
-                  {/* Card 2 Image */}
-                  <div className="relative h-48 w-full rounded-xl overflow-hidden border border-[#DBBB6E]/40 shadow-sm my-3">
+                  {/* Card 2 Image: Imagen_QR.jfif with LoveStory Inner White Border Frame */}
+                  <div className="relative h-56 w-full rounded-lg overflow-hidden border border-[#DBBB6E]/40 shadow-md my-3 group bg-slate-100">
                     <Image 
-                      src="/Novia y Novio anillo.jpg" 
-                      alt="Recepción y Check-in QR en Puerta" 
+                      src="/Imagen_QR.jfif" 
+                      alt="Recepción y Escáner QR de Invitados" 
                       fill 
-                      className="object-cover hover:scale-105 transition-transform duration-500"
+                      className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
                     />
+                    {/* Inner White Margin Frame (Estilo Invitaciones de Boda) */}
+                    <div className="absolute inset-3 border-2 border-white pointer-events-none z-10 shadow-sm"></div>
                   </div>
 
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
@@ -310,14 +314,16 @@ export default function Home() {
 
                   <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">3. Control en Vivo & Catering</h3>
                   
-                  {/* Card 3 Image */}
-                  <div className="relative h-48 w-full rounded-xl overflow-hidden border border-[#DBBB6E]/40 shadow-sm my-3">
+                  {/* Card 3 Image: Control_catering.png with LoveStory Inner White Border Frame */}
+                  <div className="relative h-56 w-full rounded-lg overflow-hidden border border-[#DBBB6E]/40 shadow-md my-3 group bg-slate-100">
                     <Image 
-                      src="/3.jpeg" 
-                      alt="Control de Ocupación de Mesas 2D y Catering" 
+                      src="/Control_catering.png" 
+                      alt="Control de Asistencia de Mesas 2D y Catering" 
                       fill 
-                      className="object-cover hover:scale-105 transition-transform duration-500"
+                      className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
                     />
+                    {/* Inner White Margin Frame (Estilo Invitaciones de Boda) */}
+                    <div className="absolute inset-3 border-2 border-white pointer-events-none z-10 shadow-sm"></div>
                   </div>
 
                   <p className="text-xs text-slate-600 leading-relaxed font-normal">
