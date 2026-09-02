@@ -3,6 +3,19 @@
 @tailwind utilities;
 
 @layer utilities {
+  /* Script / Handwriting Fonts for Luxury Wedding Invitations */
+  .font-handwriting {
+    font-family: 'Great Vibes', 'Alex Brush', cursive;
+  }
+
+  .font-script {
+    font-family: 'Alex Brush', 'Great Vibes', cursive;
+  }
+
+  .font-serif-luxury {
+    font-family: 'Cormorant Garamond', 'Playfair Display', Georgia, serif;
+  }
+
   /* Classic Luxury Editorial Cards - Sleek Subtle Rounded Corners */
   .card-luxury {
     background-color: #ffffff;
@@ -51,7 +64,7 @@
     box-shadow: 0 20px 35px -10px rgba(197, 160, 89, 0.25);
   }
 
-  /* Baroque Filigree Corner Flourish Positioning - Offset inside card */
+  /* Baroque Filigree Corner Flourish Positioning */
   .baroque-corner-tl {
     position: absolute;
     top: 10px;
@@ -96,18 +109,26 @@
   }
 }
 
-/* Base Body Background */
+/* Base Body Background: Papel de Hilo (Fine Woven Linen Invitation Paper Texture) */
 body {
   background-color: #FAF8F5;
   color: #1A1A1A;
   background-image: 
-    radial-gradient(circle at 15% 15%, rgba(197, 160, 89, 0.06) 0%, transparent 45%),
-    radial-gradient(circle at 85% 50%, rgba(197, 160, 89, 0.06) 0%, transparent 45%),
-    radial-gradient(circle at 50% 85%, rgba(197, 160, 89, 0.05) 0%, transparent 50%);
+    /* Woven Thread Grid Lines (Papel de Hilo) */
+    linear-gradient(90deg, rgba(197, 160, 89, 0.04) 1px, transparent 1px),
+    linear-gradient(0deg, rgba(197, 160, 89, 0.04) 1px, transparent 1px),
+    /* Diagonal Fine Fiber Texture */
+    linear-gradient(45deg, rgba(184, 134, 11, 0.02) 25%, transparent 25%, transparent 75%, rgba(184, 134, 11, 0.02) 75%),
+    linear-gradient(-45deg, rgba(184, 134, 11, 0.02) 25%, transparent 25%, transparent 75%, rgba(184, 134, 11, 0.02) 75%),
+    /* Soft Gold Radial Ambient Glows */
+    radial-gradient(circle at 15% 15%, rgba(197, 160, 89, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 85% 50%, rgba(197, 160, 89, 0.08) 0%, transparent 45%),
+    radial-gradient(circle at 50% 85%, rgba(197, 160, 89, 0.06) 0%, transparent 50%);
+  background-size: 10px 10px, 10px 10px, 20px 20px, 20px 20px, 100% 100%, 100% 100%, 100% 100%;
   background-attachment: fixed;
 }
 
-/* Floating Gold Granular Sparkles - Soft & Elegant */
+/* Floating Gold Granular Sparkles */
 @keyframes floatSparkle {
   0% {
     transform: translateY(0px) rotate(0deg) scale(0.85);

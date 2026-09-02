@@ -5,6 +5,7 @@ import {
   ShieldCheck, CheckCircle2, ArrowRight, Utensils, HelpCircle, Sparkles, ExternalLink, Video
 } from 'lucide-react';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
+import HeroBannerSlider from '@/components/HeroBannerSlider';
 
 /* Gracefully Curved Baroque Filigree Corner SVG Ornament tailored for rounded card containers */
 function BaroqueCornerSVG({ className = "w-10 h-10 text-[#C5A059]" }: { className?: string }) {
@@ -167,24 +168,9 @@ export default function Home() {
             </Link>
           </div>
 
-          {/* HERO BANNER FRAME WITH SLEEK SOFT ROUNDED CORNERS AND CURVED BAROQUE ACCENTS */}
-          <div className="pt-8 max-w-5xl mx-auto">
-            <div className="relative rounded-2xl overflow-hidden border border-[#C5A059]/40 shadow-2xl hover-lift bg-white">
-              {/* Curved Baroque Corner Accents */}
-              <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
-              <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
-              <div className="baroque-corner-bl"><BaroqueCornerSVG /></div>
-              <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
-
-              <Image 
-                src="/banner-hero-eventcontrol.jpg" 
-                alt="EventControl SaaS Visual Banner Editorial Palette" 
-                width={1280} 
-                height={720} 
-                className="w-full h-auto object-cover"
-                priority
-              />
-            </div>
+          {/* HERO BANNER SLIDER WITH 1.jpeg, 2.jpeg, 3.jpeg AND ELEGANT HANDWRITING SCRIPT OVERLAYS */}
+          <div className="pt-4">
+            <HeroBannerSlider />
           </div>
         </section>
 
