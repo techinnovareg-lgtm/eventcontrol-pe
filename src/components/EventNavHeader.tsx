@@ -4,8 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   BarChart3, MapPin, QrCode, MessageSquare, FileSpreadsheet, 
-  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio
+  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle
 } from 'lucide-react';
+import { calculateRemainingDays } from '@/lib/superadmin-store';
 
 interface EventNavHeaderProps {
   currentTab: 'dashboard' | 'tables' | 'qr' | 'whatsapp' | 'import' | 'reports' | 'cuts';
@@ -16,8 +17,13 @@ interface EventNavHeaderProps {
 export default function EventNavHeader({
   currentTab,
   eventId = 'evt-102',
-  eventName = 'Cumpleaños Tavo 60 Años (Evento Demo)',
+  eventName = 'Cumpleaños Tavo 60 Años',
 }: EventNavHeaderProps) {
+
+  // Demo contract expiration check: 6 days remaining triggers alert
+  const remainingDays = 6;
+  const isExpiringSoon = remainingDays <= 7;
+
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: '/dashboard' },
     { id: 'tables', label: 'Plano de Mesas', icon: MapPin, href: `/events/${eventId}/tables` },
@@ -30,6 +36,22 @@ export default function EventNavHeader({
 
   return (
     <header className="border-b border-[#C5A059]/30 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm">
+      
+      {/* 1-WEEK EXPIRATION WARNING ALERT BANNER */}
+      {isExpiringSoon && (
+        <div className="bg-amber-500 text-slate-950 px-4 py-2 text-xs font-bold flex items-center justify-between shadow-inner">
+          <div className="flex items-center gap-2 max-w-7xl mx-auto">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-slate-950" />
+            <span>
+              <strong>¡ATENCIÓN!</strong> Tu plan contratado vence en <span className="underline font-black">{remainingDays} días</span>. Contacta a tu asesor para extender la suscripción y evitar la suspensión automática del servicio.
+            </span>
+          </div>
+          <Link href="/workspace" className="underline hover:text-white font-extrabold shrink-0 ml-4">
+            Ver Mi Cuenta
+          </Link>
+        </div>
+      )}
+
       {/* Top Navbar Row */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between border-b border-slate-100">
         

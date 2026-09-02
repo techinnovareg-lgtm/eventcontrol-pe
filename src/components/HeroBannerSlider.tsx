@@ -131,7 +131,7 @@ export default function HeroBannerSlider() {
                     style={{ backgroundColor: '#DBBB6E' }}
                     className="hover:brightness-110 text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-xl transition shadow-xl flex items-center gap-2"
                   >
-                    <Sparkles className="w-4 h-4 text-white" /> Ingresar a Demo de Prueba <ArrowRight className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4 text-white" /> Ingresar a la Plataforma <ArrowRight className="w-4 h-4" />
                   </Link>
 
                   <Link

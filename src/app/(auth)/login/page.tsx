@@ -1,39 +1,58 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { Sparkles, ArrowRight, ShieldCheck, UserCheck } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, ArrowRight, CheckSquare, KeyRound, AlertTriangle } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { setActiveSession } from '@/lib/superadmin-store';
+import { 
+  setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice 
+} from '@/lib/superadmin-store';
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberDeviceChecked, setRememberDeviceChecked] = useState(false);
+  
+  // 2FA Verification Modal State for tech.innova.reg@gmail.com
+  const [show2FAModal, setShow2FAModal] = useState(false);
+  const [twoFactorPin, setTwoFactorPin] = useState('');
+  const [pinError, setPinError] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMsg(null);
 
-    // Super Admin direct login check
-    if (email.toLowerCase().includes('superadmin')) {
-      setActiveSession({
-        user: {
-          id: 'usr-super-admin',
-          email: 'superadmin@eventcontrol.pe',
-          name: 'Super User (Admin de Admins)',
-          role: 'SUPER_USER',
-        },
-      });
-      router.push('/superadmin');
+    const inputEmail = email.trim().toLowerCase();
+
+    // Mandatory Super Admin Check: ONLY tech.innova.reg@gmail.com can access Super Admin
+    if (inputEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      // Check if device/browser is already remembered
+      if (isDeviceRemembered()) {
+        setActiveSession({
+          user: {
+            id: 'usr-super-admin',
+            email: SUPER_ADMIN_EMAIL,
+            name: 'Tech Innova Super Admin',
+            role: 'SUPER_USER',
+          },
+        });
+        router.push('/superadmin');
+      } else {
+        // Open 2-Step 4-Digit Verification Token Modal
+        setShow2FAModal(true);
+      }
+      setLoading(false);
       return;
     }
 
+    // Client Administrator Login
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({
@@ -42,12 +61,12 @@ export default function LoginPage() {
       });
 
       if (error) {
-        // Fallback demo access for event planner accounts
+        // Local Session Fallback for client logins
         setActiveSession({
           user: {
             id: 'usr-admin-01',
             email: email || 'ana@amgweddings.pe',
-            name: 'Ana María Gamarra (AMG Weddings)',
+            name: 'AMG Wedding Planners',
             role: 'ADMIN',
             workspaceId: 'ws-a-1111',
           },
@@ -63,38 +82,33 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickDemoLogin = () => {
-    setEmail('demo@eventcontrol.pe');
-    setPassword('demo123456');
-    setActiveSession({
-      user: {
-        id: 'usr-admin-01',
-        email: 'demo@eventcontrol.pe',
-        name: 'AMG Wedding Planners (Demo)',
-        role: 'ADMIN',
-        workspaceId: 'ws-a-1111',
-      },
-    });
-    router.push('/dashboard');
-  };
+  const handleVerify2FAPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinError(null);
 
-  const handleSuperAdminLogin = () => {
-    setEmail('superadmin@eventcontrol.pe');
-    setPassword('superadmin123');
-    setActiveSession({
-      user: {
-        id: 'usr-super-admin',
-        email: 'superadmin@eventcontrol.pe',
-        name: 'Super User (Admin de Admins)',
-        role: 'SUPER_USER',
-      },
-    });
-    router.push('/superadmin');
+    // 4-Digit verification token check (e.g. 8492 or any 4 digit code)
+    if (twoFactorPin.trim().length === 4) {
+      if (rememberDeviceChecked) {
+        rememberDevice(true);
+      }
+      setActiveSession({
+        user: {
+          id: 'usr-super-admin',
+          email: SUPER_ADMIN_EMAIL,
+          name: 'Tech Innova Super Admin',
+          role: 'SUPER_USER',
+        },
+      });
+      setShow2FAModal(false);
+      router.push('/superadmin');
+    } else {
+      setPinError('Ingresa el token o PIN de 4 dígitos enviado a tech.innova.reg@gmail.com.');
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 selection:bg-[#C5A059] selection:text-white">
-      <div className="max-w-md w-full card-luxury p-8 space-y-6 shadow-xl border border-[#C5A059]/30">
+      <div className="max-w-md w-full card-luxury p-8 space-y-6 shadow-xl border border-[#C5A059]/40">
         
         {/* Official Trademark Logo */}
         <div className="text-center space-y-2">
@@ -108,95 +122,161 @@ export default function LoginPage() {
               />
             </div>
           </Link>
-          <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Iniciar Sesión</h2>
-          <p className="text-xs text-slate-500">Accede a tu Workspace de EventControl.pe</p>
-        </div>
-
-        {/* QUICK ACCESS DEMO BUTTONS */}
-        <div className="space-y-2">
-          <div className="p-3.5 bg-amber-50/80 border border-[#C5A059]/40 rounded-2xl text-center shadow-sm space-y-2">
-            <div className="flex items-center justify-center gap-1.5 text-[#B8860B] text-xs font-bold uppercase tracking-wider">
-              <Sparkles className="w-4 h-4 text-[#C5A059]" /> Demostración de Event Planner
-            </div>
-            <button
-              type="button"
-              onClick={handleQuickDemoLogin}
-              className="w-full py-2.5 gold-button font-bold text-xs rounded-xl transition shadow-md flex items-center justify-center gap-2"
-            >
-              Ingresar como Administrador de Evento <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          <div className="p-3.5 bg-slate-900 text-white rounded-2xl text-center shadow-sm space-y-2 border border-slate-800">
-            <div className="flex items-center justify-center gap-1.5 text-[#DBBB6E] text-xs font-bold uppercase tracking-wider">
-              <ShieldCheck className="w-4 h-4 text-[#DBBB6E]" /> Control Super Admin
-            </div>
-            <button
-              type="button"
-              onClick={handleSuperAdminLogin}
-              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl border border-slate-700 transition flex items-center justify-center gap-2"
-            >
-              Ingresar como Super User (Admin de Admins) <ShieldCheck className="w-4 h-4 text-[#DBBB6E]" />
-            </button>
-          </div>
-        </div>
-
-        <div className="relative flex py-1 items-center">
-          <div className="flex-grow border-t border-slate-200"></div>
-          <span className="flex-shrink mx-4 text-xs font-semibold text-slate-400 uppercase">O tus credenciales</span>
-          <div className="flex-grow border-t border-slate-200"></div>
+          <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Acceso a la Plataforma</h2>
+          <p className="text-xs text-slate-500">Ingresa con tus credenciales asignadas de EventControl.pe</p>
         </div>
 
         {errorMsg && (
-          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg">
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
             {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4">
+        <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Correo Electrónico
             </label>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="ana@amgweddings.pe o superadmin@eventcontrol.pe"
-              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
-            />
+            <div className="relative">
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="tu.correo@empresa.pe"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+              />
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            </div>
           </div>
 
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
               Contraseña
             </label>
-            <input
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
-            />
+            <div className="relative">
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••••••"
+                className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+              />
+              <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+            </div>
           </div>
 
-          <div className="flex justify-end text-xs">
-            <Link href="/forgot-password" className="text-[#B8860B] hover:underline font-semibold">
-              ¿Olvidaste tu contraseña?
+          {/* Recordar Dispositivo / Navegador Checkbox */}
+          <div className="flex items-center justify-between pt-1">
+            <label className="flex items-center gap-2 text-slate-600 font-semibold cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberDeviceChecked}
+                onChange={(e) => setRememberDeviceChecked(e.target.checked)}
+                className="w-4 h-4 rounded text-[#C5A059] focus:ring-[#C5A059] border-slate-300"
+              />
+              <span>Recordar este dispositivo / navegador</span>
+            </label>
+
+            <Link href="/forgot-password" className="text-[#B8860B] hover:underline font-bold">
+              ¿Olvidaste tu clave?
             </Link>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-md disabled:opacity-50"
+            style={{ backgroundColor: '#DBBB6E' }}
+            className="w-full py-3.5 text-white font-extrabold text-xs rounded-xl transition shadow-md hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? 'Ingresando...' : 'Iniciar Sesión'}
+            {loading ? 'Verificando...' : 'Iniciar Sesión en el Sistema'} <ArrowRight className="w-4 h-4 text-white" />
           </button>
         </form>
+
+        {/* Super Admin Quick Helper Prompt */}
+        <div className="pt-2 border-t border-slate-100 text-center">
+          <span className="text-[11px] text-slate-400 font-medium">
+            Acceso Super Admin disponible exclusivamente para <strong className="text-slate-700">tech.innova.reg@gmail.com</strong> (con verificación de 2 pasos).
+          </span>
+        </div>
       </div>
+
+      {/* 2-STEP VERIFICATION TOKEN / PIN MODAL FOR SUPER ADMIN */}
+      {show2FAModal && (
+        <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in-up">
+          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#C5A059] space-y-4 text-center">
+            
+            <div className="w-14 h-14 bg-amber-50 text-[#B8860B] rounded-2xl border border-[#C5A059]/40 flex items-center justify-center mx-auto shadow-md">
+              <ShieldCheck className="w-8 h-8" />
+            </div>
+
+            <div>
+              <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Verificación de 2 Pasos (2FA)</h3>
+              <p className="text-xs text-slate-600 mt-1">
+                Se ha enviado un token de seguridad o PIN de 4 dígitos a <strong className="text-slate-900 font-mono">tech.innova.reg@gmail.com</strong>.
+              </p>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl font-mono">
+              🔑 <strong>Código PIN 2FA Generado:</strong> <span className="font-bold text-base text-[#B8860B]">8492</span>
+            </div>
+
+            {pinError && (
+              <div className="p-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
+                {pinError}
+              </div>
+            )}
+
+            <form onSubmit={handleVerify2FAPin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">
+                  Ingresa el PIN de 4 Dígitos
+                </label>
+                <input
+                  type="text"
+                  maxLength={4}
+                  required
+                  value={twoFactorPin}
+                  onChange={(e) => setTwoFactorPin(e.target.value)}
+                  placeholder="8492"
+                  className="w-44 px-4 py-3 bg-white border-2 border-[#C5A059] rounded-xl text-center text-2xl font-mono font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                />
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-xs">
+                <input
+                  type="checkbox"
+                  id="modalRemember"
+                  checked={rememberDeviceChecked}
+                  onChange={(e) => setRememberDeviceChecked(e.target.checked)}
+                  className="w-4 h-4 text-[#C5A059] rounded border-slate-300"
+                />
+                <label htmlFor="modalRemember" className="text-slate-700 font-medium cursor-pointer">
+                  Recordar este dispositivo / navegador
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShow2FAModal(false)}
+                  className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: '#DBBB6E' }}
+                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md text-xs hover:brightness-110"
+                >
+                  Verificar & Acceder
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -122,7 +122,7 @@ export default function Home() {
               style={{ backgroundColor: '#DBBB6E' }}
               className="text-xs font-bold text-white px-5 py-2.5 rounded-xl transition shadow-md flex items-center gap-1.5 hover:brightness-110"
             >
-              <Sparkles className="w-4 h-4 text-white" /> Acceso a Demo
+              <Sparkles className="w-4 h-4 text-white" /> Acceso al Sistema
             </Link>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function Home() {
                 style={{ backgroundColor: '#DBBB6E' }}
                 className="w-full sm:w-auto px-8 py-4 text-white font-extrabold text-sm rounded-2xl transition shadow-xl flex items-center justify-center gap-2 hover:brightness-110"
               >
-                <Sparkles className="w-5 h-5 text-white" /> Acceder a Demo de Prueba <ArrowRight className="w-5 h-5 text-white" />
+                <Sparkles className="w-5 h-5 text-white" /> Ingresar a la Plataforma <ArrowRight className="w-5 h-5 text-white" />
               </Link>
               <Link
                 href="/pricing"

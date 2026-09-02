@@ -27,7 +27,7 @@ export interface AuthSession {
   };
 }
 
-// Initial In-Memory Store for Super Admin managed client accounts
+// In-Memory Store for Super Admin managed client accounts
 const adminAccountsStore: AdminAccount[] = [
   {
     id: 'usr-admin-01',
@@ -38,7 +38,7 @@ const adminAccountsStore: AdminAccount[] = [
     contactPhone: '+51 987 654 321',
     planCode: 'STARTER',
     contractStartDate: '2026-08-01T00:00:00.000Z',
-    contractEndDate: '2026-12-31T23:59:59.000Z',
+    contractEndDate: '2026-09-08T23:59:59.000Z', // Expiring in 6 days for testing 1-week alert
     status: 'ACTIVA',
     mustChangePassword: false,
     passwordHashMasked: '••••••••••••',
@@ -76,23 +76,71 @@ const adminAccountsStore: AdminAccount[] = [
   },
 ];
 
-// Current active session state (simulated session)
-let currentSession: AuthSession | null = {
-  user: {
-    id: 'usr-admin-01',
-    email: 'ana@amgweddings.pe',
-    name: 'Ana María Gamarra (AMG Weddings)',
-    role: 'ADMIN',
-    workspaceId: 'ws-a-1111',
-    mustChangePassword: false,
-  },
-};
+// Current active session state
+let currentSession: AuthSession | null = null;
+
+export const SUPER_ADMIN_EMAIL = 'tech.innova.reg@gmail.com';
 
 /**
- * Super Admin: Get all managed client accounts
+ * Check and enforce account expiration status automatically
+ */
+export function checkAccountExpirations(): void {
+  const now = new Date().getTime();
+  adminAccountsStore.forEach(acc => {
+    const endMs = new Date(acc.contractEndDate).getTime();
+    if (endMs < now && acc.status !== 'SUSPENDIDA') {
+      acc.status = 'VENCIDA';
+    }
+  });
+}
+
+/**
+ * Super Admin: Get all managed client accounts (with expiration check)
  */
 export function getAllAdminAccounts(): AdminAccount[] {
+  checkAccountExpirations();
   return [...adminAccountsStore];
+}
+
+/**
+ * Calculate Remaining Active Contract Days
+ */
+export function calculateRemainingDays(endDateIso: string): number {
+  const end = new Date(endDateIso).getTime();
+  const now = new Date().getTime();
+  const diffMs = end - now;
+  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+}
+
+/**
+ * Check if account is in 1-week expiration warning window (<= 7 days remaining)
+ */
+export function isAccountNearExpiration(endDateIso: string): boolean {
+  const remDays = calculateRemainingDays(endDateIso);
+  return remDays > 0 && remDays <= 7;
+}
+
+/**
+ * Super Admin: Extend Client Contract
+ * Calculates new end date starting from the DAY AFTER the previous contract end date
+ */
+export function extendAdminContract(accountId: string, extensionDays: number): { success: boolean; newEndDate: string; message: string } {
+  const acc = adminAccountsStore.find(a => a.id === accountId);
+  if (!acc) return { success: false, newEndDate: '', message: 'Cuenta no encontrada.' };
+
+  const currentEnd = new Date(acc.contractEndDate);
+  // Start from the day after the previous plan's end date
+  const startFromDate = new Date(currentEnd.getTime() + 24 * 60 * 60 * 1000);
+  const newEndDate = new Date(startFromDate.getTime() + extensionDays * 24 * 60 * 60 * 1000);
+
+  acc.contractEndDate = newEndDate.toISOString();
+  acc.status = 'ACTIVA'; // Reactivate account automatically upon extension payment
+
+  return {
+    success: true,
+    newEndDate: newEndDate.toLocaleDateString(),
+    message: `¡Contrato extendido con éxito! La nueva fecha de vencimiento es el ${newEndDate.toLocaleDateString()}, calculada desde el día siguiente del fin del plan anterior.`,
+  };
 }
 
 /**
@@ -132,7 +180,7 @@ export function createAdminAccount(data: {
 
   return {
     account,
-    tempPasswordNotice: `Cuenta creada exitosamente. Se ha generado un token de acceso inicial enviado a ${data.contactEmail}. El administrador establecerá su contraseña en su primer ingreso.`,
+    tempPasswordNotice: `Cuenta creada exitosamente. Se ha registrado a ${data.contactEmail}. El administrador establecerá su contraseña privada en su primer ingreso.`,
   };
 }
 
@@ -151,7 +199,7 @@ export function updateAdminAccount(
 }
 
 /**
- * Super Admin: Trigger Password Reset for an Administrator (Sends secure reset email link)
+ * Super Admin: Trigger Password Reset for an Administrator
  */
 export function triggerPasswordReset(accountId: string): { success: boolean; message: string } {
   const acc = adminAccountsStore.find(a => a.id === accountId);
@@ -160,18 +208,25 @@ export function triggerPasswordReset(accountId: string): { success: boolean; mes
   acc.mustChangePassword = true;
   return {
     success: true,
-    message: `Se ha enviado una solicitud de restablecimiento de contraseña al correo ${acc.contactEmail}. En su próximo ingreso, se le solicitará definir una nueva contraseña.`,
+    message: `Se ha enviado un enlace de restablecimiento al correo ${acc.contactEmail}. El cliente definirá su clave privada en su próximo ingreso.`,
   };
 }
 
 /**
- * Calculate Remaining Active Contract Days
+ * Device Memory & 2FA 4-Digit Token Verification Helper for tech.innova.reg@gmail.com
  */
-export function calculateRemainingDays(endDateIso: string): number {
-  const end = new Date(endDateIso).getTime();
-  const now = new Date().getTime();
-  const diffMs = end - now;
-  return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+export function isDeviceRemembered(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem('techinnova_trusted_device') === 'true';
+}
+
+export function rememberDevice(remember: boolean): void {
+  if (typeof window === 'undefined') return;
+  if (remember) {
+    localStorage.setItem('techinnova_trusted_device', 'true');
+  } else {
+    localStorage.removeItem('techinnova_trusted_device');
+  }
 }
 
 /**

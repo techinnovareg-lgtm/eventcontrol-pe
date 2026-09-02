@@ -6,11 +6,11 @@ import Image from 'next/image';
 import { 
   ShieldCheck, Plus, Calendar, Clock, Mail, Phone, Lock, 
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
-  Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert
+  Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
-  triggerPasswordReset, calculateRemainingDays, AdminAccount 
+  triggerPasswordReset, calculateRemainingDays, extendAdminContract, AdminAccount 
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
@@ -18,6 +18,8 @@ export default function SuperAdminPage() {
   const [accounts, setAccounts] = useState<AdminAccount[]>(() => getAllAdminAccounts());
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
+  const [extendingAccount, setExtendingAccount] = useState<AdminAccount | null>(null);
+  const [extensionDays, setExtensionDays] = useState(365);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
   // New Account Form State
@@ -52,6 +54,17 @@ export default function SuperAdminPage() {
     setIsCreateModalOpen(false);
     refreshList();
     setNoticeMessage(result.tempPasswordNotice);
+    setTimeout(() => setNoticeMessage(null), 8000);
+  };
+
+  const handleExtendContract = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!extendingAccount) return;
+
+    const result = extendAdminContract(extendingAccount.id, extensionDays);
+    setExtendingAccount(null);
+    refreshList();
+    setNoticeMessage(result.message);
     setTimeout(() => setNoticeMessage(null), 8000);
   };
 
@@ -98,12 +111,12 @@ export default function SuperAdminPage() {
             <div>
               <span className="text-xl font-bold tracking-tight text-white font-serif flex items-center gap-2">
                 EventControl<span className="text-[#C5A059]">.pe</span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-[#C5A059] text-white font-mono font-bold">
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-[#C5A059] text-white font-mono font-bold uppercase">
                   SUPER ADMIN
                 </span>
               </span>
               <span className="text-[10px] text-slate-300 uppercase tracking-widest font-semibold block">
-                Panel Global de Administración de Clientes y Cuentas
+                Panel Oficial • tech.innova.reg@gmail.com
               </span>
             </div>
           </Link>
@@ -137,13 +150,14 @@ export default function SuperAdminPage() {
         <div className="card-luxury p-6 border border-[#C5A059]/40 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Panel Super Administrador (Admin de Admins)</span>
-            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Gestión de Cuentas y Asignación de Planes</h1>
-            <p className="text-xs text-slate-500">Crea administradores de eventos, asigna sus planes contratados y restablece accesos con privacidad de contraseñas.</p>
+            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Gestión de Cuentas y Extensión de Contratos</h1>
+            <p className="text-xs text-slate-500">Crea administradores, asigna planes, extiende vencimientos tras pagos y restablece accesos con total privacidad.</p>
           </div>
 
           <button
             onClick={() => setIsCreateModalOpen(true)}
-            className="gold-button font-bold text-xs px-5 py-3 rounded-xl transition shadow-md flex items-center gap-2 self-start sm:self-auto"
+            style={{ backgroundColor: '#DBBB6E' }}
+            className="hover:brightness-110 text-white font-bold text-xs px-5 py-3 rounded-xl transition shadow-md flex items-center gap-2 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" /> Crear Nueva Cuenta de Administrador
           </button>
@@ -162,9 +176,9 @@ export default function SuperAdminPage() {
             </strong>
           </div>
           <div className="card-luxury p-5 border border-amber-200 bg-amber-50/50">
-            <span className="text-xs text-amber-800 uppercase font-semibold block">Próximos a Vencer</span>
+            <span className="text-xs text-amber-800 uppercase font-semibold block">Próximos a Vencer (&lt; 7 días)</span>
             <strong className="text-3xl font-serif font-bold text-amber-700 mt-1 block">
-              {accounts.filter(a => calculateRemainingDays(a.contractEndDate) <= 30).length}
+              {accounts.filter(a => calculateRemainingDays(a.contractEndDate) <= 7).length}
             </strong>
           </div>
           <div className="card-luxury p-5 border border-purple-200 bg-purple-50/50">
@@ -201,9 +215,10 @@ export default function SuperAdminPage() {
                 {accounts.map((acc) => {
                   const remDays = calculateRemainingDays(acc.contractEndDate);
                   const plan = PLAN_LIMITS[acc.planCode];
+                  const isNearExpiration = remDays <= 7;
 
                   return (
-                    <tr key={acc.id} className="hover:bg-amber-50/40 transition">
+                    <tr key={acc.id} className={`hover:bg-amber-50/40 transition ${isNearExpiration ? 'bg-amber-50/70' : ''}`}>
                       <td className="py-3 px-4">
                         <strong className="font-bold text-slate-900 block text-sm">{acc.companyName}</strong>
                         <span className="text-[10px] text-slate-400 font-mono">Workspace: {acc.workspaceId}</span>
@@ -235,11 +250,11 @@ export default function SuperAdminPage() {
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className="font-mono text-slate-700 block">
+                        <span className="font-mono text-slate-700 block font-bold">
                           {new Date(acc.contractEndDate).toLocaleDateString()}
                         </span>
-                        <span className={`text-[10px] font-bold ${remDays <= 15 ? 'text-red-600' : 'text-emerald-700'}`}>
-                          {remDays} días restantes
+                        <span className={`text-[10px] font-extrabold block ${remDays <= 7 ? 'text-red-600 animate-pulse' : 'text-emerald-700'}`}>
+                          {remDays <= 7 ? `⚠️ Alerta: ${remDays} días` : `${remDays} días restantes`}
                         </span>
                       </td>
 
@@ -249,25 +264,35 @@ export default function SuperAdminPage() {
                       </td>
 
                       <td className="py-3 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          acc.status === 'ACTIVA' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                          'bg-red-100 text-red-800 border border-red-300'
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                          acc.status === 'ACTIVA' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                          'bg-red-100 text-red-800 border-red-300'
                         }`}>
                           {acc.status}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-right space-x-1.5">
+                      <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                        <button
+                          onClick={() => setExtendingAccount(acc)}
+                          style={{ backgroundColor: '#DBBB6E' }}
+                          className="px-2.5 py-1.5 text-white font-bold rounded-lg transition text-[11px] shadow-sm hover:brightness-110"
+                          title="Extender Contrato / Renovar Plan"
+                        >
+                          Extender Contrato
+                        </button>
+
                         <button
                           onClick={() => setEditingAccount(acc)}
                           className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
-                          title="Editar Plan y Vencimiento"
+                          title="Editar Plan y Datos"
                         >
                           Editar
                         </button>
+                        
                         <button
                           onClick={() => handleTriggerReset(acc)}
-                          className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg border border-indigo-200 transition text-[11px]"
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
                           title="Restablecer Contraseña (Enviar Link por Correo)"
                         >
                           Reset Clave
@@ -281,6 +306,57 @@ export default function SuperAdminPage() {
           </div>
         </div>
       </main>
+
+      {/* EXTEND CONTRACT MODAL */}
+      {extendingAccount && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
+            <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Extender Contrato de Cliente</h3>
+            <p className="text-xs text-slate-600">
+              Extiende la suscripción para <strong className="text-slate-900">{extendingAccount.companyName}</strong>. La nueva fecha de vencimiento se calculará **desde el día siguiente del fin del plan anterior**.
+            </p>
+
+            <form onSubmit={handleExtendContract} className="space-y-4 text-xs">
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-1">
+                <div>Fecha de Vencimiento Actual: <strong className="font-mono">{new Date(extendingAccount.contractEndDate).toLocaleDateString()}</strong></div>
+                <div>Plan Activo: <strong>Plan {PLAN_LIMITS[extendingAccount.planCode].name}</strong></div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Período de Extensión tras Pago
+                </label>
+                <select
+                  value={extensionDays}
+                  onChange={(e) => setExtensionDays(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                >
+                  <option value={30}>+ 30 Días (Renovación Mensual)</option>
+                  <option value={90}>+ 90 Días (Renovación Trimestral)</option>
+                  <option value={365}>+ 365 Días (Renovación Anual Oficial)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setExtendingAccount(null)}
+                  className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: '#DBBB6E' }}
+                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
+                >
+                  Confirmar Extensión
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* CREATE ADMIN ACCOUNT MODAL */}
       {isCreateModalOpen && (
@@ -397,7 +473,8 @@ export default function SuperAdminPage() {
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 py-2.5 gold-button font-bold rounded-xl shadow-md"
+                  style={{ backgroundColor: '#DBBB6E' }}
+                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
                 >
                   Crear Cuenta Administradora
                 </button>
@@ -467,7 +544,8 @@ export default function SuperAdminPage() {
                 </button>
                 <button
                   type="submit"
-                  className="w-1/2 py-2.5 gold-button font-bold rounded-xl shadow-md"
+                  style={{ backgroundColor: '#DBBB6E' }}
+                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
                 >
                   Guardar Cambios
                 </button>
