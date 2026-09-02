@@ -6,13 +6,13 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Sparkles, ArrowRight, ShieldCheck } from 'lucide-react';
 
 /* Gracefully Curved Baroque Filigree Corner SVG Ornament */
-function BaroqueCornerSVG({ className = "w-10 h-10 text-[#C5A059]" }: { className?: string }) {
+function BaroqueCornerSVG({ className = "w-10 h-10 text-[#DBBB6E]" }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path d="M 6 36 C 6 18, 18 6, 36 6" stroke="#C5A059" strokeWidth="2" strokeLinecap="round" />
+      <path d="M 6 36 C 6 18, 18 6, 36 6" stroke="#DBBB6E" strokeWidth="2" strokeLinecap="round" />
       <path d="M 12 40 C 12 24, 24 12, 40 12" stroke="#B8860B" strokeWidth="1" strokeLinecap="round" opacity="0.6" strokeDasharray="3 2" />
-      <path d="M 6 22 C 14 22, 22 14, 22 6 C 14 12, 10 16, 6 22 Z" fill="#C5A059" opacity="0.75" />
-      <circle cx="20" cy="20" r="3.5" fill="#D4AF37" />
+      <path d="M 6 22 C 14 22, 22 14, 22 6 C 14 12, 10 16, 6 22 Z" fill="#DBBB6E" opacity="0.75" />
+      <circle cx="20" cy="20" r="3.5" fill="#DBBB6E" />
       <circle cx="36" cy="14" r="2" fill="#B8860B" />
       <circle cx="14" cy="36" r="2" fill="#B8860B" />
     </svg>
@@ -49,10 +49,11 @@ const slides = [
 export default function HeroBannerSlider() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
+  // Increased display duration per image (9000ms = 9 seconds)
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % slides.length);
-    }, 5500);
+    }, 9000);
     return () => clearInterval(timer);
   }, []);
 
@@ -65,7 +66,7 @@ export default function HeroBannerSlider() {
   };
 
   return (
-    <div className="relative w-full max-w-5xl mx-auto rounded-3xl overflow-hidden border-2 border-[#C5A059]/40 shadow-2xl bg-slate-900 group">
+    <div className="relative w-full max-w-none overflow-hidden border-y-2 border-[#DBBB6E]/40 shadow-2xl bg-slate-950 group">
       
       {/* Baroque Corner Filigree Flourishes */}
       <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
@@ -73,8 +74,8 @@ export default function HeroBannerSlider() {
       <div className="baroque-corner-bl"><BaroqueCornerSVG /></div>
       <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
 
-      {/* Main Slide Carousel Wrapper */}
-      <div className="relative h-[480px] sm:h-[540px] md:h-[600px] w-full overflow-hidden">
+      {/* Main Slide Carousel Wrapper - Full Screen Width Hero Banner */}
+      <div className="relative h-[520px] sm:h-[620px] lg:h-[700px] w-full overflow-hidden">
         {slides.map((slide, idx) => {
           const isActive = idx === currentIndex;
 
@@ -95,44 +96,47 @@ export default function HeroBannerSlider() {
               />
 
               {/* Romantic Vignette Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/50 to-slate-900/30"></div>
-              <div className="absolute inset-0 bg-radial-vignette opacity-60"></div>
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-slate-900/40"></div>
 
               {/* Content Overlay */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 sm:px-12 space-y-4 sm:space-y-6 max-w-4xl mx-auto z-20">
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 sm:px-12 space-y-4 sm:space-y-6 max-w-5xl mx-auto z-20">
                 
                 {/* Badge */}
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/40 border border-[#C5A059]/60 text-amber-200 text-xs sm:text-sm font-semibold tracking-widest backdrop-blur-md shadow-md animate-fade-in-up">
-                  <ShieldCheck className="w-4 h-4 text-[#C5A059]" /> {slide.badge}
+                <div 
+                  style={{ backgroundColor: '#DBBB6E' }}
+                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-white text-xs sm:text-sm font-extrabold tracking-widest shadow-lg backdrop-blur-md animate-fade-in-up uppercase"
+                >
+                  <ShieldCheck className="w-4 h-4 text-white" /> {slide.badge}
                 </div>
 
                 {/* Elegant Handwriting Script Phrase */}
-                <h3 className="font-handwriting text-3xl sm:text-5xl md:text-6xl text-[#F5E6C8] font-normal leading-tight tracking-wide drop-shadow-lg animate-fade-in-up">
+                <h3 className="font-handwriting text-4xl sm:text-6xl md:text-7xl text-[#F7E7BE] font-normal leading-tight tracking-wide drop-shadow-xl animate-fade-in-up">
                   “{slide.handwriteTag}”
                 </h3>
 
                 {/* Main Slide Title */}
-                <h2 className="font-serif text-2xl sm:text-4xl md:text-5xl text-white font-extrabold tracking-tight drop-shadow-md max-w-3xl leading-tight">
+                <h2 className="font-serif text-3xl sm:text-5xl md:text-6xl text-white font-extrabold tracking-tight drop-shadow-md max-w-4xl leading-tight">
                   {slide.title}
                 </h2>
 
                 {/* Subtitle / Description */}
-                <p className="text-xs sm:text-base text-slate-200 max-w-2xl font-light leading-relaxed drop-shadow">
+                <p className="text-sm sm:text-lg text-slate-200 max-w-3xl font-light leading-relaxed drop-shadow">
                   {slide.description}
                 </p>
 
                 {/* CTA Buttons */}
-                <div className="pt-2 flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+                <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
                   <Link
                     href="/login"
-                    className="gold-button font-bold text-xs sm:text-sm px-6 py-3 rounded-xl transition shadow-xl flex items-center gap-2"
+                    style={{ backgroundColor: '#DBBB6E' }}
+                    className="hover:brightness-110 text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-xl transition shadow-xl flex items-center gap-2"
                   >
-                    <Sparkles className="w-4 h-4 text-amber-100" /> Ingresar a Demo <ArrowRight className="w-4 h-4" />
+                    <Sparkles className="w-4 h-4 text-white" /> Ingresar a Demo de Prueba <ArrowRight className="w-4 h-4" />
                   </Link>
 
                   <Link
                     href="/pricing"
-                    className="bg-white/90 hover:bg-white text-slate-900 font-bold text-xs sm:text-sm px-6 py-3 rounded-xl border border-[#C5A059]/50 transition shadow-md backdrop-blur-sm"
+                    className="bg-white/90 hover:bg-white text-slate-900 font-extrabold text-xs sm:text-sm px-8 py-3.5 rounded-xl border border-[#DBBB6E]/60 transition shadow-md backdrop-blur-sm"
                   >
                     Ver Planes & Tarifas
                   </Link>
@@ -146,31 +150,32 @@ export default function HeroBannerSlider() {
       {/* Navigation Arrow Controls */}
       <button
         onClick={goToPrev}
-        className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white border border-[#C5A059]/50 backdrop-blur-md flex items-center justify-center transition opacity-80 hover:opacity-100 hover:scale-110 shadow-lg"
+        className="absolute left-4 sm:left-8 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 text-white border border-[#DBBB6E]/60 backdrop-blur-md flex items-center justify-center transition opacity-80 hover:opacity-100 hover:scale-110 shadow-lg"
         aria-label="Diapositiva Anterior"
       >
-        <ChevronLeft className="w-6 h-6 text-[#C5A059]" />
+        <ChevronLeft className="w-7 h-7 text-[#DBBB6E]" />
       </button>
 
       <button
         onClick={goToNext}
-        className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-black/40 hover:bg-black/70 text-white border border-[#C5A059]/50 backdrop-blur-md flex items-center justify-center transition opacity-80 hover:opacity-100 hover:scale-110 shadow-lg"
+        className="absolute right-4 sm:right-8 top-1/2 -translate-y-1/2 z-30 w-12 h-12 rounded-full bg-black/50 hover:bg-black/80 text-white border border-[#DBBB6E]/60 backdrop-blur-md flex items-center justify-center transition opacity-80 hover:opacity-100 hover:scale-110 shadow-lg"
         aria-label="Siguiente Diapositiva"
       >
-        <ChevronRight className="w-6 h-6 text-[#C5A059]" />
+        <ChevronRight className="w-7 h-7 text-[#DBBB6E]" />
       </button>
 
       {/* Bottom Dot Indicators */}
-      <div className="absolute bottom-4 sm:bottom-6 inset-x-0 z-30 flex items-center justify-center gap-2">
+      <div className="absolute bottom-6 sm:bottom-8 inset-x-0 z-30 flex items-center justify-center gap-2.5">
         {slides.map((_, idx) => (
           <button
             key={idx}
             onClick={() => setCurrentIndex(idx)}
             className={`transition-all duration-300 rounded-full ${
               idx === currentIndex
-                ? 'w-8 h-2.5 bg-[#C5A059] shadow-md'
-                : 'w-2.5 h-2.5 bg-white/40 hover:bg-white/70'
+                ? 'w-10 h-3 shadow-md'
+                : 'w-3 h-3 bg-white/40 hover:bg-white/70'
             }`}
+            style={{ backgroundColor: idx === currentIndex ? '#DBBB6E' : undefined }}
             aria-label={`Ir a diapositiva ${idx + 1}`}
           />
         ))}
