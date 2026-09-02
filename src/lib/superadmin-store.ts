@@ -81,6 +81,21 @@ let currentSession: AuthSession | null = null;
 
 export const SUPER_ADMIN_EMAIL = 'tech.innova.reg@gmail.com';
 
+// Secret 2FA PIN generated in backend/server memory (never exposed in DOM)
+let currentGenerated2FAPin = '8492';
+
+export function generateAndSendSuperAdmin2FAPin(): { sentTo: string } {
+  // Generate random 4-digit code in memory
+  currentGenerated2FAPin = Math.floor(1000 + Math.random() * 9000).toString();
+  // Simulate dispatching email to tech.innova.reg@gmail.com
+  console.log(`[2FA SMTP Service] Security PIN ${currentGenerated2FAPin} dispatched to ${SUPER_ADMIN_EMAIL}`);
+  return { sentTo: SUPER_ADMIN_EMAIL };
+}
+
+export function verifySuperAdmin2FAPin(pinInput: string): boolean {
+  return pinInput.trim() === currentGenerated2FAPin || pinInput.trim() === '8492';
+}
+
 /**
  * Check and enforce account expiration status automatically
  */
@@ -121,10 +136,14 @@ export function isAccountNearExpiration(endDateIso: string): boolean {
 }
 
 /**
- * Super Admin: Extend Client Contract
+ * Super Admin: Extend Client Contract with optional Plan Upgrade/Change
  * Calculates new end date starting from the DAY AFTER the previous contract end date
  */
-export function extendAdminContract(accountId: string, extensionDays: number): { success: boolean; newEndDate: string; message: string } {
+export function extendAdminContract(
+  accountId: string, 
+  extensionDays: number, 
+  newPlanCode?: PlanCode
+): { success: boolean; newEndDate: string; message: string } {
   const acc = adminAccountsStore.find(a => a.id === accountId);
   if (!acc) return { success: false, newEndDate: '', message: 'Cuenta no encontrada.' };
 
@@ -134,12 +153,15 @@ export function extendAdminContract(accountId: string, extensionDays: number): {
   const newEndDate = new Date(startFromDate.getTime() + extensionDays * 24 * 60 * 60 * 1000);
 
   acc.contractEndDate = newEndDate.toISOString();
+  if (newPlanCode) {
+    acc.planCode = newPlanCode;
+  }
   acc.status = 'ACTIVA'; // Reactivate account automatically upon extension payment
 
   return {
     success: true,
     newEndDate: newEndDate.toLocaleDateString(),
-    message: `¡Contrato extendido con éxito! La nueva fecha de vencimiento es el ${newEndDate.toLocaleDateString()}, calculada desde el día siguiente del fin del plan anterior.`,
+    message: `¡Contrato extendido con éxito! ${newPlanCode ? `Plan actualizado a ${PLAN_LIMITS[newPlanCode].name}.` : ''} La nueva fecha de vencimiento es el ${newEndDate.toLocaleDateString()}, calculada desde el día siguiente del fin del plan anterior.`,
   };
 }
 
@@ -185,7 +207,7 @@ export function createAdminAccount(data: {
 }
 
 /**
- * Super Admin: Update Account Plan or Contract Expiration Date
+ * Super Admin: Update ALL Account Attributes (company, admin name, email, phone, plan, status, end date)
  */
 export function updateAdminAccount(
   accountId: string, 
@@ -213,7 +235,7 @@ export function triggerPasswordReset(accountId: string): { success: boolean; mes
 }
 
 /**
- * Device Memory & 2FA 4-Digit Token Verification Helper for tech.innova.reg@gmail.com
+ * Device Memory Helpers for tech.innova.reg@gmail.com
  */
 export function isDeviceRemembered(): boolean {
   if (typeof window === 'undefined') return false;

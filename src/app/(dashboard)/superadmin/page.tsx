@@ -19,7 +19,11 @@ export default function SuperAdminPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
   const [extendingAccount, setExtendingAccount] = useState<AdminAccount | null>(null);
+  
+  // Extension Modal State
   const [extensionDays, setExtensionDays] = useState(365);
+  const [selectedExtensionPlan, setSelectedExtensionPlan] = useState<PlanCode>('PROFESSIONAL');
+  
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
 
   // New Account Form State
@@ -57,11 +61,16 @@ export default function SuperAdminPage() {
     setTimeout(() => setNoticeMessage(null), 8000);
   };
 
-  const handleExtendContract = (e: React.FormEvent) => {
+  const handleOpenExtendModal = (account: AdminAccount) => {
+    setExtendingAccount(account);
+    setSelectedExtensionPlan(account.planCode);
+  };
+
+  const handleExtendContractSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!extendingAccount) return;
 
-    const result = extendAdminContract(extendingAccount.id, extensionDays);
+    const result = extendAdminContract(extendingAccount.id, extensionDays, selectedExtensionPlan);
     setExtendingAccount(null);
     refreshList();
     setNoticeMessage(result.message);
@@ -69,7 +78,7 @@ export default function SuperAdminPage() {
   };
 
   const handleTriggerReset = (account: AdminAccount) => {
-    if (confirm(`¿Restablecer contraseña para la cuenta de "${account.companyName}"? Se solicitará definir una nueva clave en su próximo ingreso.`)) {
+    if (confirm(`¿Restablecer contraseña para la cuenta de "${account.companyName}"? Se enviará un enlace para definir su nueva clave.`)) {
       const res = triggerPasswordReset(account.id);
       refreshList();
       setNoticeMessage(res.message);
@@ -77,7 +86,7 @@ export default function SuperAdminPage() {
     }
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAccount) return;
 
@@ -88,10 +97,13 @@ export default function SuperAdminPage() {
       contactPhone: editingAccount.contactPhone,
       planCode: editingAccount.planCode,
       status: editingAccount.status,
+      contractEndDate: editingAccount.contractEndDate,
     });
 
     setEditingAccount(null);
     refreshList();
+    setNoticeMessage(`¡Atributos de la cuenta "${editingAccount.companyName}" actualizados exitosamente!`);
+    setTimeout(() => setNoticeMessage(null), 6000);
   };
 
   return (
@@ -115,8 +127,8 @@ export default function SuperAdminPage() {
                   SUPER ADMIN
                 </span>
               </span>
-              <span className="text-[10px] text-slate-300 uppercase tracking-widest font-semibold block">
-                Panel Oficial • tech.innova.reg@gmail.com
+              <span className="text-[10px] text-slate-300 uppercase tracking-widest font-semibold block font-mono">
+                tech.innova.reg@gmail.com
               </span>
             </div>
           </Link>
@@ -151,7 +163,7 @@ export default function SuperAdminPage() {
           <div>
             <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Panel Super Administrador (Admin de Admins)</span>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Gestión de Cuentas y Extensión de Contratos</h1>
-            <p className="text-xs text-slate-500">Crea administradores, asigna planes, extiende vencimientos tras pagos y restablece accesos con total privacidad.</p>
+            <p className="text-xs text-slate-500">Administra todos los atributos de las cuentas cliente, actualiza planes y renueva contratos.</p>
           </div>
 
           <button
@@ -189,7 +201,7 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        {/* Managed Client Accounts List */}
+        {/* Managed Client Accounts List (Clean Layout without Contraseña column) */}
         <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
@@ -202,13 +214,12 @@ export default function SuperAdminPage() {
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
-                  <th className="py-3 px-4">Empresa / Planner</th>
-                  <th className="py-3 px-4">Administrador & Correo</th>
-                  <th className="py-3 px-4">Plan Contratado</th>
-                  <th className="py-3 px-4">Vencimiento & Días</th>
-                  <th className="py-3 px-4">Contraseña</th>
-                  <th className="py-3 px-4">Estado</th>
-                  <th className="py-3 px-4 text-right">Acciones</th>
+                  <th className="py-3.5 px-4">Empresa / Planner</th>
+                  <th className="py-3.5 px-4">Administrador & Correo</th>
+                  <th className="py-3.5 px-4">Plan Contratado</th>
+                  <th className="py-3.5 px-4">Vencimiento & Días</th>
+                  <th className="py-3.5 px-4">Estado</th>
+                  <th className="py-3.5 px-4 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -219,12 +230,15 @@ export default function SuperAdminPage() {
 
                   return (
                     <tr key={acc.id} className={`hover:bg-amber-50/40 transition ${isNearExpiration ? 'bg-amber-50/70' : ''}`}>
-                      <td className="py-3 px-4">
+                      
+                      {/* Empresa / Planner */}
+                      <td className="py-3.5 px-4">
                         <strong className="font-bold text-slate-900 block text-sm">{acc.companyName}</strong>
                         <span className="text-[10px] text-slate-400 font-mono">Workspace: {acc.workspaceId}</span>
                       </td>
 
-                      <td className="py-3 px-4">
+                      {/* Administrador & Correo */}
+                      <td className="py-3.5 px-4">
                         <span className="font-semibold text-slate-800 block">{acc.adminName}</span>
                         <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1">
                           <Mail className="w-3 h-3 text-[#B8860B]" /> {acc.contactEmail}
@@ -236,21 +250,20 @@ export default function SuperAdminPage() {
                         )}
                       </td>
 
-                      <td className="py-3 px-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[11px] font-extrabold border ${
-                          acc.planCode === 'BUSINESS' ? 'bg-purple-100 text-purple-900 border-purple-300' :
-                          acc.planCode === 'PROFESSIONAL' ? 'bg-amber-100 text-amber-900 border-amber-300' :
-                          'bg-slate-100 text-slate-800 border-slate-300'
-                        }`}>
-                          Plan {plan.name} (S/{plan.monthlyPricePEN}/mes)
-                        </span>
+                      {/* Clean Non-Overflowing Plan Contratado Column */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border font-bold text-xs shadow-sm bg-amber-50 text-[#B8860B] border-[#DBBB6E]/50">
+                          <span>Plan {plan.name}</span>
+                          <span className="text-[10px] font-normal text-slate-500">(S/{plan.monthlyPricePEN}/mes)</span>
+                        </div>
                         <span className="text-[10px] text-slate-500 block mt-1">
                           Evts: {plan.maxActiveEvents === -1 ? 'Ilimitados' : plan.maxActiveEvents} • Pases: {plan.maxPassesPerEvent}
                         </span>
                       </td>
 
-                      <td className="py-3 px-4">
-                        <span className="font-mono text-slate-700 block font-bold">
+                      {/* Vencimiento & Días */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-mono text-slate-800 block font-bold">
                           {new Date(acc.contractEndDate).toLocaleDateString()}
                         </span>
                         <span className={`text-[10px] font-extrabold block ${remDays <= 7 ? 'text-red-600 animate-pulse' : 'text-emerald-700'}`}>
@@ -258,13 +271,9 @@ export default function SuperAdminPage() {
                         </span>
                       </td>
 
-                      <td className="py-3 px-4">
-                        <span className="text-slate-400 font-mono text-xs block">{acc.passwordHashMasked}</span>
-                        <span className="text-[10px] text-slate-400 italic">Privacidad protegida</span>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                      {/* Estado */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
                           acc.status === 'ACTIVA' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
                           'bg-red-100 text-red-800 border-red-300'
                         }`}>
@@ -272,27 +281,28 @@ export default function SuperAdminPage() {
                         </span>
                       </td>
 
-                      <td className="py-3 px-4 text-right space-x-1.5 whitespace-nowrap">
+                      {/* Acciones */}
+                      <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                         <button
-                          onClick={() => setExtendingAccount(acc)}
+                          onClick={() => handleOpenExtendModal(acc)}
                           style={{ backgroundColor: '#DBBB6E' }}
-                          className="px-2.5 py-1.5 text-white font-bold rounded-lg transition text-[11px] shadow-sm hover:brightness-110"
+                          className="px-3 py-1.5 text-white font-bold rounded-lg transition text-[11px] shadow-sm hover:brightness-110"
                           title="Extender Contrato / Renovar Plan"
                         >
                           Extender Contrato
                         </button>
 
                         <button
-                          onClick={() => setEditingAccount(acc)}
-                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
-                          title="Editar Plan y Datos"
+                          onClick={() => setEditingAccount({ ...acc })}
+                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
+                          title="Editar Todos los Atributos"
                         >
                           Editar
                         </button>
                         
                         <button
                           onClick={() => handleTriggerReset(acc)}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
+                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
                           title="Restablecer Contraseña (Enviar Link por Correo)"
                         >
                           Reset Clave
@@ -307,19 +317,34 @@ export default function SuperAdminPage() {
         </div>
       </main>
 
-      {/* EXTEND CONTRACT MODAL */}
+      {/* EXTEND CONTRACT MODAL (WITH PLAN UPGRADE / CHANGE OPTION) */}
       {extendingAccount && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
-            <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Extender Contrato de Cliente</h3>
-            <p className="text-xs text-slate-600">
+            <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Extender Contrato / Renovar Plan</h3>
+            <p className="text-xs text-slate-600 leading-relaxed">
               Extiende la suscripción para <strong className="text-slate-900">{extendingAccount.companyName}</strong>. La nueva fecha de vencimiento se calculará **desde el día siguiente del fin del plan anterior**.
             </p>
 
-            <form onSubmit={handleExtendContract} className="space-y-4 text-xs">
+            <form onSubmit={handleExtendContractSubmit} className="space-y-4 text-xs">
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-1">
-                <div>Fecha de Vencimiento Actual: <strong className="font-mono">{new Date(extendingAccount.contractEndDate).toLocaleDateString()}</strong></div>
-                <div>Plan Activo: <strong>Plan {PLAN_LIMITS[extendingAccount.planCode].name}</strong></div>
+                <div>Vencimiento Previo: <strong className="font-mono">{new Date(extendingAccount.contractEndDate).toLocaleDateString()}</strong></div>
+                <div>Plan Actual: <strong>Plan {PLAN_LIMITS[extendingAccount.planCode].name}</strong></div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Plan Contratado (Cambiar o Mantener Plan)
+                </label>
+                <select
+                  value={selectedExtensionPlan}
+                  onChange={(e) => setSelectedExtensionPlan(e.target.value as PlanCode)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                >
+                  <option value="STARTER">Plan Starter (S/29/mes - 3 eventos, 150 pases/evt)</option>
+                  <option value="PROFESSIONAL">Plan Professional (S/59/mes - 10 eventos, 500 pases/evt)</option>
+                  <option value="BUSINESS">Plan Business (S/99/mes - Ilimitados evts, 1,000 pases/evt)</option>
+                </select>
               </div>
 
               <div>
@@ -460,7 +485,7 @@ export default function SuperAdminPage() {
               </div>
 
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900">
-                🔒 <strong>Privacidad de Contraseñas:</strong> El Super User no puede visualizar las contraseñas. El cliente recibirá un enlace inicial para definir su clave en su primer acceso.
+                🔒 <strong>Privacidad de Contraseñas:</strong> El cliente recibirá un enlace inicial para definir su clave privada en su primer acceso.
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -484,54 +509,112 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* EDIT ADMIN ACCOUNT MODAL */}
+      {/* EDIT ALL USER ATTRIBUTES MODAL */}
       {editingAccount && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border border-[#C5A059]/40 space-y-4">
-            <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Editar Cuenta Administradora</h3>
+          <div className="max-w-lg w-full card-luxury p-6 shadow-2xl border border-[#C5A059]/40 space-y-4">
+            <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Editar Atributos de la Cuenta</h3>
+            <p className="text-xs text-slate-500">Modifica cualquier dato del cliente (empresa, administrador, correo, teléfono, plan o estado).</p>
 
-            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+            <form onSubmit={handleSaveEditSubmit} className="space-y-4 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Empresa / Planner
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingAccount.companyName}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, companyName: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Nombre del Administrador
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingAccount.adminName}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, adminName: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Correo Electrónico
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    value={editingAccount.contactEmail}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, contactEmail: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Teléfono
+                  </label>
+                  <input
+                    type="text"
+                    value={editingAccount.contactPhone || ''}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, contactPhone: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Plan Contratado
+                  </label>
+                  <select
+                    value={editingAccount.planCode}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, planCode: e.target.value as PlanCode })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  >
+                    <option value="STARTER">Starter</option>
+                    <option value="PROFESSIONAL">Professional</option>
+                    <option value="BUSINESS">Business</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Estado de la Cuenta
+                  </label>
+                  <select
+                    value={editingAccount.status}
+                    onChange={(e) => setEditingAccount({ ...editingAccount, status: e.target.value as any })}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  >
+                    <option value="ACTIVA">ACTIVA</option>
+                    <option value="SUSPENDIDA">SUSPENDIDA</option>
+                    <option value="VENCIDA">VENCIDA</option>
+                  </select>
+                </div>
+              </div>
+
               <div>
                 <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Empresa / Planner
+                  Fecha de Vencimiento (ISO Date String)
                 </label>
                 <input
                   type="text"
                   required
-                  value={editingAccount.companyName}
-                  onChange={(e) => setEditingAccount({ ...editingAccount, companyName: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  value={editingAccount.contractEndDate}
+                  onChange={(e) => setEditingAccount({ ...editingAccount, contractEndDate: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
                 />
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Plan Contratado (Actualización Automática de Límites)
-                </label>
-                <select
-                  value={editingAccount.planCode}
-                  onChange={(e) => setEditingAccount({ ...editingAccount, planCode: e.target.value as PlanCode })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
-                >
-                  <option value="STARTER">Starter</option>
-                  <option value="PROFESSIONAL">Professional</option>
-                  <option value="BUSINESS">Business</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Estado de la Cuenta
-                </label>
-                <select
-                  value={editingAccount.status}
-                  onChange={(e) => setEditingAccount({ ...editingAccount, status: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
-                >
-                  <option value="ACTIVA">ACTIVA</option>
-                  <option value="SUSPENDIDA">SUSPENDIDA</option>
-                  <option value="VENCIDA">VENCIDA</option>
-                </select>
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -547,7 +630,7 @@ export default function SuperAdminPage() {
                   style={{ backgroundColor: '#DBBB6E' }}
                   className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
                 >
-                  Guardar Cambios
+                  Guardar Todos los Atributos
                 </button>
               </div>
             </form>

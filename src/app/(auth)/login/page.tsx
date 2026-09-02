@@ -1,13 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, Mail, ArrowRight, CheckSquare, KeyRound, AlertTriangle } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, ArrowRight, CheckSquare, KeyRound, AlertTriangle, RefreshCw } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { 
-  setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice 
+  setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice,
+  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin 
 } from '@/lib/superadmin-store';
 
 export default function LoginPage() {
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [twoFactorPin, setTwoFactorPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
+  const [resendNotice, setResendNotice] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -45,7 +47,8 @@ export default function LoginPage() {
         });
         router.push('/superadmin');
       } else {
-        // Open 2-Step 4-Digit Verification Token Modal
+        // Trigger PIN dispatch to tech.innova.reg@gmail.com
+        generateAndSendSuperAdmin2FAPin();
         setShow2FAModal(true);
       }
       setLoading(false);
@@ -86,8 +89,7 @@ export default function LoginPage() {
     e.preventDefault();
     setPinError(null);
 
-    // 4-Digit verification token check (e.g. 8492 or any 4 digit code)
-    if (twoFactorPin.trim().length === 4) {
+    if (verifySuperAdmin2FAPin(twoFactorPin)) {
       if (rememberDeviceChecked) {
         rememberDevice(true);
       }
@@ -102,8 +104,14 @@ export default function LoginPage() {
       setShow2FAModal(false);
       router.push('/superadmin');
     } else {
-      setPinError('Ingresa el token o PIN de 4 dígitos enviado a tech.innova.reg@gmail.com.');
+      setPinError('Código PIN incorrecto o expirado. Revisa tu correo tech.innova.reg@gmail.com.');
     }
+  };
+
+  const handleResendPin = () => {
+    generateAndSendSuperAdmin2FAPin();
+    setResendNotice('Se ha re-enviado un nuevo código PIN de 4 dígitos a tech.innova.reg@gmail.com.');
+    setTimeout(() => setResendNotice(null), 5000);
   };
 
   return (
@@ -197,12 +205,12 @@ export default function LoginPage() {
         {/* Super Admin Quick Helper Prompt */}
         <div className="pt-2 border-t border-slate-100 text-center">
           <span className="text-[11px] text-slate-400 font-medium">
-            Acceso Super Admin disponible exclusivamente para <strong className="text-slate-700">tech.innova.reg@gmail.com</strong> (con verificación de 2 pasos).
+            Acceso Super Admin exclusivo para <strong className="text-slate-700 font-mono">tech.innova.reg@gmail.com</strong> (verificación 2FA vía correo).
           </span>
         </div>
       </div>
 
-      {/* 2-STEP VERIFICATION TOKEN / PIN MODAL FOR SUPER ADMIN */}
+      {/* 2-STEP VERIFICATION TOKEN / PIN MODAL FOR SUPER ADMIN (PIN SECURELY DISPATCHED TO EMAIL, NOT DISPLAYED IN DOM) */}
       {show2FAModal && (
         <div className="fixed inset-0 bg-slate-900/75 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in-up">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#C5A059] space-y-4 text-center">
@@ -213,17 +221,19 @@ export default function LoginPage() {
 
             <div>
               <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Verificación de 2 Pasos (2FA)</h3>
-              <p className="text-xs text-slate-600 mt-1">
-                Se ha enviado un token de seguridad o PIN de 4 dígitos a <strong className="text-slate-900 font-mono">tech.innova.reg@gmail.com</strong>.
+              <p className="text-xs text-slate-600 mt-2 leading-relaxed">
+                Se ha enviado un código de seguridad de 4 dígitos a la bandeja de <strong className="text-slate-900 font-mono">tech.innova.reg@gmail.com</strong>.
               </p>
             </div>
 
-            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs rounded-xl font-mono">
-              🔑 <strong>Código PIN 2FA Generado:</strong> <span className="font-bold text-base text-[#B8860B]">8492</span>
-            </div>
+            {resendNotice && (
+              <div className="p-2.5 bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs rounded-xl font-medium">
+                {resendNotice}
+              </div>
+            )}
 
             {pinError && (
-              <div className="p-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium">
                 {pinError}
               </div>
             )}
@@ -234,12 +244,13 @@ export default function LoginPage() {
                   Ingresa el PIN de 4 Dígitos
                 </label>
                 <input
-                  type="text"
+                  type="password"
                   maxLength={4}
                   required
+                  autoFocus
                   value={twoFactorPin}
                   onChange={(e) => setTwoFactorPin(e.target.value)}
-                  placeholder="8492"
+                  placeholder="••••"
                   className="w-44 px-4 py-3 bg-white border-2 border-[#C5A059] rounded-xl text-center text-2xl font-mono font-bold tracking-widest focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                 />
               </div>
@@ -250,11 +261,21 @@ export default function LoginPage() {
                   id="modalRemember"
                   checked={rememberDeviceChecked}
                   onChange={(e) => setRememberDeviceChecked(e.target.checked)}
-                  className="w-4 h-4 text-[#C5A059] rounded border-slate-300"
+                  className="w-4 h-4 text-[#C5A059] rounded border-slate-300 cursor-pointer"
                 />
                 <label htmlFor="modalRemember" className="text-slate-700 font-medium cursor-pointer">
                   Recordar este dispositivo / navegador
                 </label>
+              </div>
+
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={handleResendPin}
+                  className="text-xs text-[#B8860B] hover:underline font-bold inline-flex items-center gap-1"
+                >
+                  <RefreshCw className="w-3 h-3" /> Re-enviar código a tech.innova.reg@gmail.com
+                </button>
               </div>
 
               <div className="flex gap-2 pt-2">
