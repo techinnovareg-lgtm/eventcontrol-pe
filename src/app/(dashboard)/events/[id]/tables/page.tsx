@@ -56,7 +56,7 @@ export default function TablesManagementPage() {
     tbls.forEach((t, i) => {
       initialPos[t.id] = {
         x: t.pos_x || (140 + (i % 4) * 280),
-        y: t.pos_y || (140 + Math.floor(i / 4) * 200), // Height headroom to avoid covering top row
+        y: t.pos_y || (140 + Math.floor(i / 4) * 200),
         shape: i === 4 ? 'VIP_HONOR' : 'ROUND',
       };
     });
@@ -229,20 +229,20 @@ export default function TablesManagementPage() {
     }
   };
 
-  // REAL CLIENT-SIDE PNG IMAGE GENERATION & DOWNLOAD LINK DISPATCH
+  // HIGH-FIDELITY PNG IMAGE GENERATION (100% MATCHES WEB APP & INCLUDES FOOTER WATERMARK)
   const handleExportPNG = () => {
     const canvas = document.createElement('canvas');
     canvas.width = 1400;
-    canvas.height = 900;
+    canvas.height = 920;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 1. Draw Woven Linen Parchment Background
+    // 1. Background Parchment Texture
     ctx.fillStyle = '#FAF8F5';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Grid Dots
-    ctx.fillStyle = 'rgba(197, 160, 89, 0.25)';
+    // Subtle Gold Woven Grid Dots
+    ctx.fillStyle = 'rgba(197, 160, 89, 0.2)';
     for (let x = 0; x < canvas.width; x += 28) {
       for (let y = 0; y < canvas.height; y += 28) {
         ctx.beginPath();
@@ -251,88 +251,182 @@ export default function TablesManagementPage() {
       }
     }
 
-    // 2. Draw Header Title Bar
-    ctx.fillStyle = '#1A1A1A';
-    ctx.font = 'bold 24px serif';
-    ctx.fillText(`${event?.name || 'Evento'} - Plano Oficial de Distribución del Salón`, 40, 50);
-    
-    ctx.fillStyle = '#B8860B';
-    ctx.font = '13px sans-serif';
-    ctx.fillText(`Total Invitados: ${totalAuthorizedGuests} personas (${totalAssignedGuests} ubicados en ${tables.length} mesas)`, 40, 75);
+    // 2. Top Header Title & Metrics Banner (Clean Space from y:0 to y:120)
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = 'rgba(197, 160, 89, 0.4)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(30, 20, 1340, 90, 16);
+    ctx.fill();
+    ctx.stroke();
 
-    // 3. Draw Venue Architectural Elements (Bar, Escenario, Maceteros, etc.)
+    // Event Title
+    ctx.fillStyle = '#1A1A1A';
+    ctx.font = 'bold 22px serif';
+    ctx.fillText(`${event?.name || 'Evento'} - Plano Oficial de Distribución del Salón`, 50, 56);
+
+    // Metrics Subtitle
+    ctx.fillStyle = '#B8860B';
+    ctx.font = 'bold 12px sans-serif';
+    ctx.fillText(`Capacidad: ${totalAuthorizedGuests} invitados autorizados  •  Ubicados: ${totalAssignedGuests} pers. en ${tables.length} mesas`, 50, 84);
+
+    // Y Shift for Objects (+120px offset to keep Mesa Principal VIP completely below the header banner)
+    const yOffset = 120;
+
+    // 3. Render Venue Architectural Elements (Bar, Escenario, Maceteros)
     venueElements.forEach((elem) => {
       const dims = computeElementDimensions(elem.size || 'medium', elem.shape, elem.orientation);
+      const isCircle = elem.shape === 'circle' || elem.shape === 'oval';
+      const posX = elem.pos_x;
+      const posY = elem.pos_y + yOffset;
+
       ctx.save();
       ctx.fillStyle = '#FFFDF9';
       ctx.strokeStyle = '#DBBB6E';
       ctx.lineWidth = 2.5;
 
-      if (elem.shape === 'circle' || elem.shape === 'oval') {
+      if (isCircle) {
         ctx.beginPath();
-        ctx.ellipse(elem.pos_x + dims.width / 2, elem.pos_y + dims.height / 2, dims.width / 2, dims.height / 2, 0, 0, 2 * Math.PI);
+        ctx.ellipse(posX + dims.width / 2, posY + dims.height / 2, dims.width / 2, dims.height / 2, 0, 0, 2 * Math.PI);
         ctx.fill();
         ctx.stroke();
       } else {
         ctx.beginPath();
-        ctx.roundRect(elem.pos_x, elem.pos_y, dims.width, dims.height, 16);
+        ctx.roundRect(posX, posY, dims.width, dims.height, 16);
         ctx.fill();
         ctx.stroke();
       }
 
+      // Non-Overflowing Multi-line Label Centered
       ctx.fillStyle = '#1A1A1A';
-      ctx.font = 'bold 12px serif';
+      ctx.font = 'bold 11px serif';
       ctx.textAlign = 'center';
-      ctx.fillText(elem.label, elem.pos_x + dims.width / 2, elem.pos_y + dims.height / 2 + 4);
+
+      const words = elem.label.split(' ');
+      let line = '';
+      let lines = [];
+      for (let n = 0; n < words.length; n++) {
+        let testLine = line + words[n] + ' ';
+        let metrics = ctx.measureText(testLine);
+        if (metrics.width > dims.width - 20 && n > 0) {
+          lines.push(line);
+          line = words[n] + ' ';
+        } else {
+          line = testLine;
+        }
+      }
+      lines.push(line);
+
+      let startY = posY + (dims.height / 2) - ((lines.length - 1) * 7);
+      lines.forEach((l, i) => {
+        ctx.fillText(l.trim(), posX + dims.width / 2, startY + (i * 14));
+      });
+
       ctx.restore();
     });
 
-    // 4. Draw Tables Cards & Seating Lists
+    // 4. Render Table Cards with Rich Styling & Precise Alignment
     tables.forEach((tbl) => {
       const pos = tablePositions[tbl.id] || { x: tbl.pos_x || 200, y: tbl.pos_y || 200 };
+      const posX = pos.x;
+      const posY = pos.y + yOffset;
       const occ = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
 
       ctx.save();
-      ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = occ.isOvercapacity ? '#dc2626' : '#DBBB6E';
+      ctx.fillStyle = occ.isOvercapacity ? '#FEF2F2' : '#FFFFFF';
+      ctx.strokeStyle = occ.isOvercapacity ? '#DC2626' : '#DBBB6E';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(pos.x, pos.y, 210, 130, 16);
+      ctx.roundRect(posX, posY, 210, 130, 16);
       ctx.fill();
       ctx.stroke();
 
-      // Header Bar
+      // Grip Pill Badge
+      ctx.fillStyle = '#DBBB6E';
+      ctx.beginPath();
+      ctx.roundRect(posX + 65, posY - 10, 80, 18, 9);
+      ctx.fill();
       ctx.fillStyle = '#1A1A1A';
-      ctx.font = 'bold 13px serif';
+      ctx.font = 'extrabold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(tbl.name.split(' ')[0] + ' ' + (tbl.name.split(' ')[1] || ''), posX + 105, posY + 2);
+
+      // Table Title Name
+      ctx.fillStyle = '#1A1A1A';
+      ctx.font = 'bold 12px serif';
       ctx.textAlign = 'left';
-      ctx.fillText(tbl.name, pos.x + 12, pos.y + 24);
+      let truncatedName = tbl.name;
+      if (ctx.measureText(truncatedName).width > 120) {
+        truncatedName = tbl.name.slice(0, 14) + '...';
+      }
+      ctx.fillText(truncatedName, posX + 12, posY + 26);
 
-      // Ratio Badge
-      ctx.fillStyle = occ.isOvercapacity ? '#dc2626' : '#DBBB6E';
-      ctx.font = 'bold 11px sans-serif';
-      ctx.fillText(`${occ.occupancyRatio}`, pos.x + 150, pos.y + 24);
+      // Ratio Pill Badge
+      ctx.fillStyle = occ.isOvercapacity ? '#DC2626' : '#DBBB6E';
+      ctx.beginPath();
+      ctx.roundRect(posX + 150, posY + 12, 48, 18, 9);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${occ.occupancyRatio}`, posX + 174, posY + 25);
 
-      // Assigned Guests List
+      // Divider Line
+      ctx.strokeStyle = '#F1F5F9';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(posX + 12, posY + 36);
+      ctx.lineTo(posX + 198, posY + 36);
+      ctx.stroke();
+
+      // Guest Assignments List
       const tblAsgn = assignments.filter(a => a.table_id === tbl.id);
-      let lineY = pos.y + 48;
+      let lineY = posY + 54;
       if (tblAsgn.length === 0) {
-        ctx.fillStyle = '#94a3b8';
+        ctx.fillStyle = '#94A3B8';
         ctx.font = 'italic 11px sans-serif';
-        ctx.fillText('Sin asignaciones', pos.x + 12, lineY);
+        ctx.textAlign = 'left';
+        ctx.fillText('Sin asignaciones', posX + 12, lineY);
       } else {
-        tblAsgn.forEach((asgn) => {
+        tblAsgn.slice(0, 3).forEach((asgn) => {
           const grp = groups.find(g => g.id === asgn.group_id);
           ctx.fillStyle = '#334155';
           ctx.font = '11px sans-serif';
-          ctx.fillText(`• ${grp?.group_name || 'Grupo'} (${asgn.assigned_passes}p)`, pos.x + 12, lineY);
+          ctx.textAlign = 'left';
+          let grpName = grp?.group_name || 'Grupo';
+          if (ctx.measureText(grpName).width > 130) {
+            grpName = grpName.slice(0, 15) + '...';
+          }
+          ctx.fillText(`• ${grpName}`, posX + 12, lineY);
+          
+          ctx.fillStyle = '#B8860B';
+          ctx.font = 'bold 10px sans-serif';
+          ctx.textAlign = 'right';
+          ctx.fillText(`${asgn.assigned_passes}p`, posX + 198, lineY);
+
           lineY += 18;
         });
       }
 
+      // Sillas Capacity Footer
+      ctx.fillStyle = '#64748B';
+      ctx.font = '10px sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`Cap: ${tbl.capacity} sillas`, posX + 12, posY + 118);
+
       ctx.restore();
     });
 
-    // 5. Export Data URL & Trigger Link Download
+    // 5. MANDATORY TRADEMARK FOOTER WATERMARK (Tech Innova & EventControl.pe)
+    ctx.fillStyle = 'rgba(26, 26, 26, 0.85)';
+    ctx.fillRect(0, canvas.height - 36, canvas.width, 36);
+
+    ctx.fillStyle = '#C5A059';
+    ctx.font = 'bold 11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Generado oficialmente por Plataforma EventControl.pe  |  Desarrollado e Innovado por Tech Innova (tech.innova.reg@gmail.com)', canvas.width / 2, canvas.height - 14);
+
+    // 6. Data URL Export & Link Download
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.download = `Plano_Distribucion_Salón_${event?.name.replace(/[^a-zA-Z0-9]/g, '_') || 'EventControl'}.png`;
@@ -515,36 +609,38 @@ export default function TablesManagementPage() {
     }
   };
 
-  /* FULLSCREEN MODE: ONLY EXPANDS 2D CANVAS VIRTUAL VIEWPORT OVERLAY */
+  /* FULLSCREEN MODE: FIXED NON-OVERLAPPING HEADER BAR + 100% CANVAS VIEWPORT */
   if (isFullScreen) {
     return (
       <div className="fixed inset-0 z-50 bg-[#FAF8F5] flex flex-col justify-between overflow-hidden select-none">
         
-        {/* UNIFIED 1-ROW FLOATING MANAGEMENT TOOLBAR IN FULLSCREEN MODE */}
-        <div className="absolute top-4 left-4 right-4 z-40 flex items-center justify-between gap-2 bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-[#C5A059]/40 shadow-xl overflow-x-auto whitespace-nowrap">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-serif font-bold text-[#1A1A1A] px-2 border-r border-slate-200">
-              Plano Virtual del Salón
+        {/* FIXED TOP HEADER BAR IN FULLSCREEN MODE (OUTSIDE CANVAS WORKSPACE) */}
+        <div className="h-16 bg-white border-b border-[#C5A059]/40 px-4 sm:px-6 flex items-center justify-between z-40 shrink-0 shadow-sm">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-serif font-bold text-[#1A1A1A] hidden md:inline">
+              {event?.name || 'Evento'} - Plano Virtual en Pantalla Completa
             </span>
-            <div className="flex items-center">
+            
+            {/* Zoom & Centrar Plano */}
+            <div className="flex items-center bg-slate-50 border border-slate-300 rounded-xl p-1">
               <button
                 onClick={() => setCanvasZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(1))))}
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-700 transition"
+                className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-700 transition"
               >
-                <ZoomOut className="w-4 h-4" />
+                <ZoomOut className="w-3.5 h-3.5" />
               </button>
               <span className="text-xs font-mono font-bold px-2 text-[#B8860B]">
                 {Math.round(canvasZoom * 100)}%
               </span>
               <button
                 onClick={() => setCanvasZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(1))))}
-                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-700 transition"
+                className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-700 transition"
               >
-                <ZoomIn className="w-4 h-4" />
+                <ZoomIn className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={() => { setCanvasZoom(0.8); setPanOffset({ x: 0, y: 0 }); }}
-                className="p-1.5 hover:bg-amber-50 rounded-lg text-[#B8860B] transition border-l border-slate-200 flex items-center gap-1 px-2 text-xs font-bold"
+                className="p-1.5 hover:bg-amber-100 rounded-lg text-[#B8860B] transition border-l border-slate-200 flex items-center gap-1 px-2 text-xs font-bold"
                 title="Centrar Plano (80%)"
               >
                 <RotateCcw className="w-3.5 h-3.5" /> Centrar Plano
@@ -555,23 +651,23 @@ export default function TablesManagementPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowExportModal(true)}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
             >
               <Printer className="w-4 h-4 text-[#B8860B]" /> Exportar Plano
             </button>
 
             <button
               onClick={toggleFullScreen}
-              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-xl flex items-center gap-1.5 border border-slate-700"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-1.5 border border-slate-700"
             >
               <Minimize2 className="w-4 h-4 text-[#C5A059]" /> Salir de Pantalla Completa
             </button>
           </div>
         </div>
 
-        {/* 100% CANVAS VIEWPORT IN FULLSCREEN MODE */}
+        {/* 100% CANVAS VIEWPORT IN FULLSCREEN MODE (CLEANLY PLACED BELOW HEADER) */}
         <div
-          className="w-full h-full relative overflow-hidden cursor-grab active:cursor-grabbing"
+          className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing w-full h-[calc(100vh-64px)]"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget || (e.target as HTMLElement).getAttribute('data-canvas-bg') === 'true') {
               handleCanvasStartPan(e.clientX, e.clientY);
@@ -636,7 +732,7 @@ export default function TablesManagementPage() {
                   <button
                     onClick={(e) => { e.stopPropagation(); setEditingVenueElementObj(elem); }}
                     className="absolute top-1.5 right-1.5 p-1 bg-white hover:bg-amber-100 text-[#B8860B] rounded-full border border-[#DBBB6E] shadow-sm transition group-hover:scale-110 z-20"
-                    title="Editar Título u Opción"
+                    title="Editar Título o Opción"
                   >
                     <Edit3 className="w-3 h-3" />
                   </button>
@@ -917,7 +1013,7 @@ export default function TablesManagementPage() {
             )}
           </div>
 
-          {/* MAIN 2D INTERACTIVE CANVAS VIEWPORT (CLEANLY SEPARATED FROM TOP TOOLBAR) */}
+          {/* MAIN 2D INTERACTIVE CANVAS VIEWPORT */}
           <div className="lg:col-span-3 card-luxury p-3 border-2 border-[#C5A059]/40 shadow-xl relative overflow-hidden bg-[#FAF8F5]">
             
             {/* CANVAS INTERACTIVE PANNING WRAPPER */}
@@ -1185,7 +1281,7 @@ export default function TablesManagementPage() {
         )}
       </main>
 
-      {/* EXPORT FLOOR PLAN MODAL (PDF / PNG REAL GENERATION) */}
+      {/* EXPORT FLOOR PLAN MODAL (PDF / PNG REAL GENERATION WITH FOOTER WATERMARK) */}
       {showExportModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in-up">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
@@ -1218,12 +1314,12 @@ export default function TablesManagementPage() {
                 onClick={handleExportPNG}
                 className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2.5"
               >
-                <Download className="w-4 h-4 text-[#C5A059]" /> Descargar Imagen PNG (Descarga Real)
+                <Download className="w-4 h-4 text-[#C5A059]" /> Descargar Imagen PNG (Fidelidad 100% Web)
               </button>
             </div>
 
-            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 font-medium">
-              💡 <strong>Guía para Colaboradores:</strong> La imagen PNG descargará la distribución completa del salón con mesas, invitados ubicados, escenario y bar.
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 font-medium space-y-1">
+              <div>💡 <strong>Fidelidad & Marca Oficial:</strong> El archivo PNG y PDF incluirán el encabezado oficial, datos de invitados y el pie de página indicando la plataforma <strong>EventControl.pe</strong> y desarrollador <strong>Tech Innova</strong>.</div>
             </div>
 
             <div className="pt-2">
