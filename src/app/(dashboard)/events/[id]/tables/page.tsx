@@ -42,7 +42,6 @@ export default function TablesManagementPage() {
   const [canvasZoom, setCanvasZoom] = useState<number>(0.8);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
-  const [isCompactView, setIsCompactView] = useState<boolean>(true);
 
   // Drag state for guest groups -> tables
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
@@ -341,41 +340,298 @@ export default function TablesManagementPage() {
   const assignedGroupIds = new Set(assignments.map(a => a.group_id));
   const unassignedGroups = groups.filter(g => !assignedGroupIds.has(g.id));
 
-  // EXACT MATHEMATICAL SEATING METRICS
-  const totalAuthorizedPasses = groups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
-  const totalUnassignedPasses = unassignedGroups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
-  const totalAssignedPasses = Math.max(0, totalAuthorizedPasses - totalUnassignedPasses);
+  // EXACT MATHEMATICAL SEATING METRICS FOR INVITADOS (PERSONAS) + PASES (GRUPOS)
+  const totalAuthorizedGuests = groups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
+  const totalAuthorizedPassesCount = groups.length;
+
+  const totalUnassignedGuests = unassignedGroups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
+  const totalUnassignedPassesCount = unassignedGroups.length;
+
+  const totalAssignedGuests = Math.max(0, totalAuthorizedGuests - totalUnassignedGuests);
+  const totalAssignedPassesCount = totalAuthorizedPassesCount - totalUnassignedPassesCount;
+
   const totalTableCapacity = tables.reduce((sum, t) => sum + t.capacity, 0);
-  const assignedPercentage = totalAuthorizedPasses > 0 ? Math.min(100, Math.round((totalAssignedPasses / totalAuthorizedPasses) * 100)) : 0;
+  const assignedGuestsPercentage = totalAuthorizedGuests > 0 ? Math.min(100, Math.round((totalAssignedGuests / totalAuthorizedGuests) * 100)) : 0;
 
   const selectedTableObj = tables.find(t => t.id === selectedTableId);
   const selectedTableAssignments = assignments.filter(a => a.table_id === selectedTableId);
 
-  // Helper icon renderer for Venue Elements
+  // Helper icon renderer for Venue Elements with soft luxury pastel colors
   const renderVenueElementIcon = (type: VenueElementType) => {
     switch (type) {
-      case 'BAR': return <GlassWater className="w-5 h-5 text-amber-600" />;
-      case 'BUFFET': return <UtensilsCrossed className="w-5 h-5 text-orange-600" />;
-      case 'MACETERO': return <Flower2 className="w-5 h-5 text-emerald-600" />;
-      case 'COLUMNA': return <Columns className="w-5 h-5 text-slate-600" />;
-      case 'PISCINA': return <Waves className="w-5 h-5 text-blue-600" />;
-      case 'JARDIN': return <Trees className="w-5 h-5 text-emerald-700" />;
-      case 'ENTRADA': return <DoorOpen className="w-5 h-5 text-indigo-600" />;
+      case 'BAR': return <GlassWater className="w-5 h-5 text-amber-700" />;
+      case 'BUFFET': return <UtensilsCrossed className="w-5 h-5 text-orange-700" />;
+      case 'MACETERO': return <Flower2 className="w-5 h-5 text-emerald-700" />;
+      case 'COLUMNA': return <Columns className="w-5 h-5 text-slate-700" />;
+      case 'PISCINA': return <Waves className="w-5 h-5 text-blue-700" />;
+      case 'JARDIN': return <Trees className="w-5 h-5 text-emerald-800" />;
+      case 'ENTRADA': return <DoorOpen className="w-5 h-5 text-indigo-700" />;
       default: return <Sparkles className="w-5 h-5 text-[#B8860B]" />;
     }
   };
 
+  // Helper background style for Venue Elements to ensure light elegant palette
+  const getVenueElementCardStyle = (type: VenueElementType) => {
+    switch (type) {
+      case 'BAR':
+      case 'BUFFET':
+      case 'ESCENARIO':
+      case 'PISTA_ORQUESTA':
+      case 'PISTA_BAILE':
+        return 'bg-amber-50/90 text-slate-900 border-2 border-[#DBBB6E] shadow-md';
+      case 'MACETERO':
+      case 'JARDIN':
+        return 'bg-emerald-50/90 text-slate-900 border-2 border-emerald-300 shadow-md';
+      case 'PISCINA':
+        return 'bg-blue-50/90 text-slate-900 border-2 border-blue-300 shadow-md';
+      case 'COLUMNA':
+      case 'ENTRADA':
+        return 'bg-slate-50/90 text-slate-900 border-2 border-slate-300 shadow-md';
+      default:
+        return 'bg-amber-50/90 text-slate-900 border-2 border-[#DBBB6E] shadow-md';
+    }
+  };
+
+  /* FULLSCREEN MODE: ONLY EXPANDS 2D CANVAS VIRTUAL VIEWPORT OVERLAY */
+  if (isFullScreen) {
+    return (
+      <div className="fixed inset-0 z-50 bg-[#FAF8F5] flex flex-col justify-between overflow-hidden select-none">
+        
+        {/* Floating Controls Bar in FullScreen Mode */}
+        <div className="absolute top-4 left-4 right-4 z-40 flex items-center justify-between pointer-events-auto">
+          <div className="flex items-center gap-2 bg-white/90 backdrop-blur-md p-2 rounded-2xl border border-[#C5A059]/40 shadow-xl">
+            <span className="text-xs font-serif font-bold text-[#1A1A1A] px-2 border-r border-slate-200">
+              Plano Virtual del Salón
+            </span>
+            <div className="flex items-center">
+              <button
+                onClick={() => setCanvasZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(1))))}
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-700 transition"
+              >
+                <ZoomOut className="w-4 h-4" />
+              </button>
+              <span className="text-xs font-mono font-bold px-2 text-[#B8860B]">
+                {Math.round(canvasZoom * 100)}%
+              </span>
+              <button
+                onClick={() => setCanvasZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(1))))}
+                className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-700 transition"
+              >
+                <ZoomIn className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => { setCanvasZoom(0.8); setPanOffset({ x: 0, y: 0 }); }}
+                className="p-1.5 hover:bg-amber-50 rounded-lg text-[#B8860B] transition border-l border-slate-200"
+                title="Restablecer (80% Centrado)"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-[#C5A059]/40 shadow-xl text-xs font-bold text-slate-800 hidden sm:block">
+            {totalAssignedGuests} de {totalAuthorizedGuests} invitados ubicados ({assignedGuestsPercentage}%)
+          </div>
+
+          <button
+            onClick={toggleFullScreen}
+            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-2xl transition shadow-xl flex items-center gap-1.5 border border-slate-700"
+          >
+            <Minimize2 className="w-4 h-4 text-[#C5A059]" /> Salir de Pantalla Completa
+          </button>
+        </div>
+
+        {/* 100% CANVAS VIEWPORT IN FULLSCREEN MODE */}
+        <div
+          className="w-full h-full relative overflow-hidden cursor-grab active:cursor-grabbing"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget || (e.target as HTMLElement).getAttribute('data-canvas-bg') === 'true') {
+              handleCanvasStartPan(e.clientX, e.clientY);
+            }
+          }}
+          onMouseMove={(e) => handleCanvasMovePan(e.clientX, e.clientY)}
+          onMouseUp={handleCanvasEndPan}
+          onTouchStart={(e) => {
+            if (e.touches.length === 1) handleCanvasStartPan(e.touches[0].clientX, e.touches[0].clientY);
+          }}
+          onTouchMove={(e) => {
+            if (e.touches.length === 1) handleCanvasMovePan(e.touches[0].clientX, e.touches[0].clientY);
+          }}
+          onTouchEnd={handleCanvasEndPan}
+          data-canvas-bg="true"
+        >
+          {/* TRANSFORM SCALED WORLD */}
+          <div
+            ref={canvasWorldRef}
+            className="absolute inset-0 w-[1400px] h-[900px] transition-transform duration-75 origin-top-left"
+            style={{
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${canvasZoom})`,
+            }}
+            data-canvas-bg="true"
+          >
+            {/* Elegant Woven Grid Background */}
+            <div 
+              className="absolute inset-0 pointer-events-none opacity-30"
+              style={{
+                backgroundImage: 'radial-gradient(#C5A059 1px, transparent 1px), linear-gradient(90deg, rgba(197,160,89,0.12) 1px, transparent 1px)',
+                backgroundSize: '28px 28px, 28px 28px',
+              }}
+              data-canvas-bg="true"
+            ></div>
+
+            {/* RENDER VENUE ARCHITECTURAL ELEMENTS (FULLSCREEN MODE) */}
+            {venueElements.map((elem) => {
+              const isCircle = elem.shape === 'circle' || elem.shape === 'oval';
+              const shapeRadius = isCircle ? 'rounded-full' : elem.shape === 'round_rect' ? 'rounded-2xl' : 'rounded-none';
+              const cardBgStyle = getVenueElementCardStyle(elem.type);
+
+              // Minimum dimensions to guarantee non-overflowing text
+              const minWidth = Math.max(elem.width, isCircle ? 95 : 190);
+              const minHeight = Math.max(elem.height, isCircle ? 95 : 85);
+
+              return (
+                <div
+                  key={elem.id}
+                  data-drag-node="true"
+                  className={`absolute z-10 p-2 text-center cursor-move transition-shadow ${shapeRadius} ${cardBgStyle} group flex flex-col items-center justify-center`}
+                  style={{
+                    left: `${elem.pos_x}px`,
+                    top: `${elem.pos_y}px`,
+                    width: `${minWidth}px`,
+                    height: `${minHeight}px`,
+                  }}
+                  onDoubleClick={() => setEditingVenueElementObj(elem)}
+                >
+                  <div
+                    onPointerDown={(e) => handlePointerDownItemGrip(e, elem.id, 'venue_element', elem.pos_x, elem.pos_y)}
+                    className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#DBBB6E] text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase shadow-md cursor-grab active:cursor-grabbing flex items-center gap-1 z-20"
+                  >
+                    <GripVertical className="w-3 h-3" /> Mover
+                  </div>
+
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setEditingVenueElementObj(elem); }}
+                    className="absolute top-1.5 right-1.5 p-1 bg-white hover:bg-amber-100 text-[#B8860B] rounded-full border border-[#DBBB6E] shadow-sm transition group-hover:scale-110 z-20"
+                    title="Editar Título o Forma"
+                  >
+                    <Edit3 className="w-3 h-3" />
+                  </button>
+
+                  <div className="flex flex-col items-center justify-center gap-0.5 px-2 max-w-full">
+                    {renderVenueElementIcon(elem.type)}
+                    <span className="text-[11px] font-serif font-bold text-slate-900 leading-tight text-center max-w-full break-words line-clamp-3">
+                      {elem.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* RENDER EVENT TABLES NODES (FULLSCREEN MODE) */}
+            {tables.map((tbl) => {
+              const occ = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
+              const isOver = occ.isOvercapacity;
+              const isSelected = selectedTableId === tbl.id;
+              const isDragOver = dragOverTableId === tbl.id;
+              const pos = tablePositions[tbl.id] || { x: tbl.pos_x || 200, y: tbl.pos_y || 200, shape: 'ROUND' };
+
+              return (
+                <div
+                  key={tbl.id}
+                  data-table-node="true"
+                  data-drag-node="true"
+                  className={`absolute z-20 transition-shadow ${
+                    isSelected ? 'ring-4 ring-[#DBBB6E] ring-offset-2 scale-105' : ''
+                  } ${isDragOver ? 'ring-4 ring-emerald-500 scale-110' : ''}`}
+                  style={{
+                    left: `${pos.x}px`,
+                    top: `${pos.y}px`,
+                  }}
+                  onDragOver={(e) => handleDragOverTable(e, tbl.id)}
+                  onDragLeave={handleDragLeaveTable}
+                  onDrop={(e) => handleDropGroupOnTable(e, tbl.id)}
+                  onClick={() => setSelectedTableId(tbl.id)}
+                >
+                  <div
+                    onPointerDown={(e) => handlePointerDownItemGrip(e, tbl.id, 'table', pos.x, pos.y)}
+                    className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#DBBB6E] text-slate-950 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow-md cursor-grab active:cursor-grabbing flex items-center gap-1 z-30"
+                  >
+                    <GripVertical className="w-3 h-3" /> {tbl.name.split(' ')[0]} {tbl.name.split(' ')[1] || ''}
+                  </div>
+
+                  <div className={`p-4 min-w-[200px] border-2 shadow-xl rounded-2xl transition flex flex-col justify-between ${
+                    isOver ? 'bg-red-50 border-red-500 text-red-950' : 'bg-white text-slate-900 border-[#DBBB6E]/70'
+                  }`}>
+                    
+                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                      <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[130px]">
+                        {tbl.name}
+                      </strong>
+                      <span 
+                        style={{ backgroundColor: isOver ? '#dc2626' : '#DBBB6E' }}
+                        className="px-2 py-0.5 text-white font-extrabold text-[10px] rounded-full shadow-sm"
+                      >
+                        {occ.occupancyRatio}
+                      </span>
+                    </div>
+
+                    <div className="py-2 space-y-1 min-h-[45px]">
+                      {assignments.filter(a => a.table_id === tbl.id).length === 0 ? (
+                        <span className="text-[11px] text-slate-400 italic block text-center pt-2">
+                          Arrastra pases aquí
+                        </span>
+                      ) : (
+                        assignments.filter(a => a.table_id === tbl.id).map(asgn => {
+                          const grp = groups.find(g => g.id === asgn.group_id);
+                          return (
+                            <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                              <span className="font-semibold text-slate-800 truncate max-w-[120px]">
+                                {grp?.group_name || 'Grupo'}
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <span className="font-bold text-[#B8860B]">{asgn.assigned_passes}p</span>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id); }}
+                                  className="text-slate-400 hover:text-red-600 transition"
+                                  title="Desasignar"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                      <span className="text-slate-500 font-semibold">Cap: {tbl.capacity} sillas</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setEditingTableObj(tbl); }}
+                        className="text-[#B8860B] hover:underline font-bold"
+                      >
+                        Editar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* NORMAL DASHBOARD PAGE LAYOUT */
   return (
-    <div className={`min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white select-none ${
-      isFullScreen ? 'fixed inset-0 z-50 bg-[#FAF8F5] overflow-hidden' : ''
-    }`}>
-      
-      {!isFullScreen && <EventNavHeader currentTab="tables" eventId={eventId} eventName={event?.name} />}
+    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white select-none">
+      <EventNavHeader currentTab="tables" eventId={eventId} eventName={event?.name} />
 
       {/* Main Container */}
-      <main className={`flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4 w-full ${isFullScreen ? 'p-2 max-w-full h-full flex flex-col justify-between' : ''}`}>
+      <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4 w-full">
         
-        {/* Title Bar & Mode Controls */}
+        {/* Title Bar & Toolbar */}
         <div className="card-luxury p-5 border border-[#C5A059]/30 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">
@@ -387,7 +643,7 @@ export default function TablesManagementPage() {
             </p>
           </div>
 
-          {/* Mode & Toolbar Controls */}
+          {/* Toolbar Controls */}
           <div className="flex flex-wrap items-center gap-2">
             
             {/* Zoom Controls */}
@@ -421,13 +677,10 @@ export default function TablesManagementPage() {
             {/* Fullscreen Button */}
             <button
               onClick={toggleFullScreen}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 border ${
-                isFullScreen ? 'bg-slate-900 text-white' : 'bg-white text-slate-800 border-slate-300 hover:bg-slate-50'
-              }`}
+              className="px-3 py-2 bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
               title="Alternar Pantalla Completa"
             >
-              {isFullScreen ? <Minimize2 className="w-4 h-4 text-[#C5A059]" /> : <Maximize2 className="w-4 h-4 text-[#C5A059]" />}
-              {isFullScreen ? 'Salir Pantalla Completa' : 'Pantalla Completa'}
+              <Maximize2 className="w-4 h-4 text-[#C5A059]" /> Pantalla Completa
             </button>
 
             {/* Add Table Button */}
@@ -449,32 +702,32 @@ export default function TablesManagementPage() {
           </div>
         </div>
 
-        {/* INFORMATIVE SUMMARY CARDS PANEL */}
+        {/* INFORMATIVE SUMMARY CARDS PANEL WITH BOTH INVITADOS & PASES COUNTS */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="card-luxury p-4 border border-[#C5A059]/30 text-center">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Invitados Autorizados</span>
-            <strong className="text-xl font-serif font-bold text-slate-900 mt-0.5 block">{totalAuthorizedPasses} pases</strong>
-            <span className="text-[10px] text-slate-500 font-medium">Capacidad total en lista</span>
+            <strong className="text-xl font-serif font-bold text-slate-900 mt-0.5 block">{totalAuthorizedGuests} personas</strong>
+            <span className="text-[10px] text-slate-500 font-medium">En {totalAuthorizedPassesCount} pases / grupos</span>
           </div>
 
           <div className="card-luxury p-4 border border-emerald-200 bg-emerald-50/50 text-center">
             <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">Asignados a Mesa</span>
             <strong className="text-xl font-serif font-bold text-emerald-800 mt-0.5 block">
-              {totalAssignedPasses} pases ({assignedPercentage}%)
+              {totalAssignedGuests} personas ({assignedGuestsPercentage}%)
             </strong>
-            <span className="text-[10px] text-emerald-700 font-medium">Ubicados en mesas de gala</span>
+            <span className="text-[10px] text-emerald-700 font-medium">En {totalAssignedPassesCount} pases ubicados</span>
           </div>
 
           <div className="card-luxury p-4 border border-amber-200 bg-amber-50/50 text-center">
             <span className="text-[10px] text-amber-800 font-bold uppercase tracking-wider block">Invitados Sin Asignar</span>
-            <strong className="text-xl font-serif font-bold text-amber-800 mt-0.5 block">{totalUnassignedPasses} pases</strong>
-            <span className="text-[10px] text-amber-700 font-medium">{unassignedGroups.length} familias pendientes</span>
+            <strong className="text-xl font-serif font-bold text-amber-800 mt-0.5 block">{totalUnassignedGuests} personas</strong>
+            <span className="text-[10px] text-amber-700 font-medium">{totalUnassignedPassesCount} pases pendientes</span>
           </div>
 
           <div className="card-luxury p-4 border border-purple-200 bg-purple-50/50 text-center">
             <span className="text-[10px] text-purple-900 font-bold uppercase tracking-wider block">Capacidad Total Mesas</span>
             <strong className="text-xl font-serif font-bold text-purple-900 mt-0.5 block">{totalTableCapacity} sillas</strong>
-            <span className="text-[10px] text-purple-800 font-medium">{tables.length} mesas instaladas</span>
+            <span className="text-[10px] text-purple-800 font-medium">{tables.length} mesas en salón</span>
           </div>
         </div>
 
@@ -488,7 +741,7 @@ export default function TablesManagementPage() {
                 <Users className="w-4 h-4 text-[#B8860B]" /> Pases Sin Mesa ({unassignedGroups.length})
               </h3>
               <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                {totalUnassignedPasses} pers.
+                {totalUnassignedGuests} pers.
               </span>
             </div>
 
@@ -527,11 +780,11 @@ export default function TablesManagementPage() {
             )}
           </div>
 
-          {/* MAIN 2D INTERACTIVE CANVAS VIEWPORT WITH TOUCH PANNING & 80% DEFAULT ZOOM */}
-          <div className="lg:col-span-3 card-luxury p-3 border-2 border-[#C5A059]/40 shadow-xl relative overflow-hidden bg-slate-900">
+          {/* MAIN 2D INTERACTIVE CANVAS VIEWPORT WITH LIGHT LUXURY PALETTE */}
+          <div className="lg:col-span-3 card-luxury p-3 border-2 border-[#C5A059]/40 shadow-xl relative overflow-hidden bg-[#FAF8F5]">
             
             {/* Canvas Control Header Overlay */}
-            <div className="absolute top-4 left-4 z-30 bg-slate-950/80 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#C5A059]/40 text-[11px] font-bold text-amber-200 flex items-center gap-2">
+            <div className="absolute top-4 left-4 z-30 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-xl border border-[#C5A059]/40 text-[11px] font-bold text-slate-800 flex items-center gap-2 shadow-md">
               <Move className="w-3.5 h-3.5 text-[#DBBB6E]" />
               <span>Arrastra el fondo libre para desplazar todo el salón</span>
             </div>
@@ -539,7 +792,7 @@ export default function TablesManagementPage() {
             <div className="absolute top-4 right-4 z-30 flex gap-2">
               <button
                 onClick={() => setPanOffset({ x: 0, y: 0 })}
-                className="bg-slate-950/80 hover:bg-slate-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#C5A059]/40 backdrop-blur-md transition flex items-center gap-1"
+                className="bg-white/90 hover:bg-white text-slate-800 text-[11px] font-bold px-3 py-1.5 rounded-xl border border-[#C5A059]/40 backdrop-blur-md transition flex items-center gap-1 shadow-md"
               >
                 <RotateCcw className="w-3 h-3 text-[#DBBB6E]" /> Centrar Plano
               </button>
@@ -549,7 +802,6 @@ export default function TablesManagementPage() {
             <div
               className="w-full h-[650px] relative overflow-hidden cursor-grab active:cursor-grabbing rounded-lg"
               onMouseDown={(e) => {
-                // Only start pan if clicking directly on background wrapper
                 if (e.target === e.currentTarget || (e.target as HTMLElement).getAttribute('data-canvas-bg') === 'true') {
                   handleCanvasStartPan(e.clientX, e.clientY);
                 }
@@ -558,19 +810,15 @@ export default function TablesManagementPage() {
               onMouseUp={handleCanvasEndPan}
               onMouseLeave={handleCanvasEndPan}
               onTouchStart={(e) => {
-                if (e.touches.length === 1) {
-                  handleCanvasStartPan(e.touches[0].clientX, e.touches[0].clientY);
-                }
+                if (e.touches.length === 1) handleCanvasStartPan(e.touches[0].clientX, e.touches[0].clientY);
               }}
               onTouchMove={(e) => {
-                if (e.touches.length === 1) {
-                  handleCanvasMovePan(e.touches[0].clientX, e.touches[0].clientY);
-                }
+                if (e.touches.length === 1) handleCanvasMovePan(e.touches[0].clientX, e.touches[0].clientY);
               }}
               onTouchEnd={handleCanvasEndPan}
               data-canvas-bg="true"
             >
-              {/* TRANSFORM SCALED WORLD (Zoom & Pan Translation) */}
+              {/* TRANSFORM SCALED WORLD */}
               <div
                 ref={canvasWorldRef}
                 className="absolute inset-0 w-[1400px] h-[900px] transition-transform duration-75 origin-top-left"
@@ -579,58 +827,63 @@ export default function TablesManagementPage() {
                 }}
                 data-canvas-bg="true"
               >
-                {/* Woven Linen Thread Grid Texture Background */}
+                {/* Woven Paper Texture Grid */}
                 <div 
-                  className="absolute inset-0 pointer-events-none opacity-20"
+                  className="absolute inset-0 pointer-events-none opacity-30"
                   style={{
-                    backgroundImage: 'radial-gradient(#DBBB6E 1px, transparent 1px), linear-gradient(90deg, rgba(219,187,110,0.1) 1px, transparent 1px)',
-                    backgroundSize: '24px 24px, 24px 24px',
+                    backgroundImage: 'radial-gradient(#C5A059 1px, transparent 1px), linear-gradient(90deg, rgba(197,160,89,0.12) 1px, transparent 1px)',
+                    backgroundSize: '28px 28px, 28px 28px',
                   }}
                   data-canvas-bg="true"
                 ></div>
 
-                {/* RENDER VENUE ARCHITECTURAL ELEMENTS (Escenario, Bar, Maceteros, Piscina, etc.) */}
+                {/* RENDER VENUE ARCHITECTURAL ELEMENTS (LIGHT PALETTE & NO TEXT OVERFLOW) */}
                 {venueElements.map((elem) => {
                   const isCircle = elem.shape === 'circle' || elem.shape === 'oval';
                   const shapeRadius = isCircle ? 'rounded-full' : elem.shape === 'round_rect' ? 'rounded-2xl' : 'rounded-none';
+                  const cardBgStyle = getVenueElementCardStyle(elem.type);
+
+                  // Minimum dimensions to prevent text overflow
+                  const minWidth = Math.max(elem.width, isCircle ? 95 : 190);
+                  const minHeight = Math.max(elem.height, isCircle ? 95 : 85);
 
                   return (
                     <div
                       key={elem.id}
                       data-drag-node="true"
-                      className={`absolute z-10 p-3 border-2 border-[#DBBB6E] shadow-xl flex flex-col items-center justify-center text-center cursor-move transition-shadow ${shapeRadius} bg-gradient-to-br from-slate-900 to-slate-950 text-white group`}
+                      className={`absolute z-10 p-2 text-center cursor-move transition-shadow ${shapeRadius} ${cardBgStyle} group flex flex-col items-center justify-center`}
                       style={{
                         left: `${elem.pos_x}px`,
                         top: `${elem.pos_y}px`,
-                        width: `${elem.width}px`,
-                        height: `${elem.height}px`,
+                        width: `${minWidth}px`,
+                        height: `${minHeight}px`,
                       }}
                       onDoubleClick={() => setEditingVenueElementObj(elem)}
                     >
                       {/* Drag Grip Handle */}
                       <div
                         onPointerDown={(e) => handlePointerDownItemGrip(e, elem.id, 'venue_element', elem.pos_x, elem.pos_y)}
-                        className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#DBBB6E] text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-black uppercase shadow-md cursor-grab active:cursor-grabbing flex items-center gap-1 z-20"
+                        className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#DBBB6E] text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase shadow-md cursor-grab active:cursor-grabbing flex items-center gap-1 z-20"
                       >
                         <GripVertical className="w-3 h-3" /> Mover
                       </div>
 
-                      {/* Element Icon & Label */}
-                      <div className="flex flex-col items-center justify-center gap-1">
-                        {renderVenueElementIcon(elem.type)}
-                        <span className="text-xs font-serif font-bold text-amber-200 leading-tight drop-shadow-md max-w-[90%]">
-                          {elem.label}
-                        </span>
-                      </div>
-
-                      {/* Quick Edit Action Floating Button */}
+                      {/* Visible Edit Action Button (Inside Node) */}
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditingVenueElementObj(elem); }}
-                        className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 p-1 bg-white/20 hover:bg-white/40 text-white rounded-md transition"
+                        className="absolute top-1.5 right-1.5 p-1 bg-white hover:bg-amber-100 text-[#B8860B] rounded-full border border-[#DBBB6E] shadow-sm transition group-hover:scale-110 z-20"
                         title="Editar Título o Forma"
                       >
                         <Edit3 className="w-3 h-3" />
                       </button>
+
+                      {/* Element Icon & Non-Overflowing Label */}
+                      <div className="flex flex-col items-center justify-center gap-0.5 px-2 max-w-full">
+                        {renderVenueElementIcon(elem.type)}
+                        <span className="text-[11px] font-serif font-bold text-slate-900 leading-tight text-center max-w-full break-words line-clamp-3">
+                          {elem.label}
+                        </span>
+                      </div>
                     </div>
                   );
                 })}
@@ -649,7 +902,7 @@ export default function TablesManagementPage() {
                       data-table-node="true"
                       data-drag-node="true"
                       className={`absolute z-20 transition-shadow ${
-                        isSelected ? 'ring-4 ring-[#DBBB6E] ring-offset-2 ring-offset-slate-900 scale-105' : ''
+                        isSelected ? 'ring-4 ring-[#DBBB6E] ring-offset-2 scale-105' : ''
                       } ${isDragOver ? 'ring-4 ring-emerald-500 scale-110' : ''}`}
                       style={{
                         left: `${pos.x}px`,
@@ -660,7 +913,6 @@ export default function TablesManagementPage() {
                       onDrop={(e) => handleDropGroupOnTable(e, tbl.id)}
                       onClick={() => setSelectedTableId(tbl.id)}
                     >
-                      {/* Drag Grip Handle */}
                       <div
                         onPointerDown={(e) => handlePointerDownItemGrip(e, tbl.id, 'table', pos.x, pos.y)}
                         className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#DBBB6E] text-slate-950 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow-md cursor-grab active:cursor-grabbing flex items-center gap-1 z-30"
@@ -668,9 +920,8 @@ export default function TablesManagementPage() {
                         <GripVertical className="w-3 h-3" /> {tbl.name.split(' ')[0]} {tbl.name.split(' ')[1] || ''}
                       </div>
 
-                      {/* TABLE NODE CARD CONTAINER */}
-                      <div className={`p-4 min-w-[200px] border-2 shadow-2xl rounded-2xl transition flex flex-col justify-between ${
-                        isOver ? 'bg-red-950/90 border-red-500 text-white' : 'bg-white text-slate-900 border-[#DBBB6E]/60'
+                      <div className={`p-4 min-w-[200px] border-2 shadow-xl rounded-2xl transition flex flex-col justify-between ${
+                        isOver ? 'bg-red-50 border-red-500 text-red-950' : 'bg-white text-slate-900 border-[#DBBB6E]/70'
                       }`}>
                         
                         <div className="flex items-center justify-between pb-2 border-b border-slate-100">
@@ -685,7 +936,6 @@ export default function TablesManagementPage() {
                           </span>
                         </div>
 
-                        {/* Assigned Guest List Preview */}
                         <div className="py-2 space-y-1 min-h-[45px]">
                           {assignments.filter(a => a.table_id === tbl.id).length === 0 ? (
                             <span className="text-[11px] text-slate-400 italic block text-center pt-2">
