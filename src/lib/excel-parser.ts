@@ -10,6 +10,7 @@ export interface ColumnMapping {
   groupNameCol: string;
   maxPassesCol: string;
   phoneCol?: string;
+  responsibleCol?: string;
   externalIdCol?: string;
   notesCol?: string;
 }
@@ -19,6 +20,7 @@ export interface ValidatedGuestRow {
   groupName: string;
   maxPasses: number;
   phone?: string;
+  responsible?: string;
   externalId?: string;
   notes?: string;
   isValid: boolean;
@@ -35,7 +37,8 @@ export interface ImportValidationResult {
 }
 
 /**
- * Parses an Excel or CSV file buffer and returns sheet headers and row objects
+ * Parses an Excel or CSV file buffer and returns sheet headers and row objects,
+ * with smart header row detection for title rows (like Formato_ejemplo.xlsx).
  */
 export function parseExcelFile(fileBuffer: ArrayBuffer): RawExcelSheet[] {
   const workbook = XLSX.read(fileBuffer, { type: 'array' });
@@ -47,10 +50,28 @@ export function parseExcelFile(fileBuffer: ArrayBuffer): RawExcelSheet[] {
 
     if (jsonData.length === 0) continue;
 
-    // Find header row (first non-empty row)
-    let headerIndex = 0;
-    while (headerIndex < jsonData.length && (!jsonData[headerIndex] || jsonData[headerIndex].length === 0)) {
-      headerIndex++;
+    // Smart Header Row Detection:
+    // Look for a row containing typical column keywords (PASES, GRUPOS, PERSONAS, RESPONSABLE, INVITADOS)
+    let headerIndex = -1;
+    for (let r = 0; r < Math.min(15, jsonData.length); r++) {
+      const rowArr = jsonData[r] as any[];
+      if (!rowArr || rowArr.length === 0) continue;
+      const joinedRow = rowArr.map(c => String(c || '').toUpperCase()).join(' ');
+      if (
+        (joinedRow.includes('PASES') || joinedRow.includes('INVITADO') || joinedRow.includes('GRUPO')) &&
+        (joinedRow.includes('PERSONAS') || joinedRow.includes('RESPONSABLE') || joinedRow.includes('CANTIDAD') || joinedRow.includes('NRO'))
+      ) {
+        headerIndex = r;
+        break;
+      }
+    }
+
+    // Fallback to first non-empty row if keyword match is not found
+    if (headerIndex === -1) {
+      headerIndex = 0;
+      while (headerIndex < jsonData.length && (!jsonData[headerIndex] || jsonData[headerIndex].length === 0)) {
+        headerIndex++;
+      }
     }
 
     if (headerIndex >= jsonData.length) continue;
@@ -74,7 +95,8 @@ export function parseExcelFile(fileBuffer: ArrayBuffer): RawExcelSheet[] {
         if (rowObj[header]) hasData = true;
       });
 
-      if (hasData) {
+      const firstColVal = String(rowObj[rawHeaders[0]] || '').trim().toUpperCase();
+      if (hasData && firstColVal !== 'EVENTO' && firstColVal !== 'TOTAL' && !firstColVal.startsWith('---')) {
         rows.push(rowObj);
       }
     }
@@ -110,7 +132,7 @@ export function validateMappedRows(
     const groupName = rawGroupName ? String(rawGroupName).trim() : '';
 
     if (!groupName) {
-      errors.push('El nombre del grupo o responsable está vacío');
+      errors.push('El nombre del grupo o lista de personas está vacío');
     } else if (groupName.toUpperCase() === 'TOTAL') {
       errors.push('Fila de total omitida');
     } else if (seenGroupNames.has(groupName.toLowerCase())) {
@@ -122,7 +144,7 @@ export function validateMappedRows(
     const maxPasses = parseInt(String(rawPasses), 10);
 
     if (isNaN(maxPasses)) {
-      errors.push('La cantidad de pases no es un número válido');
+      errors.push('La cantidad de personas/pases no es un número válido');
     } else if (maxPasses <= 0) {
       errors.push(`Cantidad de pases inválida (${maxPasses}). Debe ser mayor a 0`);
     }
@@ -133,7 +155,8 @@ export function validateMappedRows(
       errors.push(`Formato de teléfono sospechoso: "${phone}"`);
     }
 
-    // 4. Optional fields
+    // 4. Optional Responsible & Notes
+    const responsible = mapping.responsibleCol ? String(row[mapping.responsibleCol] || '').trim() : '';
     const externalId = mapping.externalIdCol ? String(row[mapping.externalIdCol] || '').trim() : '';
     const notes = mapping.notesCol ? String(row[mapping.notesCol] || '').trim() : '';
 
@@ -142,6 +165,7 @@ export function validateMappedRows(
       groupName,
       maxPasses: isNaN(maxPasses) ? 0 : maxPasses,
       phone,
+      responsible,
       externalId,
       notes,
       isValid: errors.length === 0,
@@ -168,15 +192,53 @@ export function validateMappedRows(
 }
 
 /**
+ * Generates downloadable official Excel template (.xlsx) based on Formato_ejemplo.xlsx
+ */
+export function generateTemplateExcel(eventName?: string): Uint8Array {
+  const wb = XLSX.utils.book_new();
+  const data = [
+    ['EVENTO', (eventName || 'CUMPLEAÑOS TAVO 60 AÑOS').toUpperCase(), '', ''],
+    ['', '', '', ''],
+    ['', '', '', ''],
+    ['PASES O GRUPOS', 'NRO DE PERSONAS', 'RESPONSABLE GRUPO/PASE', 'NRO DE TELÉFONO (WhatsApp)'],
+    ['Juan', 1, 'Juan', '912345678'],
+    ['Lili , Lucho , Moico, Enamorada, Gaby , Sra. Ernestina', 6, 'Lucho', '912345678'],
+    ['Nathali , German , Lula, Tati', 4, 'Lili', '912345678'],
+    ['Nidia, Emo', 2, 'Nidia', '912345678'],
+    ['Pepe', 1, 'Pepe', '912345678'],
+    ['Melo , Nidia, Enamorado, Nico', 4, 'Melo', '912345678'],
+    ['Miguel , Nicol', 2, 'Miguel', '912345678'],
+    ['Claudia , Jorge Matias', 3, 'Claudia', '912345678'],
+    ['Lapo , Gasdy', 2, 'Lapo', '912345678'],
+    ['Opal , Yovana', 2, 'Opal', '912345678'],
+    ['Shen, Esposa', 2, 'Esposa', '912345678'],
+    ['Tato, Gardenia', 2, 'Gardenia', '912345678'],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  ws['!cols'] = [
+    { wch: 55 }, // PASES O GRUPOS
+    { wch: 18 }, // NRO DE PERSONAS
+    { wch: 28 }, // RESPONSABLE GRUPO/PASE
+    { wch: 28 }, // NRO DE TELÉFONO (WhatsApp)
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Hoja1');
+  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Uint8Array(excelBuffer);
+}
+
+/**
  * Generates downloadable error report Excel buffer
  */
 export function generateErrorReportExcel(invalidRows: ValidatedGuestRow[]): Uint8Array {
   const exportData = invalidRows.map(r => ({
     Fila: r.rowNumber,
-    'Grupo / Responsable': r.groupName || '(Vacío)',
-    Pases: r.maxPasses,
-    Teléfono: r.phone || '',
-    Errores: r.errors.join(' | '),
+    'Pases o Grupos': r.groupName || '(Vacío)',
+    'Nro de Personas': r.maxPasses,
+    'Responsable': r.responsible || '',
+    'Teléfono': r.phone || '',
+    'Errores Detectados': r.errors.join(' | '),
   }));
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
