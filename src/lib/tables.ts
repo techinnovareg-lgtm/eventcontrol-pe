@@ -1,5 +1,32 @@
 import { Table, TableAssignment } from '@/lib/supabase/types';
 
+export type VenueElementType = 
+  | 'ESCENARIO'
+  | 'PISTA_BAILE'
+  | 'PISTA_ORQUESTA'
+  | 'BAR'
+  | 'BUFFET'
+  | 'PISCINA'
+  | 'JARDIN'
+  | 'MACETERO'
+  | 'COLUMNA'
+  | 'ENTRADA';
+
+export interface VenueElement {
+  id: string;
+  event_id: string;
+  workspace_id: string;
+  type: VenueElementType;
+  label: string;
+  pos_x: number;
+  pos_y: number;
+  width: number;
+  height: number;
+  orientation: 'horizontal' | 'vertical';
+  shape: 'rect' | 'round_rect' | 'circle' | 'oval';
+  created_at: string;
+}
+
 // In-memory store for tables
 const tablesStore: Record<string, Table[]> = {
   'evt-102': [
@@ -22,6 +49,54 @@ const assignmentsStore: Record<string, TableAssignment[]> = {
     { id: 'asgn-6', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-3', group_id: 'grp-006', assigned_passes: 4, created_at: new Date().toISOString() },
     { id: 'asgn-7', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-4', group_id: 'grp-007', assigned_passes: 2, created_at: new Date().toISOString() },
     { id: 'asgn-8', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-4', group_id: 'grp-008', assigned_passes: 3, created_at: new Date().toISOString() },
+  ],
+};
+
+// In-memory store for venue architectural elements
+const venueElementsStore: Record<string, VenueElement[]> = {
+  'evt-102': [
+    {
+      id: 've-1',
+      event_id: 'evt-102',
+      workspace_id: 'ws-a-1111',
+      type: 'PISTA_ORQUESTA',
+      label: 'PISTA DE BAILE CENTRAL & ORQUESTA EN VIVO',
+      pos_x: 420,
+      pos_y: 200,
+      width: 220,
+      height: 120,
+      orientation: 'horizontal',
+      shape: 'round_rect',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 've-2',
+      event_id: 'evt-102',
+      workspace_id: 'ws-a-1111',
+      type: 'BAR',
+      label: 'Barra de Coctelería de Honor',
+      pos_x: 140,
+      pos_y: 520,
+      width: 180,
+      height: 70,
+      orientation: 'horizontal',
+      shape: 'round_rect',
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 've-3',
+      event_id: 'evt-102',
+      workspace_id: 'ws-a-1111',
+      type: 'MACETERO',
+      label: 'Jardinera Ornamental Gigante',
+      pos_x: 740,
+      pos_y: 520,
+      width: 70,
+      height: 70,
+      orientation: 'horizontal',
+      shape: 'circle',
+      created_at: new Date().toISOString(),
+    },
   ],
 };
 
@@ -123,4 +198,98 @@ export function calculateTableOccupancy(eventId: string, tableId: string, capaci
     occupancyRatio: `${totalAssigned} / ${capacity}`,
     occupancyPercentage: pct,
   };
+}
+
+/* VENUE ELEMENTS FUNCTIONS */
+export function getEventVenueElements(eventId: string): VenueElement[] {
+  return venueElementsStore[eventId] || [];
+}
+
+export function createVenueElement(
+  eventId: string, 
+  workspaceId: string, 
+  type: VenueElementType, 
+  label: string, 
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect',
+  posX = 420, 
+  posY = 400
+): VenueElement {
+  if (!venueElementsStore[eventId]) {
+    venueElementsStore[eventId] = [];
+  }
+
+  let width = 180;
+  let height = 80;
+  if (type === 'MACETERO' || type === 'COLUMNA') {
+    width = 70;
+    height = 70;
+  } else if (type === 'PISCINA' || type === 'JARDIN') {
+    width = 240;
+    height = 140;
+  } else if (type === 'PISTA_ORQUESTA' || type === 'ESCENARIO') {
+    width = 220;
+    height = 120;
+  }
+
+  if (orientation === 'vertical' && width !== height) {
+    const temp = width;
+    width = height;
+    height = temp;
+  }
+
+  const newElem: VenueElement = {
+    id: `ve-${Date.now()}`,
+    event_id: eventId,
+    workspace_id: workspaceId,
+    type,
+    label,
+    pos_x: posX,
+    pos_y: posY,
+    width,
+    height,
+    orientation,
+    shape,
+    created_at: new Date().toISOString(),
+  };
+
+  venueElementsStore[eventId].push(newElem);
+  return newElem;
+}
+
+export function updateVenueElementPosition(eventId: string, elementId: string, posX: number, posY: number): void {
+  if (venueElementsStore[eventId]) {
+    const elem = venueElementsStore[eventId].find(e => e.id === elementId);
+    if (elem) {
+      elem.pos_x = posX;
+      elem.pos_y = posY;
+    }
+  }
+}
+
+export function updateVenueElement(
+  eventId: string, 
+  elementId: string, 
+  data: Partial<Pick<VenueElement, 'label' | 'orientation' | 'shape' | 'width' | 'height'>>
+): VenueElement | null {
+  if (venueElementsStore[eventId]) {
+    const elem = venueElementsStore[eventId].find(e => e.id === elementId);
+    if (elem) {
+      if (data.orientation && data.orientation !== elem.orientation) {
+        // Swap dimensions when toggling orientation
+        const temp = elem.width;
+        elem.width = elem.height;
+        elem.height = temp;
+      }
+      Object.assign(elem, data);
+      return elem;
+    }
+  }
+  return null;
+}
+
+export function deleteVenueElement(eventId: string, elementId: string): void {
+  if (venueElementsStore[eventId]) {
+    venueElementsStore[eventId] = venueElementsStore[eventId].filter(e => e.id !== elementId);
+  }
 }
