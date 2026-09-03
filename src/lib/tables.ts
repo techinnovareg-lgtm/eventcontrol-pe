@@ -12,12 +12,15 @@ export type VenueElementType =
   | 'COLUMNA'
   | 'ENTRADA';
 
+export type ElementSize = 'small' | 'medium' | 'large';
+
 export interface VenueElement {
   id: string;
   event_id: string;
   workspace_id: string;
   type: VenueElementType;
   label: string;
+  size: ElementSize;
   pos_x: number;
   pos_y: number;
   width: number;
@@ -61,10 +64,11 @@ const venueElementsStore: Record<string, VenueElement[]> = {
       workspace_id: 'ws-a-1111',
       type: 'PISTA_ORQUESTA',
       label: 'PISTA DE BAILE CENTRAL & ORQUESTA EN VIVO',
+      size: 'large',
       pos_x: 420,
       pos_y: 200,
-      width: 220,
-      height: 120,
+      width: 280,
+      height: 140,
       orientation: 'horizontal',
       shape: 'round_rect',
       created_at: new Date().toISOString(),
@@ -75,10 +79,11 @@ const venueElementsStore: Record<string, VenueElement[]> = {
       workspace_id: 'ws-a-1111',
       type: 'BAR',
       label: 'Barra de Coctelería de Honor',
+      size: 'medium',
       pos_x: 140,
       pos_y: 520,
-      width: 180,
-      height: 70,
+      width: 200,
+      height: 95,
       orientation: 'horizontal',
       shape: 'round_rect',
       created_at: new Date().toISOString(),
@@ -89,16 +94,46 @@ const venueElementsStore: Record<string, VenueElement[]> = {
       workspace_id: 'ws-a-1111',
       type: 'MACETERO',
       label: 'Jardinera Ornamental Gigante',
+      size: 'medium',
       pos_x: 740,
       pos_y: 520,
-      width: 70,
-      height: 70,
+      width: 110,
+      height: 110,
       orientation: 'horizontal',
       shape: 'circle',
       created_at: new Date().toISOString(),
     },
   ],
 };
+
+export function computeElementDimensions(
+  size: ElementSize = 'medium', 
+  shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect', 
+  orientation: 'horizontal' | 'vertical' = 'horizontal'
+): { width: number; height: number } {
+  let w = 200;
+  let h = 100;
+
+  if (size === 'small') {
+    w = shape === 'circle' ? 80 : 130;
+    h = shape === 'circle' ? 80 : 65;
+  } else if (size === 'large') {
+    w = shape === 'circle' ? 160 : 280;
+    h = shape === 'circle' ? 160 : 140;
+  } else {
+    // medium
+    w = shape === 'circle' ? 110 : 200;
+    h = shape === 'circle' ? 110 : 95;
+  }
+
+  if (orientation === 'vertical' && shape !== 'circle') {
+    const temp = w;
+    w = h;
+    h = temp;
+  }
+
+  return { width: w, height: h };
+}
 
 export function getEventTables(eventId: string): Table[] {
   return tablesStore[eventId] || [];
@@ -200,7 +235,7 @@ export function calculateTableOccupancy(eventId: string, tableId: string, capaci
   };
 }
 
-/* VENUE ELEMENTS FUNCTIONS */
+/* VENUE ELEMENTS FUNCTIONS WITH SIZE SUPPORT */
 export function getEventVenueElements(eventId: string): VenueElement[] {
   return venueElementsStore[eventId] || [];
 }
@@ -210,6 +245,7 @@ export function createVenueElement(
   workspaceId: string, 
   type: VenueElementType, 
   label: string, 
+  size: ElementSize = 'medium',
   orientation: 'horizontal' | 'vertical' = 'horizontal',
   shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect',
   posX = 420, 
@@ -219,24 +255,7 @@ export function createVenueElement(
     venueElementsStore[eventId] = [];
   }
 
-  let width = 180;
-  let height = 80;
-  if (type === 'MACETERO' || type === 'COLUMNA') {
-    width = 70;
-    height = 70;
-  } else if (type === 'PISCINA' || type === 'JARDIN') {
-    width = 240;
-    height = 140;
-  } else if (type === 'PISTA_ORQUESTA' || type === 'ESCENARIO') {
-    width = 220;
-    height = 120;
-  }
-
-  if (orientation === 'vertical' && width !== height) {
-    const temp = width;
-    width = height;
-    height = temp;
-  }
+  const { width, height } = computeElementDimensions(size, shape, orientation);
 
   const newElem: VenueElement = {
     id: `ve-${Date.now()}`,
@@ -244,6 +263,7 @@ export function createVenueElement(
     workspace_id: workspaceId,
     type,
     label,
+    size,
     pos_x: posX,
     pos_y: posY,
     width,
@@ -270,18 +290,22 @@ export function updateVenueElementPosition(eventId: string, elementId: string, p
 export function updateVenueElement(
   eventId: string, 
   elementId: string, 
-  data: Partial<Pick<VenueElement, 'label' | 'orientation' | 'shape' | 'width' | 'height'>>
+  data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>
 ): VenueElement | null {
   if (venueElementsStore[eventId]) {
     const elem = venueElementsStore[eventId].find(e => e.id === elementId);
     if (elem) {
-      if (data.orientation && data.orientation !== elem.orientation) {
-        // Swap dimensions when toggling orientation
-        const temp = elem.width;
-        elem.width = elem.height;
-        elem.height = temp;
-      }
-      Object.assign(elem, data);
+      const nextSize = data.size || elem.size || 'medium';
+      const nextShape = data.shape || elem.shape;
+      const nextOrientation = data.orientation || elem.orientation;
+
+      const dims = computeElementDimensions(nextSize, nextShape, nextOrientation);
+
+      Object.assign(elem, data, {
+        size: nextSize,
+        width: dims.width,
+        height: dims.height,
+      });
       return elem;
     }
   }

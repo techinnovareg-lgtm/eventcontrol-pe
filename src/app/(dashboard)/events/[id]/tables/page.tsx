@@ -10,14 +10,14 @@ import {
   Trash2, Move, UserCheck, X, GripVertical, Disc, LayoutGrid, 
   Sparkles, Compass, MapPin, ShieldAlert, Award, ZoomIn, ZoomOut, Maximize2, Minimize2,
   ChevronDown, ChevronUp, Edit3, Save, RotateCcw, GlassWater, UtensilsCrossed, 
-  Flower2, Columns, Waves, Trees, DoorOpen, Layers, Maximize
+  Flower2, Columns, Waves, Trees, DoorOpen, Layers, Maximize, UserPlus
 } from 'lucide-react';
 import { getEventById, getEventGuestGroups } from '@/lib/events';
 import { 
   getEventTables, createTable, deleteTable, updateTable, getEventTableAssignments, 
   assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
   getEventVenueElements, createVenueElement, updateVenueElement, updateVenueElementPosition, 
-  deleteVenueElement, VenueElement, VenueElementType 
+  deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions 
 } from '@/lib/tables';
 import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
 
@@ -42,6 +42,9 @@ export default function TablesManagementPage() {
   const [canvasZoom, setCanvasZoom] = useState<number>(0.8);
   const [panOffset, setPanOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+  
+  // Restored: Toggle between Modo Desplegado (full table details) & Modo Plano Compacto
+  const [isCompactView, setIsCompactView] = useState<boolean>(false);
 
   // Drag state for guest groups -> tables
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
@@ -71,10 +74,11 @@ export default function TablesManagementPage() {
   const [tableShape, setTableShape] = useState<TableShape>('ROUND');
   const [showAddTableModal, setShowAddTableModal] = useState(false);
 
-  // New Venue Element Modal Form
+  // New Venue Element Modal Form (With Size Selection)
   const [showAddElementModal, setShowAddElementModal] = useState(false);
   const [elementType, setElementType] = useState<VenueElementType>('MACETERO');
   const [elementLabel, setElementLabel] = useState('');
+  const [elementSize, setElementSize] = useState<ElementSize>('medium');
   const [elementOrientation, setElementOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
   const [elementShape, setElementShape] = useState<'rect' | 'round_rect' | 'circle' | 'oval'>('circle');
 
@@ -127,6 +131,7 @@ export default function TablesManagementPage() {
       currentWorkspaceId,
       elementType,
       elementLabel || defaultLabels[elementType],
+      elementSize,
       elementOrientation,
       elementShape,
       480,
@@ -151,6 +156,7 @@ export default function TablesManagementPage() {
     if (!editingVenueElementObj) return;
     updateVenueElement(eventId, editingVenueElementObj.id, {
       label: editingVenueElementObj.label,
+      size: editingVenueElementObj.size || 'medium',
       orientation: editingVenueElementObj.orientation,
       shape: editingVenueElementObj.shape,
     });
@@ -485,9 +491,7 @@ export default function TablesManagementPage() {
               const shapeRadius = isCircle ? 'rounded-full' : elem.shape === 'round_rect' ? 'rounded-2xl' : 'rounded-none';
               const cardBgStyle = getVenueElementCardStyle(elem.type);
 
-              // Minimum dimensions to guarantee non-overflowing text
-              const minWidth = Math.max(elem.width, isCircle ? 95 : 190);
-              const minHeight = Math.max(elem.height, isCircle ? 95 : 85);
+              const dims = computeElementDimensions(elem.size || 'medium', elem.shape, elem.orientation);
 
               return (
                 <div
@@ -497,8 +501,8 @@ export default function TablesManagementPage() {
                   style={{
                     left: `${elem.pos_x}px`,
                     top: `${elem.pos_y}px`,
-                    width: `${minWidth}px`,
-                    height: `${minHeight}px`,
+                    width: `${dims.width}px`,
+                    height: `${dims.height}px`,
                   }}
                   onDoubleClick={() => setEditingVenueElementObj(elem)}
                 >
@@ -629,7 +633,7 @@ export default function TablesManagementPage() {
       <EventNavHeader currentTab="tables" eventId={eventId} eventName={event?.name} />
 
       {/* Main Container */}
-      <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-4 w-full">
+      <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
         
         {/* Title Bar & Toolbar */}
         <div className="card-luxury p-5 border border-[#C5A059]/30 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -639,7 +643,7 @@ export default function TablesManagementPage() {
             </span>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-0.5">Plano Virtual del Salón & Elementos</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Zoom predeterminado al 80%. Arrastra desde el fondo libre para mover todo el plano. Agrega mesas y elementos del salón (maceteros, bar, pista).
+              Zoom predeterminado al 80%. Arrastra desde el fondo libre para mover todo el plano. Agrega mesas y elementos del salón.
             </p>
           </div>
 
@@ -673,6 +677,15 @@ export default function TablesManagementPage() {
                 <RotateCcw className="w-3.5 h-3.5" />
               </button>
             </div>
+
+            {/* RESTORED: Toggle Modo Desplegado vs Modo Plano Compacto */}
+            <button
+              onClick={() => setIsCompactView(!isCompactView)}
+              className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-[#C5A059]/40 font-bold text-xs rounded-xl transition flex items-center gap-1 shadow-sm"
+            >
+              {isCompactView ? <ChevronDown className="w-4 h-4 text-[#B8860B]" /> : <ChevronUp className="w-4 h-4 text-[#B8860B]" />}
+              {isCompactView ? 'Ver Mesas Desplegadas' : 'Modo Plano Compacto'}
+            </button>
 
             {/* Fullscreen Button */}
             <button
@@ -837,15 +850,13 @@ export default function TablesManagementPage() {
                   data-canvas-bg="true"
                 ></div>
 
-                {/* RENDER VENUE ARCHITECTURAL ELEMENTS (LIGHT PALETTE & NO TEXT OVERFLOW) */}
+                {/* RENDER VENUE ARCHITECTURAL ELEMENTS WITH CUSTOMIZABLE SIZE */}
                 {venueElements.map((elem) => {
                   const isCircle = elem.shape === 'circle' || elem.shape === 'oval';
                   const shapeRadius = isCircle ? 'rounded-full' : elem.shape === 'round_rect' ? 'rounded-2xl' : 'rounded-none';
                   const cardBgStyle = getVenueElementCardStyle(elem.type);
 
-                  // Minimum dimensions to prevent text overflow
-                  const minWidth = Math.max(elem.width, isCircle ? 95 : 190);
-                  const minHeight = Math.max(elem.height, isCircle ? 95 : 85);
+                  const dims = computeElementDimensions(elem.size || 'medium', elem.shape, elem.orientation);
 
                   return (
                     <div
@@ -855,8 +866,8 @@ export default function TablesManagementPage() {
                       style={{
                         left: `${elem.pos_x}px`,
                         top: `${elem.pos_y}px`,
-                        width: `${minWidth}px`,
-                        height: `${minHeight}px`,
+                        width: `${dims.width}px`,
+                        height: `${dims.height}px`,
                       }}
                       onDoubleClick={() => setEditingVenueElementObj(elem)}
                     >
@@ -872,7 +883,7 @@ export default function TablesManagementPage() {
                       <button
                         onClick={(e) => { e.stopPropagation(); setEditingVenueElementObj(elem); }}
                         className="absolute top-1.5 right-1.5 p-1 bg-white hover:bg-amber-100 text-[#B8860B] rounded-full border border-[#DBBB6E] shadow-sm transition group-hover:scale-110 z-20"
-                        title="Editar Título o Forma"
+                        title="Editar Título, Tamaño o Forma"
                       >
                         <Edit3 className="w-3 h-3" />
                       </button>
@@ -983,6 +994,89 @@ export default function TablesManagementPage() {
             </div>
           </div>
         </div>
+
+        {/* RESTORED: DETALLE GENERAL DE MESAS INSTALADAS (MODO DESPLEGADO) */}
+        {!isCompactView && (
+          <div className="space-y-4 pt-4 border-t border-[#C5A059]/30 animate-fade-in-up">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                  <LayoutGrid className="w-5 h-5 text-[#B8860B]" /> Detalle General de Mesas Instaladas ({tables.length})
+                </h3>
+                <p className="text-xs text-slate-500">Vista desplegada con desglose de grupos e invitados asignados por cada mesa.</p>
+              </div>
+
+              <button
+                onClick={() => setShowAddTableModal(true)}
+                style={{ backgroundColor: '#DBBB6E' }}
+                className="px-3.5 py-2 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-1.5 hover:brightness-110"
+              >
+                <Plus className="w-4 h-4 text-white" /> Agregar Mesa
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {tables.map(tbl => {
+                const occ = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
+                const tblAssignments = assignments.filter(a => a.table_id === tbl.id);
+
+                return (
+                  <div key={tbl.id} className="card-luxury p-5 border border-[#C5A059]/40 shadow-md space-y-3 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                        <strong className="text-sm font-serif font-bold text-slate-900">{tbl.name}</strong>
+                        <span 
+                          style={{ backgroundColor: occ.isOvercapacity ? '#dc2626' : '#DBBB6E' }}
+                          className="px-2.5 py-1 text-white font-extrabold text-xs rounded-lg shadow-sm"
+                        >
+                          {occ.occupancyRatio}
+                        </span>
+                      </div>
+
+                      <div className="py-3 space-y-1.5">
+                        <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Grupos e Invitados Asignados:</span>
+                        {tblAssignments.length === 0 ? (
+                          <span className="text-xs text-slate-400 italic block py-2 text-center bg-slate-50 rounded-xl">Sin asignaciones aún</span>
+                        ) : (
+                          tblAssignments.map(asgn => {
+                            const grp = groups.find(g => g.id === asgn.group_id);
+                            return (
+                              <div key={asgn.id} className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-xl border border-slate-200">
+                                <span className="font-semibold text-slate-800">{grp?.group_name || 'Grupo'}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-[#B8860B]">{asgn.assigned_passes} pases</span>
+                                  <button
+                                    onClick={() => handleUnassign(asgn.group_id)}
+                                    className="text-slate-400 hover:text-red-600 transition"
+                                    title="Quitar de mesa"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <span className="text-slate-500 font-semibold">Capacidad: {tbl.capacity} sillas</span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setEditingTableObj(tbl)}
+                          className="text-[#B8860B] hover:underline font-bold"
+                        >
+                          Editar Mesa
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* ADD NEW TABLE MODAL */}
@@ -1038,12 +1132,12 @@ export default function TablesManagementPage() {
         </div>
       )}
 
-      {/* ADD VENUE ARCHITECTURAL ELEMENT MODAL */}
+      {/* ADD VENUE ARCHITECTURAL ELEMENT MODAL WITH SIZE SELECTION */}
       {showAddElementModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
             <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Agregar Elemento del Salón</h3>
-            <p className="text-xs text-slate-500">Selecciona el tipo de elemento del menú desplegable para incorporar al espacio virtual.</p>
+            <p className="text-xs text-slate-500">Selecciona el tipo, tamaño y forma del elemento del menú desplegable.</p>
 
             <form onSubmit={handleCreateVenueElement} className="space-y-4 text-xs">
               <div>
@@ -1079,6 +1173,22 @@ export default function TablesManagementPage() {
                   placeholder="Ej. Barra de Coctelería VIP"
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
                 />
+              </div>
+
+              {/* Tamaños: Pequeño, Mediano, Grande */}
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Tamaño del Elemento
+                </label>
+                <select
+                  value={elementSize}
+                  onChange={(e) => setElementSize(e.target.value as ElementSize)}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                >
+                  <option value="small">Pequeño (Compacto)</option>
+                  <option value="medium">Mediano (Estándar)</option>
+                  <option value="large">Grande (Gran Tamaño / Destacado)</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1134,7 +1244,7 @@ export default function TablesManagementPage() {
         </div>
       )}
 
-      {/* EDIT VENUE ELEMENT MODAL */}
+      {/* EDIT VENUE ELEMENT MODAL WITH SIZE SELECTION */}
       {editingVenueElementObj && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
@@ -1152,6 +1262,21 @@ export default function TablesManagementPage() {
                   onChange={(e) => setEditingVenueElementObj({ ...editingVenueElementObj, label: e.target.value })}
                   className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Tamaño del Elemento
+                </label>
+                <select
+                  value={editingVenueElementObj.size || 'medium'}
+                  onChange={(e) => setEditingVenueElementObj({ ...editingVenueElementObj, size: e.target.value as ElementSize })}
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                >
+                  <option value="small">Pequeño (Compacto)</option>
+                  <option value="medium">Mediano (Estándar)</option>
+                  <option value="large">Grande (Gran Tamaño / Destacado)</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
