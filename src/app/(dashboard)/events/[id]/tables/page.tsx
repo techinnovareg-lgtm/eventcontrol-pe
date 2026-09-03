@@ -49,14 +49,14 @@ export default function TablesManagementPage() {
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
   const [dragOverTableId, setDragOverTableId] = useState<string | null>(null);
 
-  // Table & Venue Element Positions
+  // Table & Venue Element Positions initialized with proper headroom
   const [tablePositions, setTablePositions] = useState<Record<string, { x: number; y: number; shape: TableShape }>>(() => {
     const initialPos: Record<string, { x: number; y: number; shape: TableShape }> = {};
     const tbls = getEventTables(eventId);
     tbls.forEach((t, i) => {
       initialPos[t.id] = {
         x: t.pos_x || (140 + (i % 4) * 280),
-        y: t.pos_y || (110 + Math.floor(i / 4) * 200),
+        y: t.pos_y || (140 + Math.floor(i / 4) * 200), // Height headroom to avoid covering top row
         shape: i === 4 ? 'VIP_HONOR' : 'ROUND',
       };
     });
@@ -91,7 +91,7 @@ export default function TablesManagementPage() {
     updatedTables.forEach((t, i) => {
       updatedPos[t.id] = tablePositions[t.id] || {
         x: t.pos_x || (140 + (i % 4) * 280),
-        y: t.pos_y || (110 + Math.floor(i / 4) * 200),
+        y: t.pos_y || (140 + Math.floor(i / 4) * 200),
         shape: 'ROUND',
       };
     });
@@ -229,14 +229,123 @@ export default function TablesManagementPage() {
     }
   };
 
-  // EXPORT FLOOR PLAN HANDLERS
-  const handleExportPDF = () => {
-    window.print();
+  // REAL CLIENT-SIDE PNG IMAGE GENERATION & DOWNLOAD LINK DISPATCH
+  const handleExportPNG = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1400;
+    canvas.height = 900;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 1. Draw Woven Linen Parchment Background
+    ctx.fillStyle = '#FAF8F5';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Grid Dots
+    ctx.fillStyle = 'rgba(197, 160, 89, 0.25)';
+    for (let x = 0; x < canvas.width; x += 28) {
+      for (let y = 0; y < canvas.height; y += 28) {
+        ctx.beginPath();
+        ctx.arc(x, y, 1.5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    }
+
+    // 2. Draw Header Title Bar
+    ctx.fillStyle = '#1A1A1A';
+    ctx.font = 'bold 24px serif';
+    ctx.fillText(`${event?.name || 'Evento'} - Plano Oficial de Distribución del Salón`, 40, 50);
+    
+    ctx.fillStyle = '#B8860B';
+    ctx.font = '13px sans-serif';
+    ctx.fillText(`Total Invitados: ${totalAuthorizedGuests} personas (${totalAssignedGuests} ubicados en ${tables.length} mesas)`, 40, 75);
+
+    // 3. Draw Venue Architectural Elements (Bar, Escenario, Maceteros, etc.)
+    venueElements.forEach((elem) => {
+      const dims = computeElementDimensions(elem.size || 'medium', elem.shape, elem.orientation);
+      ctx.save();
+      ctx.fillStyle = '#FFFDF9';
+      ctx.strokeStyle = '#DBBB6E';
+      ctx.lineWidth = 2.5;
+
+      if (elem.shape === 'circle' || elem.shape === 'oval') {
+        ctx.beginPath();
+        ctx.ellipse(elem.pos_x + dims.width / 2, elem.pos_y + dims.height / 2, dims.width / 2, dims.height / 2, 0, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.roundRect(elem.pos_x, elem.pos_y, dims.width, dims.height, 16);
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#1A1A1A';
+      ctx.font = 'bold 12px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(elem.label, elem.pos_x + dims.width / 2, elem.pos_y + dims.height / 2 + 4);
+      ctx.restore();
+    });
+
+    // 4. Draw Tables Cards & Seating Lists
+    tables.forEach((tbl) => {
+      const pos = tablePositions[tbl.id] || { x: tbl.pos_x || 200, y: tbl.pos_y || 200 };
+      const occ = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
+
+      ctx.save();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = occ.isOvercapacity ? '#dc2626' : '#DBBB6E';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(pos.x, pos.y, 210, 130, 16);
+      ctx.fill();
+      ctx.stroke();
+
+      // Header Bar
+      ctx.fillStyle = '#1A1A1A';
+      ctx.font = 'bold 13px serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(tbl.name, pos.x + 12, pos.y + 24);
+
+      // Ratio Badge
+      ctx.fillStyle = occ.isOvercapacity ? '#dc2626' : '#DBBB6E';
+      ctx.font = 'bold 11px sans-serif';
+      ctx.fillText(`${occ.occupancyRatio}`, pos.x + 150, pos.y + 24);
+
+      // Assigned Guests List
+      const tblAsgn = assignments.filter(a => a.table_id === tbl.id);
+      let lineY = pos.y + 48;
+      if (tblAsgn.length === 0) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = 'italic 11px sans-serif';
+        ctx.fillText('Sin asignaciones', pos.x + 12, lineY);
+      } else {
+        tblAsgn.forEach((asgn) => {
+          const grp = groups.find(g => g.id === asgn.group_id);
+          ctx.fillStyle = '#334155';
+          ctx.font = '11px sans-serif';
+          ctx.fillText(`• ${grp?.group_name || 'Grupo'} (${asgn.assigned_passes}p)`, pos.x + 12, lineY);
+          lineY += 18;
+        });
+      }
+
+      ctx.restore();
+    });
+
+    // 5. Export Data URL & Trigger Link Download
+    const dataUrl = canvas.toDataURL('image/png');
+    const link = document.createElement('a');
+    link.download = `Plano_Distribucion_Salón_${event?.name.replace(/[^a-zA-Z0-9]/g, '_') || 'EventControl'}.png`;
+    link.href = dataUrl;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setShowExportModal(false);
   };
 
-  const handleExportPNG = () => {
-    alert('¡Plano exportado exitosamente! Se ha descargado el archivo "Plano_Distribucion_Salón_EventControl.png" en alta resolución (300 DPI) para imprimir o enviar a colaboradores.');
-    setShowExportModal(false);
+  const handleExportPDF = () => {
+    window.print();
   };
 
   // CANVAS PANNING VIA EMPTY BACKGROUND DRAGGING / TOUCH-PAN
@@ -411,9 +520,9 @@ export default function TablesManagementPage() {
     return (
       <div className="fixed inset-0 z-50 bg-[#FAF8F5] flex flex-col justify-between overflow-hidden select-none">
         
-        {/* Floating Toolbar in FullScreen Mode */}
-        <div className="absolute top-4 left-4 right-4 z-40 flex items-center justify-between pointer-events-auto">
-          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-[#C5A059]/40 shadow-xl">
+        {/* UNIFIED 1-ROW FLOATING MANAGEMENT TOOLBAR IN FULLSCREEN MODE */}
+        <div className="absolute top-4 left-4 right-4 z-40 flex items-center justify-between gap-2 bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-[#C5A059]/40 shadow-xl overflow-x-auto whitespace-nowrap">
+          <div className="flex items-center gap-2">
             <span className="text-xs font-serif font-bold text-[#1A1A1A] px-2 border-r border-slate-200">
               Plano Virtual del Salón
             </span>
@@ -435,10 +544,10 @@ export default function TablesManagementPage() {
               </button>
               <button
                 onClick={() => { setCanvasZoom(0.8); setPanOffset({ x: 0, y: 0 }); }}
-                className="p-1.5 hover:bg-amber-50 rounded-lg text-[#B8860B] transition border-l border-slate-200"
+                className="p-1.5 hover:bg-amber-50 rounded-lg text-[#B8860B] transition border-l border-slate-200 flex items-center gap-1 px-2 text-xs font-bold"
                 title="Centrar Plano (80%)"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
+                <RotateCcw className="w-3.5 h-3.5" /> Centrar Plano
               </button>
             </div>
           </div>
@@ -446,14 +555,14 @@ export default function TablesManagementPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowExportModal(true)}
-              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-2xl shadow-xl transition flex items-center gap-1.5"
+              className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5"
             >
-              <Printer className="w-4 h-4 text-[#B8860B]" /> Exportar (PDF / PNG)
+              <Printer className="w-4 h-4 text-[#B8860B]" /> Exportar Plano
             </button>
 
             <button
               onClick={toggleFullScreen}
-              className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-2xl transition shadow-xl flex items-center gap-1.5 border border-slate-700"
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-xl flex items-center gap-1.5 border border-slate-700"
             >
               <Minimize2 className="w-4 h-4 text-[#C5A059]" /> Salir de Pantalla Completa
             </button>
@@ -646,7 +755,7 @@ export default function TablesManagementPage() {
       {/* Main Container */}
       <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
         
-        {/* Title Bar & Page Header */}
+        {/* Page Title Bar */}
         <div className="card-luxury p-5 border border-[#C5A059]/30 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">
@@ -657,18 +766,9 @@ export default function TablesManagementPage() {
               Gestión centralizada de mesas, ambientación y exportación oficial de guías para el personal.
             </p>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="px-3.5 py-2.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
-            >
-              <Printer className="w-4 h-4 text-[#B8860B]" /> Exportar Plano (PDF / PNG)
-            </button>
-          </div>
         </div>
 
-        {/* INFORMATIVE SUMMARY CARDS PANEL WITH BOTH INVITADOS & PASES COUNTS */}
+        {/* INFORMATIVE SUMMARY CARDS PANEL */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="card-luxury p-4 border border-[#C5A059]/30 text-center">
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Invitados Autorizados</span>
@@ -694,6 +794,77 @@ export default function TablesManagementPage() {
             <span className="text-[10px] text-purple-900 font-bold uppercase tracking-wider block">Capacidad Total Mesas</span>
             <strong className="text-xl font-serif font-bold text-purple-900 mt-0.5 block">{totalTableCapacity} sillas</strong>
             <span className="text-[10px] text-purple-800 font-medium">{tables.length} mesas en salón</span>
+          </div>
+        </div>
+
+        {/* UNIFIED 1-ROW FLOATING MANAGEMENT TOOLBAR (PLACED CLEANLY ABOVE CANVAS CONTAINER) */}
+        <div className="flex items-center justify-between gap-2 bg-white p-2.5 rounded-2xl border border-[#C5A059]/40 shadow-sm overflow-x-auto whitespace-nowrap">
+          {/* Zoom & Centrar Plano */}
+          <div className="flex items-center bg-slate-50 border border-slate-300 rounded-xl p-1 shrink-0">
+            <button
+              onClick={() => setCanvasZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(1))))}
+              className="p-1 hover:bg-slate-200 rounded-lg text-slate-700 transition"
+              title="Alejar Zoom"
+            >
+              <ZoomOut className="w-3.5 h-3.5" />
+            </button>
+            <span className="text-[11px] font-mono font-bold px-2 text-[#B8860B]">
+              {Math.round(canvasZoom * 100)}%
+            </span>
+            <button
+              onClick={() => setCanvasZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(1))))}
+              className="p-1 hover:bg-slate-200 rounded-lg text-slate-700 transition"
+              title="Acercar Zoom"
+            >
+              <ZoomIn className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => { setCanvasZoom(0.8); setPanOffset({ x: 0, y: 0 }); }}
+              className="p-1 hover:bg-amber-100 rounded-lg text-[#B8860B] transition border-l border-slate-200 flex items-center gap-1 px-2 text-[11px] font-bold"
+              title="Centrar Plano (80%)"
+            >
+              <RotateCcw className="w-3 h-3" /> Centrar Plano
+            </button>
+          </div>
+
+          {/* Action Buttons Row */}
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setIsCompactView(!isCompactView)}
+              className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-[#C5A059]/40 font-bold text-xs rounded-xl transition flex items-center gap-1 shadow-sm"
+            >
+              {isCompactView ? <ChevronDown className="w-3.5 h-3.5 text-[#B8860B]" /> : <ChevronUp className="w-3.5 h-3.5 text-[#B8860B]" />}
+              {isCompactView ? 'Ver Mesas Desplegadas' : 'Modo Plano Compacto'}
+            </button>
+
+            <button
+              onClick={toggleFullScreen}
+              className="px-3 py-2 bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-[#C5A059]" /> Pantalla Completa
+            </button>
+
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#B8860B]" /> Exportar Plano
+            </button>
+
+            <button
+              onClick={() => setShowAddTableModal(true)}
+              style={{ backgroundColor: '#DBBB6E' }}
+              className="px-3.5 py-2 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-1.5 hover:brightness-110"
+            >
+              <Plus className="w-3.5 h-3.5 text-white" /> Nueva Mesa
+            </button>
+
+            <button
+              onClick={() => setShowAddElementModal(true)}
+              className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-1.5"
+            >
+              <Layers className="w-3.5 h-3.5 text-[#C5A059]" /> + Elemento Salón
+            </button>
           </div>
         </div>
 
@@ -746,86 +917,12 @@ export default function TablesManagementPage() {
             )}
           </div>
 
-          {/* MAIN 2D INTERACTIVE CANVAS VIEWPORT WITH UNIFIED FLOATING CONTROL TOOLBAR */}
+          {/* MAIN 2D INTERACTIVE CANVAS VIEWPORT (CLEANLY SEPARATED FROM TOP TOOLBAR) */}
           <div className="lg:col-span-3 card-luxury p-3 border-2 border-[#C5A059]/40 shadow-xl relative overflow-hidden bg-[#FAF8F5]">
             
-            {/* UNIFIED SINGLE MANAGEMENT TOOLBAR (TOP FLOATING MENU BAR) */}
-            <div className="absolute top-4 left-4 right-4 z-30 flex flex-wrap items-center justify-between gap-2 bg-white/95 backdrop-blur-md p-2 rounded-2xl border border-[#C5A059]/40 shadow-lg">
-              
-              {/* Left Group: Zoom & Centrar Plano */}
-              <div className="flex items-center gap-1.5">
-                <div className="flex items-center bg-slate-50 border border-slate-300 rounded-xl p-1">
-                  <button
-                    onClick={() => setCanvasZoom(z => Math.max(0.4, Number((z - 0.1).toFixed(1))))}
-                    className="p-1 hover:bg-slate-200 rounded-lg text-slate-700 transition"
-                    title="Alejar Zoom"
-                  >
-                    <ZoomOut className="w-3.5 h-3.5" />
-                  </button>
-                  <span className="text-[11px] font-mono font-bold px-2 text-[#B8860B]">
-                    {Math.round(canvasZoom * 100)}%
-                  </span>
-                  <button
-                    onClick={() => setCanvasZoom(z => Math.min(1.5, Number((z + 0.1).toFixed(1))))}
-                    className="p-1 hover:bg-slate-200 rounded-lg text-slate-700 transition"
-                    title="Acercar Zoom"
-                  >
-                    <ZoomIn className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => { setCanvasZoom(0.8); setPanOffset({ x: 0, y: 0 }); }}
-                    className="p-1 hover:bg-amber-100 rounded-lg text-[#B8860B] transition border-l border-slate-200 flex items-center gap-1 px-1.5 text-[10px] font-bold"
-                    title="Centrar Plano (80%)"
-                  >
-                    <RotateCcw className="w-3 h-3" /> Centrar Plano
-                  </button>
-                </div>
-              </div>
-
-              {/* Center/Right Group: Mode, Fullscreen, Export & Add Actions */}
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => setIsCompactView(!isCompactView)}
-                  className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-[#C5A059]/40 font-bold text-[11px] rounded-xl transition flex items-center gap-1 shadow-sm"
-                >
-                  {isCompactView ? <ChevronDown className="w-3.5 h-3.5 text-[#B8860B]" /> : <ChevronUp className="w-3.5 h-3.5 text-[#B8860B]" />}
-                  {isCompactView ? 'Ver Mesas Desplegadas' : 'Modo Plano Compacto'}
-                </button>
-
-                <button
-                  onClick={toggleFullScreen}
-                  className="px-3 py-1.5 bg-white text-slate-800 border border-slate-300 hover:bg-slate-50 rounded-xl text-[11px] font-bold transition flex items-center gap-1 shadow-sm"
-                >
-                  <Maximize2 className="w-3.5 h-3.5 text-[#C5A059]" /> Pantalla Completa
-                </button>
-
-                <button
-                  onClick={() => setShowExportModal(true)}
-                  className="px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-[11px] font-bold transition flex items-center gap-1 shadow-sm"
-                >
-                  <Printer className="w-3.5 h-3.5 text-[#B8860B]" /> Exportar Plano
-                </button>
-
-                <button
-                  onClick={() => setShowAddTableModal(true)}
-                  style={{ backgroundColor: '#DBBB6E' }}
-                  className="px-3 py-1.5 text-white font-bold text-[11px] rounded-xl transition shadow-md flex items-center gap-1 hover:brightness-110"
-                >
-                  <Plus className="w-3.5 h-3.5 text-white" /> Nueva Mesa
-                </button>
-
-                <button
-                  onClick={() => setShowAddElementModal(true)}
-                  className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] rounded-xl transition shadow-md flex items-center gap-1"
-                >
-                  <Layers className="w-3.5 h-3.5 text-[#C5A059]" /> + Elemento Salón
-                </button>
-              </div>
-            </div>
-
             {/* CANVAS INTERACTIVE PANNING WRAPPER */}
             <div
-              className="w-full h-[650px] relative overflow-hidden cursor-grab active:cursor-grabbing rounded-lg pt-14"
+              className="w-full h-[650px] relative overflow-hidden cursor-grab active:cursor-grabbing rounded-lg"
               onMouseDown={(e) => {
                 if (e.target === e.currentTarget || (e.target as HTMLElement).getAttribute('data-canvas-bg') === 'true') {
                   handleCanvasStartPan(e.clientX, e.clientY);
@@ -1088,7 +1185,7 @@ export default function TablesManagementPage() {
         )}
       </main>
 
-      {/* EXPORT FLOOR PLAN MODAL (PDF / PNG) */}
+      {/* EXPORT FLOOR PLAN MODAL (PDF / PNG REAL GENERATION) */}
       {showExportModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in-up">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
@@ -1105,7 +1202,7 @@ export default function TablesManagementPage() {
             </div>
 
             <p className="text-xs text-slate-600 leading-relaxed">
-              Exporta la disposición final de las mesas y elementos del salón en PDF o formato de imagen en alta resolución para imprimir o enviar a colaboradores y personal de producción.
+              Exporta la disposición final de las mesas y elementos del salón en formato PDF o descárgalo como imagen PNG lista para enviar o imprimir.
             </p>
 
             <div className="space-y-3 pt-2">
@@ -1121,12 +1218,12 @@ export default function TablesManagementPage() {
                 onClick={handleExportPNG}
                 className="w-full py-3.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-2.5"
               >
-                <Download className="w-4 h-4 text-[#C5A059]" /> Descargar Imagen PNG (300 DPI)
+                <Download className="w-4 h-4 text-[#C5A059]" /> Descargar Imagen PNG (Descarga Real)
               </button>
             </div>
 
             <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 font-medium">
-              💡 <strong>Guía para Colaboradores:</strong> El documento PDF/PNG incluye el desglose de invitados asignados a cada mesa, ubicación del escenario, bar y maceteros.
+              💡 <strong>Guía para Colaboradores:</strong> La imagen PNG descargará la distribución completa del salón con mesas, invitados ubicados, escenario y bar.
             </div>
 
             <div className="pt-2">
