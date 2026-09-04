@@ -115,18 +115,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAF8F5] p-4 selection:bg-[#C5A059] selection:text-white">
-      
-      {/* Top Back to Landing Button */}
-      <div className="max-w-md w-full mb-3">
-        <Link 
-          href="/" 
-          className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#B8860B] transition bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs hover:border-[#C5A059]/40"
-        >
-          <ArrowLeft className="w-4 h-4 text-[#B8860B]" /> Volver a la Página Principal (Landing)
-        </Link>
-      </div>
-
+    <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 selection:bg-[#C5A059] selection:text-white">
       <div className="max-w-md w-full card-luxury p-8 space-y-6 shadow-xl border border-[#C5A059]/40">
         
         {/* Official Trademark Logo */}
