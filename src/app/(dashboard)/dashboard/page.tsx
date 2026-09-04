@@ -286,12 +286,12 @@ export default function RealtimeDashboardPage() {
           </div>
 
           <a
-            href="https://tech-innova.vercel.app/"
+            href="https://tech-innova.online/"
             target="_blank"
             rel="noopener noreferrer"
             className="text-[#B8860B] font-bold hover:underline flex items-center gap-1"
           >
-            tech-innova.vercel.app <ExternalLink className="w-3.5 h-3.5" />
+            tech-innova.online <ExternalLink className="w-3.5 h-3.5" />
           </a>
         </div>
       </main>

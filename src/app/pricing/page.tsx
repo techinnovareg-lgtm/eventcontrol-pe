@@ -140,7 +140,7 @@ export default function PricingPage() {
           <p>* El plan Business con eventos activos ilimitados está sujeto a política de uso razonable.</p>
           <p className="text-slate-600 font-semibold">
             Plataforma SaaS desarrollada con excelencia por{' '}
-            <a href="https://tech-innova.vercel.app/" target="_blank" rel="noopener noreferrer" className="text-[#B8860B] font-bold hover:underline">
+            <a href="https://tech-innova.online/" target="_blank" rel="noopener noreferrer" className="text-[#B8860B] font-bold hover:underline">
               Tech Innova
             </a>
           </p>

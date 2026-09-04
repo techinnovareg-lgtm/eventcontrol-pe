@@ -532,7 +532,7 @@ export default function Home() {
               </div>
 
               <a
-                href="https://tech-innova.vercel.app/"
+                href="https://tech-innova.online/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="px-6 py-3.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition shadow-md flex items-center gap-2 shrink-0"
@@ -544,7 +544,7 @@ export default function Home() {
             {/* Social Media & Tech Innova Links */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
               <a
-                href="https://tech-innova.vercel.app/"
+                href="https://tech-innova.online/"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-4 bg-white rounded-xl border border-[#DBBB6E]/40 hover:border-[#DBBB6E] transition flex items-center gap-3 group shadow-sm"
@@ -554,7 +554,7 @@ export default function Home() {
                 </div>
                 <div>
                   <span className="font-bold text-slate-900 block group-hover:text-[#B8860B] transition">Portal Web Oficial</span>
-                  <span className="text-[11px] text-slate-500 font-mono">tech-innova.vercel.app</span>
+                  <span className="text-[11px] text-slate-500 font-mono">tech-innova.online</span>
                 </div>
               </a>
 
@@ -573,15 +573,20 @@ export default function Home() {
                 </div>
               </a>
 
-              <div className="p-4 bg-white rounded-xl border border-slate-200 opacity-70 flex items-center gap-3">
+              <a
+                href="https://www.youtube.com/@TechInnova-c9k"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-4 bg-white rounded-xl border border-[#DBBB6E]/40 hover:border-red-500 transition flex items-center gap-3 group shadow-sm"
+              >
                 <div className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center font-bold">
                   <Video className="w-4 h-4" />
                 </div>
                 <div>
-                  <span className="font-bold text-slate-900 block">Canal de YouTube</span>
-                  <span className="text-[11px] text-slate-500 italic">Próximamente</span>
+                  <span className="font-bold text-slate-900 block group-hover:text-red-600 transition">Canal de YouTube</span>
+                  <span className="text-[11px] text-slate-500 font-mono">@TechInnova-c9k</span>
                 </div>
-              </div>
+              </a>
             </div>
           </div>
         </section>
@@ -601,7 +606,7 @@ export default function Home() {
           <div className="text-center sm:text-right text-slate-600">
             Desarrollado con excelencia por{' '}
             <a 
-              href="https://tech-innova.vercel.app/" 
+              href="https://tech-innova.online/" 
               target="_blank" 
               rel="noopener noreferrer" 
               className="text-[#B8860B] font-bold hover:underline"
