@@ -382,37 +382,86 @@ export default function Home() {
             </div>
 
             {/* Workflow Steps Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 pt-4">
-              <div className="flex flex-col items-center p-4 rounded-xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm">
-                <FileSpreadsheet className="w-8 h-8 text-[#B8860B] mb-2" />
-                <span className="text-xs font-bold text-slate-800">1. Excel</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3.5 pt-4 text-center items-stretch">
+              
+              {/* Step 1 */}
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm group">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#B8860B] flex items-center justify-center mb-2.5 shrink-0 group-hover:scale-110 transition-transform">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 font-serif">1. Excel</span>
+                <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug font-normal">
+                  Importación masiva de lista de invitados en 1 clic.
+                </p>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm">
-                <Users className="w-8 h-8 text-[#B8860B] mb-2" />
-                <span className="text-xs font-bold text-slate-800">2. Grupos</span>
+
+              {/* Step 2 */}
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm group">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#B8860B] flex items-center justify-center mb-2.5 shrink-0 group-hover:scale-110 transition-transform">
+                  <Users className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 font-serif">2. Grupos</span>
+                <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug font-normal">
+                  Agrupación por familias y pases por delegación.
+                </p>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm">
-                <QrCode className="w-8 h-8 text-[#B8860B] mb-2" />
-                <span className="text-xs font-bold text-slate-800">3. QR Único</span>
+
+              {/* Step 3 */}
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm group">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#B8860B] flex items-center justify-center mb-2.5 shrink-0 group-hover:scale-110 transition-transform">
+                  <QrCode className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 font-serif">3. QR Único</span>
+                <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug font-normal">
+                  Pases digitales por familia enviados vía WhatsApp.
+                </p>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm">
-                <Grid className="w-8 h-8 text-[#B8860B] mb-2" />
-                <span className="text-xs font-bold text-slate-800">4. Mesas</span>
+
+              {/* Step 4 */}
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm group">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#B8860B] flex items-center justify-center mb-2.5 shrink-0 group-hover:scale-110 transition-transform">
+                  <Grid className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 font-serif">4. Mesas</span>
+                <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug font-normal">
+                  Asignación de asientos en plano 2D interactivo.
+                </p>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm">
-                <Calendar className="w-8 h-8 text-[#B8860B] mb-2" />
-                <span className="text-xs font-bold text-slate-800">5. Check-in</span>
+
+              {/* Step 5 */}
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm group">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#B8860B] flex items-center justify-center mb-2.5 shrink-0 group-hover:scale-110 transition-transform">
+                  <Calendar className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 font-serif">5. Check-in</span>
+                <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug font-normal">
+                  Escaneo instantáneo en puerta con o sin conexión.
+                </p>
               </div>
-              <div className="flex flex-col items-center p-4 rounded-xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm">
-                <Clock className="w-8 h-8 text-[#B8860B] mb-2" />
-                <span className="text-xs font-bold text-slate-800">6. Dashboard</span>
+
+              {/* Step 6 */}
+              <div className="flex flex-col items-center p-4 rounded-2xl bg-white border border-[#DBBB6E]/40 hover-lift shadow-sm group">
+                <div className="w-10 h-10 rounded-xl bg-amber-50 text-[#B8860B] flex items-center justify-center mb-2.5 shrink-0 group-hover:scale-110 transition-transform">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-slate-800 font-serif">6. Dashboard</span>
+                <p className="text-[10.5px] text-slate-500 mt-1.5 leading-snug font-normal">
+                  Métricas de aforo y avance de flujo en tiempo real.
+                </p>
               </div>
+
+              {/* Step 7 */}
               <div 
                 style={{ backgroundColor: '#DBBB6E' }}
-                className="flex flex-col items-center p-4 rounded-xl border border-[#DBBB6E] hover-lift shadow-md text-white"
+                className="flex flex-col items-center p-4 rounded-2xl border border-[#C5A059] hover-lift shadow-md text-white group"
               >
-                <Utensils className="w-8 h-8 text-white mb-2" />
-                <span className="text-xs font-bold text-white">7. Catering</span>
+                <div className="w-10 h-10 rounded-xl bg-white/20 text-white flex items-center justify-center mb-2.5 shrink-0 group-hover:scale-110 transition-transform">
+                  <Utensils className="w-5 h-5" />
+                </div>
+                <span className="text-xs font-bold text-white font-serif">7. Catering</span>
+                <p className="text-[10.5px] text-amber-50 mt-1.5 leading-snug font-normal">
+                  Congelamiento de platos y conciliación de cenas.
+                </p>
               </div>
             </div>
           </div>
