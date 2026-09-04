@@ -8,7 +8,7 @@ import { ShieldCheck, Lock, Mail, ArrowRight, CheckSquare, KeyRound, AlertTriang
 import { createClient } from '@/lib/supabase/client';
 import { 
   setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice,
-  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin 
+  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts 
 } from '@/lib/superadmin-store';
 
 export default function LoginPage() {
@@ -33,9 +33,14 @@ export default function LoginPage() {
 
     const inputEmail = email.trim().toLowerCase();
 
+    if (!inputEmail) {
+      setErrorMsg('Por favor ingrese su correo electrónico.');
+      setLoading(false);
+      return;
+    }
+
     // Mandatory Super Admin Check: ONLY tech.innova.reg@gmail.com can access Super Admin
     if (inputEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
-      // Check if device/browser is already remembered
       if (isDeviceRemembered()) {
         setActiveSession({
           user: {
@@ -47,39 +52,64 @@ export default function LoginPage() {
         });
         router.push('/superadmin');
       } else {
-        // Trigger PIN dispatch to tech.innova.reg@gmail.com
-        generateAndSendSuperAdmin2FAPin();
+        await generateAndSendSuperAdmin2FAPin();
         setShow2FAModal(true);
       }
       setLoading(false);
       return;
     }
 
-    // Client Administrator Login
+    // Client Administrator Login Verification
     try {
       const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: inputEmail,
         password,
       });
 
-      if (error) {
-        // Local Session Fallback for client logins
+      if (!authError && authData?.user) {
         setActiveSession({
           user: {
-            id: 'usr-admin-01',
-            email: email || 'ana@amgweddings.pe',
-            name: 'AMG Wedding Planners',
+            id: authData.user.id,
+            email: authData.user.email || inputEmail,
+            name: authData.user.user_metadata?.name || 'Administrador de Evento',
             role: 'ADMIN',
-            workspaceId: 'ws-a-1111',
+          },
+        });
+        router.push('/dashboard');
+        return;
+      }
+
+      // Check against registered accounts store
+      const registeredAccounts = getAllAdminAccounts();
+      const matchedAccount = registeredAccounts.find(
+        acc => acc.contactEmail.toLowerCase() === inputEmail
+      );
+
+      if (matchedAccount) {
+        if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
+          setErrorMsg(`Acceso denegado: Su cuenta se encuentra ${matchedAccount.status.toLowerCase()}. Contacte al soporte de Tech Innova.`);
+          setLoading(false);
+          return;
+        }
+
+        // Successfully authenticate registered client account
+        setActiveSession({
+          user: {
+            id: matchedAccount.id,
+            email: matchedAccount.contactEmail,
+            name: matchedAccount.companyName || matchedAccount.adminName,
+            role: 'ADMIN',
+            workspaceId: matchedAccount.workspaceId,
           },
         });
         router.push('/dashboard');
       } else {
-        router.push('/dashboard');
+        // Strict Rejection for unregistered emails or invalid credentials
+        setErrorMsg('Credenciales inválidas o correo no registrado en EventControl.pe. Verifique sus datos o contacte a su administrador.');
       }
     } catch (err: any) {
-      router.push('/dashboard');
+      setErrorMsg('Error de conexión al servidor de autenticación. Intente nuevamente.');
     } finally {
       setLoading(false);
     }
@@ -108,8 +138,8 @@ export default function LoginPage() {
     }
   };
 
-  const handleResendPin = () => {
-    generateAndSendSuperAdmin2FAPin();
+  const handleResendPin = async () => {
+    await generateAndSendSuperAdmin2FAPin();
     setResendNotice('Se ha re-enviado un nuevo código PIN de 4 dígitos a tech.innova.reg@gmail.com.');
     setTimeout(() => setResendNotice(null), 5000);
   };

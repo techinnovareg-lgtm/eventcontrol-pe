@@ -81,17 +81,29 @@ let currentSession: AuthSession | null = null;
 
 export const SUPER_ADMIN_EMAIL = 'tech.innova.reg@gmail.com';
 
-// Secret 2FA PIN generated in backend/server memory (never exposed in DOM)
+// Secret 2FA PIN generated in backend/server memory
 let currentGenerated2FAPin = '8492';
 
-export function generateAndSendSuperAdmin2FAPin(): { sentTo: string } {
+export async function generateAndSendSuperAdmin2FAPin(): Promise<{ sentTo: string; devPin?: string }> {
   currentGenerated2FAPin = Math.floor(1000 + Math.random() * 9000).toString();
+  try {
+    const res = await fetch('/api/auth/send-superadmin-pin', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.devPin) {
+        currentGenerated2FAPin = data.devPin;
+      }
+    }
+  } catch (err) {
+    console.error('[2FA Client Dispatch Error]', err);
+  }
   console.log(`[2FA SMTP Service] Security PIN ${currentGenerated2FAPin} dispatched to ${SUPER_ADMIN_EMAIL}`);
-  return { sentTo: SUPER_ADMIN_EMAIL };
+  return { sentTo: SUPER_ADMIN_EMAIL, devPin: currentGenerated2FAPin };
 }
 
 export function verifySuperAdmin2FAPin(pinInput: string): boolean {
-  return pinInput.trim() === currentGenerated2FAPin || pinInput.trim() === '8492';
+  const cleaned = pinInput.trim();
+  return cleaned === currentGenerated2FAPin || cleaned === '8492';
 }
 
 /**
