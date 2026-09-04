@@ -39,6 +39,7 @@ export default function EventNavHeader({
     { id: 'import', label: 'Importar Excel', icon: FileSpreadsheet, href: `/events/${eventId}/import` },
     { id: 'reports', label: 'Reportes', icon: Clock, href: `/events/${eventId}/reports` },
     { id: 'cuts', label: 'Cortes Catering', icon: Scissors, href: `/events/${eventId}/cuts` },
+    { id: 'scan', label: 'Escáner PWA', icon: QrCode, href: `/scan` },
   ];
 
   return (
@@ -59,7 +60,7 @@ export default function EventNavHeader({
         </div>
       )}
 
-      {/* Top Navbar Row (Generous h-20 height with perfectly homogenized action elements) */}
+      {/* Top Navbar Row (Cleaned Top Row with Profile, Catálogo and Salir) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between border-b border-slate-100/80 gap-3">
         
         {/* Brand Logo & Active Event Breadcrumb / Context Selector */}
@@ -95,10 +96,10 @@ export default function EventNavHeader({
           </div>
         </div>
 
-        {/* PERFECTLY HOMOGENIZED RIGHT SIDE ACTIONS (ALL MATCHING h-11 HEIGHT & STYLING) */}
+        {/* PERFECTLY HOMOGENIZED RIGHT SIDE ACTIONS (USER PROFILE, CATÁLOGO & SALIR) */}
         <div className="flex items-center gap-2.5 shrink-0">
           
-          {/* 1. USER PROFILE CARD (h-11 STANDARDIZED HEIGHT) */}
+          {/* 1. USER PROFILE CARD */}
           <Link 
             href="/workspace"
             className="h-11 px-3.5 flex items-center gap-2.5 bg-[#FAF8F5] hover:bg-amber-50/80 rounded-xl border border-[#C5A059]/40 transition group shadow-2xs"
@@ -117,54 +118,48 @@ export default function EventNavHeader({
             </div>
           </Link>
 
-          {/* 2. CATÁLOGO BUTTON (h-11 STANDARDIZED HEIGHT & LUXURY BORDER) */}
+          {/* 2. CATÁLOGO BUTTON */}
           <Link
             href="/events"
-            className="h-11 px-3.5 bg-white hover:bg-amber-50/50 text-slate-800 font-serif font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-2 shadow-2xs hidden lg:flex"
+            className="h-11 px-3.5 bg-white hover:bg-amber-50/50 text-slate-800 font-serif font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-2 shadow-2xs hidden sm:flex"
             title="Catálogo de Eventos"
           >
-            <LayoutGrid className="w-4 h-4 text-[#B8860B]" /> <span className="hidden xl:inline">Catálogo</span>
+            <LayoutGrid className="w-4 h-4 text-[#B8860B]" /> <span>Catálogo</span>
           </Link>
 
-          {/* 3. ESCÁNER PWA BUTTON (h-11 STANDARDIZED HEIGHT & GOLD GRADIENT) */}
-          <Link
-            href="/scan"
-            className="h-11 px-4 text-xs font-serif font-bold text-white bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#B8860B] border border-amber-200/60 rounded-xl transition flex items-center gap-2 shadow-xs hover:brightness-110"
-            title="Escáner PWA"
-          >
-            <QrCode className="w-4 h-4 text-amber-100" /> <span className="hidden sm:inline">Escáner</span>
-          </Link>
-
-          {/* 4. CERRAR SESIÓN BUTTON (h-11 STANDARDIZED HEIGHT & HARMONIZED BOX) */}
+          {/* 3. CERRAR SESIÓN BUTTON */}
           <Link
             href="/login"
-            className="h-11 px-3 bg-white hover:bg-red-50 text-slate-600 hover:text-red-700 hover:border-red-300 font-bold text-xs rounded-xl border border-slate-300/80 transition flex items-center gap-1.5 shadow-2xs"
+            className="h-11 px-3.5 bg-white hover:bg-red-50 text-slate-600 hover:text-red-700 hover:border-red-300 font-bold text-xs rounded-xl border border-slate-300/80 transition flex items-center gap-1.5 shadow-2xs"
             title="Cerrar Sesión"
           >
             <LogOut className="w-4 h-4 text-slate-500 hover:text-red-600" />
-            <span className="hidden xl:inline">Salir</span>
+            <span className="hidden xs:inline">Salir</span>
           </Link>
         </div>
       </div>
 
-      {/* Navigation Sub-Header Tabs (Liebe & Lavelo Luxury Gold Gradient Active Tabs) */}
+      {/* Navigation Sub-Header Tabs (Including Escáner PWA on the Event Submenu Row) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-auto scrollbar-none">
         <nav className="flex space-x-1 py-1.5" aria-label="Tabs de Evento">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
+            const isScanTab = tab.id === 'scan';
 
             return (
               <Link
                 key={tab.id}
                 href={tab.href}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
                   isActive
                     ? 'bg-gradient-to-r from-[#C5A059] to-[#B8860B] text-white shadow-sm border border-amber-300/40 font-serif'
+                    : isScanTab
+                    ? 'bg-gradient-to-r from-[#DBBB6E] via-[#D4AF37] to-[#B8860B] text-white shadow-2xs hover:brightness-110 font-serif border border-amber-200/60 ml-2'
                     : 'text-slate-600 hover:text-[#B8860B] hover:bg-amber-50/70'
                 }`}
               >
-                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive || isScanTab ? 'text-white' : 'text-slate-400'}`} />
                 {tab.label}
               </Link>
             );
