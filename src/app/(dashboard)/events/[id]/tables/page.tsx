@@ -10,7 +10,8 @@ import {
   Trash2, Move, UserCheck, X, GripVertical, Disc, LayoutGrid, 
   Sparkles, Compass, MapPin, ShieldAlert, Award, ZoomIn, ZoomOut, Maximize2, Minimize2,
   ChevronDown, ChevronUp, Edit3, Save, RotateCcw, GlassWater, UtensilsCrossed, 
-  Flower2, Columns, Waves, Trees, DoorOpen, Layers, Maximize, UserPlus, Printer, Download, FileText
+  Flower2, Columns, Waves, Trees, DoorOpen, Layers, Maximize, UserPlus, Printer, Download, FileText,
+  FoldVertical, UnfoldVertical
 } from 'lucide-react';
 import { getEventById, getEventGuestGroups } from '@/lib/events';
 import { 
@@ -44,6 +45,32 @@ export default function TablesManagementPage() {
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [isCompactView, setIsCompactView] = useState<boolean>(false);
   const [showExportModal, setShowExportModal] = useState<boolean>(false);
+
+  // INDIVIDUAL & GLOBAL TABLE COLLAPSE STATE ON 2D CANVAS
+  const [collapsedTableIds, setCollapsedTableIds] = useState<Set<string>>(new Set());
+  const [allTablesCollapsed, setAllTablesCollapsed] = useState<boolean>(false);
+
+  const toggleTableCollapse = (tableId: string) => {
+    setCollapsedTableIds(prev => {
+      const next = new Set(prev);
+      if (next.has(tableId)) {
+        next.delete(tableId);
+      } else {
+        next.add(tableId);
+      }
+      return next;
+    });
+  };
+
+  const toggleAllTablesCollapse = () => {
+    if (allTablesCollapsed) {
+      setCollapsedTableIds(new Set());
+      setAllTablesCollapsed(false);
+    } else {
+      setCollapsedTableIds(new Set(tables.map(t => t.id)));
+      setAllTablesCollapsed(true);
+    }
+  };
 
   // Drag state for guest groups -> tables
   const [draggedGroupId, setDraggedGroupId] = useState<string | null>(null);
@@ -251,7 +278,7 @@ export default function TablesManagementPage() {
       }
     }
 
-    // 2. Top Header Title & Metrics Banner (Clean Space from y:0 to y:120)
+    // 2. Top Header Title & Metrics Banner
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = 'rgba(197, 160, 89, 0.4)';
     ctx.lineWidth = 1.5;
@@ -270,10 +297,9 @@ export default function TablesManagementPage() {
     ctx.font = 'bold 12px sans-serif';
     ctx.fillText(`Capacidad: ${totalAuthorizedGuests} invitados autorizados  •  Ubicados: ${totalAssignedGuests} pers. en ${tables.length} mesas`, 50, 84);
 
-    // Y Shift for Objects (+120px offset to keep Mesa Principal VIP completely below the header banner)
     const yOffset = 120;
 
-    // 3. Render Venue Architectural Elements (Bar, Escenario, Maceteros)
+    // 3. Render Venue Architectural Elements
     venueElements.forEach((elem) => {
       const dims = computeElementDimensions(elem.size || 'medium', elem.shape, elem.orientation);
       const isCircle = elem.shape === 'circle' || elem.shape === 'oval';
@@ -297,7 +323,6 @@ export default function TablesManagementPage() {
         ctx.stroke();
       }
 
-      // Non-Overflowing Multi-line Label Centered
       ctx.fillStyle = '#1A1A1A';
       ctx.font = 'bold 11px serif';
       ctx.textAlign = 'center';
@@ -325,19 +350,21 @@ export default function TablesManagementPage() {
       ctx.restore();
     });
 
-    // 4. Render Table Cards with Rich Styling & Precise Alignment
+    // 4. Render Table Cards
     tables.forEach((tbl) => {
       const pos = tablePositions[tbl.id] || { x: tbl.pos_x || 200, y: tbl.pos_y || 200 };
       const posX = pos.x;
       const posY = pos.y + yOffset;
       const occ = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
+      const isCollapsed = collapsedTableIds.has(tbl.id);
+      const cardHeight = isCollapsed ? 54 : 130;
 
       ctx.save();
       ctx.fillStyle = occ.isOvercapacity ? '#FEF2F2' : '#FFFFFF';
       ctx.strokeStyle = occ.isOvercapacity ? '#DC2626' : '#DBBB6E';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.roundRect(posX, posY, 210, 130, 16);
+      ctx.roundRect(posX, posY, 210, cardHeight, 16);
       ctx.fill();
       ctx.stroke();
 
@@ -371,53 +398,55 @@ export default function TablesManagementPage() {
       ctx.textAlign = 'center';
       ctx.fillText(`${occ.occupancyRatio}`, posX + 174, posY + 25);
 
-      // Divider Line
-      ctx.strokeStyle = '#F1F5F9';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(posX + 12, posY + 36);
-      ctx.lineTo(posX + 198, posY + 36);
-      ctx.stroke();
+      if (!isCollapsed) {
+        // Divider Line
+        ctx.strokeStyle = '#F1F5F9';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(posX + 12, posY + 36);
+        ctx.lineTo(posX + 198, posY + 36);
+        ctx.stroke();
 
-      // Guest Assignments List
-      const tblAsgn = assignments.filter(a => a.table_id === tbl.id);
-      let lineY = posY + 54;
-      if (tblAsgn.length === 0) {
-        ctx.fillStyle = '#94A3B8';
-        ctx.font = 'italic 11px sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('Sin asignaciones', posX + 12, lineY);
-      } else {
-        tblAsgn.slice(0, 3).forEach((asgn) => {
-          const grp = groups.find(g => g.id === asgn.group_id);
-          ctx.fillStyle = '#334155';
-          ctx.font = '11px sans-serif';
+        // Guest Assignments List
+        const tblAsgn = assignments.filter(a => a.table_id === tbl.id);
+        let lineY = posY + 54;
+        if (tblAsgn.length === 0) {
+          ctx.fillStyle = '#94A3B8';
+          ctx.font = 'italic 11px sans-serif';
           ctx.textAlign = 'left';
-          let grpName = grp?.group_name || 'Grupo';
-          if (ctx.measureText(grpName).width > 130) {
-            grpName = grpName.slice(0, 15) + '...';
-          }
-          ctx.fillText(`• ${grpName}`, posX + 12, lineY);
-          
-          ctx.fillStyle = '#B8860B';
-          ctx.font = 'bold 10px sans-serif';
-          ctx.textAlign = 'right';
-          ctx.fillText(`${asgn.assigned_passes}p`, posX + 198, lineY);
+          ctx.fillText('Sin asignaciones', posX + 12, lineY);
+        } else {
+          tblAsgn.slice(0, 3).forEach((asgn) => {
+            const grp = groups.find(g => g.id === asgn.group_id);
+            ctx.fillStyle = '#334155';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'left';
+            let grpName = grp?.group_name || 'Grupo';
+            if (ctx.measureText(grpName).width > 130) {
+              grpName = grpName.slice(0, 15) + '...';
+            }
+            ctx.fillText(`• ${grpName}`, posX + 12, lineY);
+            
+            ctx.fillStyle = '#B8860B';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${asgn.assigned_passes}p`, posX + 198, lineY);
 
-          lineY += 18;
-        });
+            lineY += 18;
+          });
+        }
+
+        // Sillas Capacity Footer
+        ctx.fillStyle = '#64748B';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Cap: ${tbl.capacity} sillas`, posX + 12, posY + 118);
       }
-
-      // Sillas Capacity Footer
-      ctx.fillStyle = '#64748B';
-      ctx.font = '10px sans-serif';
-      ctx.textAlign = 'left';
-      ctx.fillText(`Cap: ${tbl.capacity} sillas`, posX + 12, posY + 118);
 
       ctx.restore();
     });
 
-    // 5. MANDATORY TRADEMARK FOOTER WATERMARK (Tech Innova & EventControl.pe)
+    // 5. MANDATORY TRADEMARK FOOTER WATERMARK
     ctx.fillStyle = 'rgba(26, 26, 26, 0.85)';
     ctx.fillRect(0, canvas.height - 36, canvas.width, 36);
 
@@ -614,7 +643,7 @@ export default function TablesManagementPage() {
     return (
       <div className="fixed inset-0 z-50 bg-[#FAF8F5] flex flex-col justify-between overflow-hidden select-none">
         
-        {/* FIXED TOP HEADER BAR IN FULLSCREEN MODE (OUTSIDE CANVAS WORKSPACE) */}
+        {/* FIXED TOP HEADER BAR IN FULLSCREEN MODE */}
         <div className="h-16 bg-white border-b border-[#C5A059]/40 px-4 sm:px-6 flex items-center justify-between z-40 shrink-0 shadow-sm">
           <div className="flex items-center gap-3">
             <span className="text-sm font-serif font-bold text-[#1A1A1A] hidden md:inline">
@@ -649,6 +678,15 @@ export default function TablesManagementPage() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* GLOBAL TOGGLE ALL TABLES MINIMIZE / EXPAND IN FULLSCREEN */}
+            <button
+              onClick={toggleAllTablesCollapse}
+              className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-[#C5A059]/40 font-bold text-xs rounded-xl transition shadow-sm flex items-center gap-1.5"
+            >
+              {allTablesCollapsed ? <UnfoldVertical className="w-4 h-4 text-[#B8860B]" /> : <FoldVertical className="w-4 h-4 text-[#B8860B]" />}
+              {allTablesCollapsed ? 'Desplegar Todas las Mesas' : 'Minimizar Todas las Mesas'}
+            </button>
+
             <button
               onClick={() => setShowExportModal(true)}
               className="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5"
@@ -665,7 +703,7 @@ export default function TablesManagementPage() {
           </div>
         </div>
 
-        {/* 100% CANVAS VIEWPORT IN FULLSCREEN MODE (CLEANLY PLACED BELOW HEADER) */}
+        {/* 100% CANVAS VIEWPORT IN FULLSCREEN MODE */}
         <div
           className="flex-1 relative overflow-hidden cursor-grab active:cursor-grabbing w-full h-[calc(100vh-64px)]"
           onMouseDown={(e) => {
@@ -747,13 +785,14 @@ export default function TablesManagementPage() {
               );
             })}
 
-            {/* RENDER EVENT TABLES NODES */}
+            {/* RENDER EVENT TABLES NODES (WITH INDIVIDUAL COLLAPSE BUTTON) */}
             {tables.map((tbl) => {
               const occ = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
               const isOver = occ.isOvercapacity;
               const isSelected = selectedTableId === tbl.id;
               const isDragOver = dragOverTableId === tbl.id;
               const pos = tablePositions[tbl.id] || { x: tbl.pos_x || 200, y: tbl.pos_y || 200, shape: 'ROUND' };
+              const isCollapsed = collapsedTableIds.has(tbl.id);
 
               return (
                 <div
@@ -779,60 +818,75 @@ export default function TablesManagementPage() {
                     <GripVertical className="w-3 h-3" /> {tbl.name.split(' ')[0]} {tbl.name.split(' ')[1] || ''}
                   </div>
 
-                  <div className={`p-4 min-w-[200px] border-2 shadow-xl rounded-2xl transition flex flex-col justify-between ${
+                  <div className={`p-3 min-w-[200px] border-2 shadow-xl rounded-2xl transition flex flex-col justify-between ${
                     isOver ? 'bg-red-50 border-red-500 text-red-950' : 'bg-white text-slate-900 border-[#DBBB6E]/70'
                   }`}>
                     
-                    <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                      <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[130px]">
-                        {tbl.name}
-                      </strong>
+                    {/* TABLE HEADER WITH COLLAPSE TOGGLE */}
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); toggleTableCollapse(tbl.id); }}
+                          className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-[#B8860B] transition"
+                          title={isCollapsed ? "Expandir Mesa" : "Minimizar Mesa"}
+                        >
+                          {isCollapsed ? <ChevronDown className="w-3.5 h-3.5 text-[#B8860B]" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                        </button>
+                        <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[120px]">
+                          {tbl.name}
+                        </strong>
+                      </div>
                       <span 
                         style={{ backgroundColor: isOver ? '#dc2626' : '#DBBB6E' }}
-                        className="px-2 py-0.5 text-white font-extrabold text-[10px] rounded-full shadow-sm"
+                        className="px-2 py-0.5 text-white font-extrabold text-[10px] rounded-full shadow-sm shrink-0"
                       >
                         {occ.occupancyRatio}
                       </span>
                     </div>
 
-                    <div className="py-2 space-y-1 min-h-[45px]">
-                      {assignments.filter(a => a.table_id === tbl.id).length === 0 ? (
-                        <span className="text-[11px] text-slate-400 italic block text-center pt-2">
-                          Arrastra pases aquí
-                        </span>
-                      ) : (
-                        assignments.filter(a => a.table_id === tbl.id).map(asgn => {
-                          const grp = groups.find(g => g.id === asgn.group_id);
-                          return (
-                            <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                              <span className="font-semibold text-slate-800 truncate max-w-[120px]">
-                                {grp?.group_name || 'Grupo'}
-                              </span>
-                              <div className="flex items-center gap-1">
-                                <span className="font-bold text-[#B8860B]">{asgn.assigned_passes}p</span>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id); }}
-                                  className="text-slate-400 hover:text-red-600 transition"
-                                  title="Desasignar"
-                                >
-                                  <X className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
+                    {/* EXPANDED TABLE CONTENT */}
+                    {!isCollapsed && (
+                      <>
+                        <div className="py-2 space-y-1 min-h-[45px]">
+                          {assignments.filter(a => a.table_id === tbl.id).length === 0 ? (
+                            <span className="text-[11px] text-slate-400 italic block text-center pt-2">
+                              Arrastra pases aquí
+                            </span>
+                          ) : (
+                            assignments.filter(a => a.table_id === tbl.id).map(asgn => {
+                              const grp = groups.find(g => g.id === asgn.group_id);
+                              return (
+                                <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                                  <span className="font-semibold text-slate-800 truncate max-w-[120px]">
+                                    {grp?.group_name || 'Grupo'}
+                                  </span>
+                                  <div className="flex items-center gap-1">
+                                    <span className="font-bold text-[#B8860B]">{asgn.assigned_passes}p</span>
+                                    <button
+                                      onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id); }}
+                                      className="text-slate-400 hover:text-red-600 transition"
+                                      title="Desasignar"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
 
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
-                      <span className="text-slate-500 font-semibold">Cap: {tbl.capacity} sillas</span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setEditingTableObj(tbl); }}
-                        className="text-[#B8860B] hover:underline font-bold"
-                      >
-                        Editar
-                      </button>
-                    </div>
+                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                          <span className="text-slate-500 font-semibold">Cap: {tbl.capacity} sillas</span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setEditingTableObj(tbl); }}
+                            className="text-[#B8860B] hover:underline font-bold"
+                          >
+                            Editar
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
@@ -893,7 +947,7 @@ export default function TablesManagementPage() {
           </div>
         </div>
 
-        {/* UNIFIED 1-ROW FLOATING MANAGEMENT TOOLBAR (PLACED CLEANLY ABOVE CANVAS CONTAINER) */}
+        {/* UNIFIED 1-ROW FLOATING MANAGEMENT TOOLBAR */}
         <div className="flex items-center justify-between gap-2 bg-white p-2.5 rounded-2xl border border-[#C5A059]/40 shadow-sm overflow-x-auto whitespace-nowrap">
           {/* Zoom & Centrar Plano */}
           <div className="flex items-center bg-slate-50 border border-slate-300 rounded-xl p-1 shrink-0">
@@ -923,11 +977,20 @@ export default function TablesManagementPage() {
             </button>
           </div>
 
-          {/* Action Buttons Row */}
+          {/* Action Buttons Row with Global Minimize / Expand All Tables Toggle */}
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => setIsCompactView(!isCompactView)}
+              onClick={toggleAllTablesCollapse}
               className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-[#C5A059]/40 font-bold text-xs rounded-xl transition flex items-center gap-1 shadow-sm"
+              title={allTablesCollapsed ? "Desplegar el detalle de todas las mesas" : "Minimizar todas las mesas para ver solo títulos"}
+            >
+              {allTablesCollapsed ? <UnfoldVertical className="w-3.5 h-3.5 text-[#B8860B]" /> : <FoldVertical className="w-3.5 h-3.5 text-[#B8860B]" />}
+              {allTablesCollapsed ? 'Desplegar Todas las Mesas' : 'Minimizar Todas las Mesas'}
+            </button>
+
+            <button
+              onClick={() => setIsCompactView(!isCompactView)}
+              className="px-3 py-2 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 font-bold text-xs rounded-xl transition flex items-center gap-1 shadow-sm"
             >
               {isCompactView ? <ChevronDown className="w-3.5 h-3.5 text-[#B8860B]" /> : <ChevronUp className="w-3.5 h-3.5 text-[#B8860B]" />}
               {isCompactView ? 'Ver Mesas Desplegadas' : 'Modo Plano Compacto'}
@@ -1101,13 +1164,14 @@ export default function TablesManagementPage() {
                   );
                 })}
 
-                {/* RENDER EVENT TABLES NODES */}
+                {/* RENDER EVENT TABLES NODES (WITH INDIVIDUAL COLLAPSE BUTTON) */}
                 {tables.map((tbl) => {
                   const occ = calculateTableOccupancy(eventId, tbl.id, tbl.capacity);
                   const isOver = occ.isOvercapacity;
                   const isSelected = selectedTableId === tbl.id;
                   const isDragOver = dragOverTableId === tbl.id;
                   const pos = tablePositions[tbl.id] || { x: tbl.pos_x || 200, y: tbl.pos_y || 200, shape: 'ROUND' };
+                  const isCollapsed = collapsedTableIds.has(tbl.id);
 
                   return (
                     <div
@@ -1133,60 +1197,75 @@ export default function TablesManagementPage() {
                         <GripVertical className="w-3 h-3" /> {tbl.name.split(' ')[0]} {tbl.name.split(' ')[1] || ''}
                       </div>
 
-                      <div className={`p-4 min-w-[200px] border-2 shadow-xl rounded-2xl transition flex flex-col justify-between ${
+                      <div className={`p-3 min-w-[200px] border-2 shadow-xl rounded-2xl transition flex flex-col justify-between ${
                         isOver ? 'bg-red-50 border-red-500 text-red-950' : 'bg-white text-slate-900 border-[#DBBB6E]/70'
                       }`}>
                         
-                        <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                          <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[130px]">
-                            {tbl.name}
-                          </strong>
+                        {/* TABLE HEADER WITH COLLAPSE TOGGLE */}
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); toggleTableCollapse(tbl.id); }}
+                              className="p-1 hover:bg-slate-100 rounded text-slate-500 hover:text-[#B8860B] transition"
+                              title={isCollapsed ? "Expandir Mesa" : "Minimizar Mesa"}
+                            >
+                              {isCollapsed ? <ChevronDown className="w-3.5 h-3.5 text-[#B8860B]" /> : <ChevronUp className="w-3.5 h-3.5" />}
+                            </button>
+                            <strong className="text-xs font-serif font-bold text-slate-900 truncate max-w-[120px]">
+                              {tbl.name}
+                            </strong>
+                          </div>
                           <span 
                             style={{ backgroundColor: isOver ? '#dc2626' : '#DBBB6E' }}
-                            className="px-2 py-0.5 text-white font-extrabold text-[10px] rounded-full shadow-sm"
+                            className="px-2 py-0.5 text-white font-extrabold text-[10px] rounded-full shadow-sm shrink-0"
                           >
                             {occ.occupancyRatio}
                           </span>
                         </div>
 
-                        <div className="py-2 space-y-1 min-h-[45px]">
-                          {assignments.filter(a => a.table_id === tbl.id).length === 0 ? (
-                            <span className="text-[11px] text-slate-400 italic block text-center pt-2">
-                              Arrastra pases aquí
-                            </span>
-                          ) : (
-                            assignments.filter(a => a.table_id === tbl.id).map(asgn => {
-                              const grp = groups.find(g => g.id === asgn.group_id);
-                              return (
-                                <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                                  <span className="font-semibold text-slate-800 truncate max-w-[120px]">
-                                    {grp?.group_name || 'Grupo'}
-                                  </span>
-                                  <div className="flex items-center gap-1">
-                                    <span className="font-bold text-[#B8860B]">{asgn.assigned_passes}p</span>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id); }}
-                                      className="text-slate-400 hover:text-red-600 transition"
-                                      title="Desasignar"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
+                        {/* EXPANDED TABLE CONTENT */}
+                        {!isCollapsed && (
+                          <>
+                            <div className="py-2 space-y-1 min-h-[45px]">
+                              {assignments.filter(a => a.table_id === tbl.id).length === 0 ? (
+                                <span className="text-[11px] text-slate-400 italic block text-center pt-2">
+                                  Arrastra pases aquí
+                                </span>
+                              ) : (
+                                assignments.filter(a => a.table_id === tbl.id).map(asgn => {
+                                  const grp = groups.find(g => g.id === asgn.group_id);
+                                  return (
+                                    <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                                      <span className="font-semibold text-slate-800 truncate max-w-[120px]">
+                                        {grp?.group_name || 'Grupo'}
+                                      </span>
+                                      <div className="flex items-center gap-1">
+                                        <span className="font-bold text-[#B8860B]">{asgn.assigned_passes}p</span>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id); }}
+                                          className="text-slate-400 hover:text-red-600 transition"
+                                          title="Desasignar"
+                                        >
+                                          <X className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
 
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
-                          <span className="text-slate-500 font-semibold">Cap: {tbl.capacity} sillas</span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setEditingTableObj(tbl); }}
-                            className="text-[#B8860B] hover:underline font-bold"
-                          >
-                            Editar
-                          </button>
-                        </div>
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                              <span className="text-slate-500 font-semibold">Cap: {tbl.capacity} sillas</span>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); setEditingTableObj(tbl); }}
+                                className="text-[#B8860B] hover:underline font-bold"
+                              >
+                                Editar
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
                   );
@@ -1281,7 +1360,7 @@ export default function TablesManagementPage() {
         )}
       </main>
 
-      {/* EXPORT FLOOR PLAN MODAL (PDF / PNG REAL GENERATION WITH FOOTER WATERMARK) */}
+      {/* EXPORT FLOOR PLAN MODAL */}
       {showExportModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in-up">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
