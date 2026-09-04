@@ -79,10 +79,10 @@ export default function RealtimeDashboardPage() {
           </div>
         </div>
 
-        {/* METRICS CARDS WITH RICH VISUAL GRAPHICS (PASTEL COLORS FOR HIGH READABILITY) */}
+        {/* METRICS CARDS WITH RICH VISUAL GRAPHICS */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
-          {/* VISUAL DONUT GAUGE CHART CARD (PASTEL MINT / EMERALD) */}
+          {/* VISUAL DONUT GAUGE CHART CARD */}
           <div className="card-luxury p-6 border border-[#C5A059]/30 flex flex-col justify-between space-y-4 shadow-sm">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
@@ -139,34 +139,43 @@ export default function RealtimeDashboardPage() {
             </div>
           </div>
 
-          {/* VISUAL HOURLY ENTRY BAR CHART TIMELINE WIDGET (SOFT PASTEL GRADIENTS) */}
-          <div className="card-luxury p-6 border border-[#C5A059]/30 flex flex-col justify-between space-y-4 lg:col-span-2 shadow-sm">
+          {/* VISUAL HOURLY ENTRY BAR CHART TIMELINE WIDGET (GENEROUS PADDING & PERFECT X-AXIS ALIGNMENT) */}
+          <div className="card-luxury p-6 pb-6 border border-[#C5A059]/30 flex flex-col justify-between gap-5 lg:col-span-2 shadow-sm">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                 <BarChart3 className="w-4 h-4 text-teal-600" /> Distribución de Ingresos por Hora (Recepción)
               </h3>
-              <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200">
+              <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2.5 py-1 rounded-full border border-slate-200">
                 Pico detectado a las 19:00 (85 pers.)
               </span>
             </div>
 
-            {/* Visual Flex Bar Graph with High Readability Soft Pastel Gradient Bars */}
-            <div className="grid grid-cols-5 gap-4 items-end h-32 pt-4 px-2">
+            {/* Visual Flex Bar Graph with Proper Bottom Padding & X-Axis Spacing */}
+            <div className="grid grid-cols-5 gap-3 sm:gap-5 items-end pt-2 pb-1 px-2">
               {hourlyData.map((h, i) => {
                 const heightPercent = Math.round((h.count / maxHourly) * 100);
                 return (
-                  <div key={i} className="flex flex-col items-center gap-1 group">
+                  <div key={i} className="flex flex-col items-center gap-1.5 group w-full">
+                    {/* Top Count Badge */}
                     <span className="text-[10px] font-bold text-teal-800 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200 group-hover:scale-105 transition shadow-2xs">
                       {h.count} pers.
                     </span>
-                    <div className="w-full bg-slate-100/80 rounded-t-xl h-24 relative overflow-hidden flex items-end p-0.5">
+
+                    {/* Bar Track Container */}
+                    <div className="w-full bg-slate-100/90 rounded-t-xl h-28 relative overflow-hidden flex items-end p-0.5 shadow-inner">
                       <div 
                         className="w-full bg-gradient-to-t from-teal-500 via-emerald-400 to-teal-200 rounded-t-lg transition-all duration-700 shadow-xs"
                         style={{ height: `${heightPercent}%` }}
                       ></div>
                     </div>
-                    <span className="text-[11px] font-bold text-slate-700 font-mono">{h.hour}</span>
-                    <span className="text-[9px] text-slate-400 font-semibold">{h.label}</span>
+
+                    {/* Clean X-Axis Labels (Hour & Phase Label with Generous Spacing) */}
+                    <div className="flex flex-col items-center pt-1.5 pb-1">
+                      <span className="text-xs font-bold text-slate-800 font-mono tracking-tight">{h.hour}</span>
+                      <span className="text-[10px] text-slate-500 font-bold truncate max-w-full text-center leading-tight mt-0.5">
+                        {h.label}
+                      </span>
+                    </div>
                   </div>
                 );
               })}
