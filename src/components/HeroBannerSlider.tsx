@@ -82,50 +82,64 @@ export default function HeroBannerSlider() {
           return (
             <div
               key={slide.id}
-              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-                isActive ? 'opacity-100 z-10 scale-100' : 'opacity-0 z-0 scale-105 pointer-events-none'
+              className={`absolute inset-0 transition-opacity duration-1500 ease-in-out ${
+                isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
               }`}
             >
-              {/* Background Image */}
-              <Image
-                src={slide.image}
-                alt={slide.title}
-                fill
-                priority={idx === 0}
-                className="object-cover object-center transition-transform duration-10000 ease-linear scale-105"
-              />
+              {/* Background Image with Slow Smooth Ken Burns Zoom */}
+              <div className="relative w-full h-full overflow-hidden">
+                <Image
+                  src={slide.image}
+                  alt={slide.title}
+                  fill
+                  priority={idx === 0}
+                  className={`object-cover object-center transition-transform duration-10000 ease-out ${
+                    isActive ? 'scale-105' : 'scale-100'
+                  }`}
+                />
+              </div>
 
-              {/* Romantic Vignette Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/60 to-slate-900/40"></div>
+              {/* Romantic Dark Overlay Vignette */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/65 to-slate-900/40"></div>
 
-              {/* Content Overlay */}
+              {/* Content Overlay with Sequential Staggered Entrance Animations */}
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 sm:px-12 space-y-4 sm:space-y-6 max-w-5xl mx-auto z-20">
                 
-                {/* Badge */}
+                {/* 1. Badge (Fades in at 300ms) */}
                 <div 
                   style={{ backgroundColor: '#DBBB6E' }}
-                  className="inline-flex items-center gap-2 px-5 py-2 rounded-full text-white text-xs sm:text-sm font-extrabold tracking-widest shadow-lg backdrop-blur-md animate-fade-in-up uppercase"
+                  className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-white text-xs sm:text-sm font-extrabold tracking-widest shadow-lg backdrop-blur-md uppercase transform transition-all duration-1000 ease-out ${
+                    isActive ? 'opacity-100 translate-y-0 delay-300' : 'opacity-0 translate-y-8 delay-0'
+                  }`}
                 >
                   <ShieldCheck className="w-4 h-4 text-white" /> {slide.badge}
                 </div>
 
-                {/* Elegant Handwriting Script Phrase */}
-                <h3 className="font-handwriting text-4xl sm:text-6xl md:text-7xl text-[#F7E7BE] font-normal leading-tight tracking-wide drop-shadow-xl animate-fade-in-up">
+                {/* 2. Elegant Handwriting Script Phrase (Fades in at 500ms) */}
+                <h3 className={`font-handwriting text-4xl sm:text-6xl md:text-7xl text-[#F7E7BE] font-normal leading-tight tracking-wide drop-shadow-xl transform transition-all duration-1000 ease-out ${
+                  isActive ? 'opacity-100 translate-y-0 delay-500' : 'opacity-0 translate-y-8 delay-0'
+                }`}>
                   “{slide.handwriteTag}”
                 </h3>
 
-                {/* Main Slide Title */}
-                <h2 className="font-serif text-3xl sm:text-5xl md:text-6xl text-white font-extrabold tracking-tight drop-shadow-md max-w-4xl leading-tight">
+                {/* 3. Main Slide Title (Fades in at 700ms) */}
+                <h2 className={`font-serif text-3xl sm:text-5xl md:text-6xl text-white font-extrabold tracking-tight drop-shadow-md max-w-4xl leading-tight transform transition-all duration-1000 ease-out ${
+                  isActive ? 'opacity-100 translate-y-0 delay-700' : 'opacity-0 translate-y-8 delay-0'
+                }`}>
                   {slide.title}
                 </h2>
 
-                {/* Subtitle / Description */}
-                <p className="text-sm sm:text-lg text-slate-200 max-w-3xl font-light leading-relaxed drop-shadow">
+                {/* 4. Subtitle / Description (Fades in at 900ms) */}
+                <p className={`text-sm sm:text-lg text-slate-200 max-w-3xl font-light leading-relaxed drop-shadow transform transition-all duration-1000 ease-out ${
+                  isActive ? 'opacity-100 translate-y-0 delay-900' : 'opacity-0 translate-y-8 delay-0'
+                }`}>
                   {slide.description}
                 </p>
 
-                {/* CTA Buttons */}
-                <div className="pt-4 flex flex-wrap items-center justify-center gap-4">
+                {/* 5. CTA Buttons (Fades in at 1100ms) */}
+                <div className={`pt-4 flex flex-wrap items-center justify-center gap-4 transform transition-all duration-1000 ease-out ${
+                  isActive ? 'opacity-100 translate-y-0 delay-1000' : 'opacity-0 translate-y-8 delay-0'
+                }`}>
                   <Link
                     href="/login"
                     style={{ backgroundColor: '#DBBB6E' }}
