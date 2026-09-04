@@ -70,18 +70,23 @@ export default function WhatsAppMessagingPage() {
       <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
 
         {/* Page Title */}
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1">
-              <MessageSquare className="w-4 h-4" /> WhatsApp Asistido (Costo S/ 0)
-            </span>
-            <h1 className="text-2xl font-bold text-slate-900 mt-1">Envío de Códigos QR por WhatsApp</h1>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                <MessageSquare className="w-4 h-4" /> WhatsApp Asistido (Costo S/ 0)
+              </span>
+              <span className="text-[11px] font-serif font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-[#C5A059]/40 shadow-2xs">
+                🍷 Evento: {event?.name}
+              </span>
+            </div>
+            <h1 className="text-2xl font-serif font-bold text-slate-900 mt-1">Envío de Códigos QR por WhatsApp</h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Genera enlaces directos wa.me para enviar los mensajes preparados desde tu propia cuenta sin costo de mensajería API.
             </p>
           </div>
 
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2">
+          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center gap-2 self-start sm:self-auto">
             <Send className="w-5 h-5 text-emerald-600 shrink-0" />
             <span>Envío asistido activo</span>
           </div>

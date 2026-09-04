@@ -184,7 +184,12 @@ export default function ExcelImportWizardPage() {
         {/* Header Title Bar */}
         <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Asistente de Importación Oficial</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Asistente de Importación Oficial</span>
+              <span className="text-[11px] font-serif font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-[#C5A059]/40 shadow-2xs">
+                🍷 Evento: {event?.name}
+              </span>
+            </div>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Cargar Pases e Invitados desde Excel / CSV</h1>
             <p className="text-xs text-slate-500 mt-0.5">Basado en el formato oficial de la plataforma (PASES O GRUPOS, NRO DE PERSONAS, RESPONSABLE, TELÉFONO).</p>
           </div>

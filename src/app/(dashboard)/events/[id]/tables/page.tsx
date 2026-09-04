@@ -908,9 +908,14 @@ export default function TablesManagementPage() {
         {/* Page Title Bar */}
         <div className="card-luxury p-5 border border-[#C5A059]/30 shadow-md flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
-            <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">
-              Organización Espacial e Interactiva 2D
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">
+                Organización Espacial e Interactiva 2D
+              </span>
+              <span className="text-[11px] font-serif font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-[#C5A059]/40 shadow-2xs">
+                🍷 Evento: {event?.name}
+              </span>
+            </div>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-0.5">Plano Virtual del Salón & Elementos</h1>
             <p className="text-xs text-slate-500 mt-0.5">
               Gestión centralizada de mesas, ambientación y exportación oficial de guías para el personal.

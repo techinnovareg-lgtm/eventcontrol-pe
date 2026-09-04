@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   BarChart3, MapPin, QrCode, MessageSquare, FileSpreadsheet, 
-  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle
+  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar
 } from 'lucide-react';
 import { calculateRemainingDays, getAccountForSession } from '@/lib/superadmin-store';
 
@@ -36,7 +36,7 @@ export default function EventNavHeader({
   ];
 
   return (
-    <header className="border-b border-[#C5A059]/30 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm">
+    <header className="border-b border-[#C5A059]/30 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
       
       {/* 1-WEEK EXPIRATION WARNING ALERT BANNER */}
       {isExpiringSoon && (
@@ -56,9 +56,9 @@ export default function EventNavHeader({
       {/* Top Navbar Row */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between border-b border-slate-100">
         
-        {/* Brand & Workspace Info */}
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard" className="flex items-center gap-2.5 group">
+        {/* Brand Logo & Active Event Breadcrumb / Context Selector */}
+        <div className="flex items-center gap-3 min-w-0">
+          <Link href="/dashboard" className="flex items-center gap-2.5 group shrink-0">
             <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-sm border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
               <Image 
                 src="/logo-eventcontrol.jpg" 
@@ -67,22 +67,33 @@ export default function EventNavHeader({
                 className="object-cover"
               />
             </div>
-            <div>
+            <div className="hidden xs:block">
               <span className="text-lg font-serif font-bold text-[#1A1A1A]">
                 EventControl<span className="text-[#C5A059]">.pe</span>
               </span>
-              <span className="text-[10px] text-slate-500 font-semibold block uppercase tracking-wider">
-                {eventName}
-              </span>
             </div>
           </Link>
+
+          {/* ORGANIC ACTIVE EVENT BREADCRUMB BADGE (PRO PLATFORM STANDARD) */}
+          <div className="flex items-center gap-2 pl-3 border-l border-slate-200 min-w-0">
+            <span className="text-slate-300 text-sm hidden sm:inline">/</span>
+            <div className="flex items-center gap-1.5 bg-[#FAF8F5] px-3 py-1.5 rounded-xl border border-[#C5A059]/40 shadow-2xs min-w-0">
+              <Sparkles className="w-3.5 h-3.5 text-[#B8860B] shrink-0" />
+              <span className="text-xs font-serif font-bold text-[#1A1A1A] truncate max-w-[180px] sm:max-w-[280px] md:max-w-[380px]">
+                {eventName}
+              </span>
+              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 hidden md:inline shrink-0">
+                ACTIVO
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Global Nav Actions */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <Link
             href="/events"
-            className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-slate-300"
+            className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-slate-300 hidden md:flex"
           >
             <LayoutGrid className="w-3.5 h-3.5 text-slate-600" /> Todos los Eventos
           </Link>
