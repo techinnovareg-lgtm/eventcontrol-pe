@@ -75,27 +75,25 @@ export default function HeroBannerSlider() {
       <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
 
       {/* Main Slide Carousel Wrapper - Full Screen Width Hero Banner */}
-      <div className="relative h-[520px] sm:h-[620px] lg:h-[700px] w-full overflow-hidden">
+      <div className="relative h-[520px] sm:h-[620px] lg:h-[700px] w-full overflow-hidden bg-slate-950">
         {slides.map((slide, idx) => {
           const isActive = idx === currentIndex;
 
           return (
             <div
               key={slide.id}
-              className={`absolute inset-0 transition-opacity duration-1500 ease-in-out ${
+              className={`absolute inset-0 transition-opacity duration-1500 ease-in-out will-change-auto ${
                 isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
               }`}
             >
-              {/* Background Image with Slow Smooth Ken Burns Zoom */}
+              {/* Background Image (Fixed Stable Scale to Prevent Abrupt Resizing/Jumps) */}
               <div className="relative w-full h-full overflow-hidden">
                 <Image
                   src={slide.image}
                   alt={slide.title}
                   fill
                   priority={idx === 0}
-                  className={`object-cover object-center transition-transform duration-10000 ease-out ${
-                    isActive ? 'scale-105' : 'scale-100'
-                  }`}
+                  className="object-cover object-center transform-gpu scale-[1.03]"
                 />
               </div>
 
@@ -109,7 +107,7 @@ export default function HeroBannerSlider() {
                 <div 
                   style={{ backgroundColor: '#DBBB6E' }}
                   className={`inline-flex items-center gap-2 px-5 py-2 rounded-full text-white text-xs sm:text-sm font-extrabold tracking-widest shadow-lg backdrop-blur-md uppercase transform transition-all duration-1000 ease-out ${
-                    isActive ? 'opacity-100 translate-y-0 delay-300' : 'opacity-0 translate-y-8 delay-0'
+                    isActive ? 'opacity-100 translate-y-0 delay-300' : 'opacity-0 translate-y-6 delay-0'
                   }`}
                 >
                   <ShieldCheck className="w-4 h-4 text-white" /> {slide.badge}
@@ -117,28 +115,28 @@ export default function HeroBannerSlider() {
 
                 {/* 2. Elegant Handwriting Script Phrase (Fades in at 500ms) */}
                 <h3 className={`font-handwriting text-4xl sm:text-6xl md:text-7xl text-[#F7E7BE] font-normal leading-tight tracking-wide drop-shadow-xl transform transition-all duration-1000 ease-out ${
-                  isActive ? 'opacity-100 translate-y-0 delay-500' : 'opacity-0 translate-y-8 delay-0'
+                  isActive ? 'opacity-100 translate-y-0 delay-500' : 'opacity-0 translate-y-6 delay-0'
                 }`}>
                   “{slide.handwriteTag}”
                 </h3>
 
                 {/* 3. Main Slide Title (Fades in at 700ms) */}
                 <h2 className={`font-serif text-3xl sm:text-5xl md:text-6xl text-white font-extrabold tracking-tight drop-shadow-md max-w-4xl leading-tight transform transition-all duration-1000 ease-out ${
-                  isActive ? 'opacity-100 translate-y-0 delay-700' : 'opacity-0 translate-y-8 delay-0'
+                  isActive ? 'opacity-100 translate-y-0 delay-700' : 'opacity-0 translate-y-6 delay-0'
                 }`}>
                   {slide.title}
                 </h2>
 
                 {/* 4. Subtitle / Description (Fades in at 900ms) */}
                 <p className={`text-sm sm:text-lg text-slate-200 max-w-3xl font-light leading-relaxed drop-shadow transform transition-all duration-1000 ease-out ${
-                  isActive ? 'opacity-100 translate-y-0 delay-900' : 'opacity-0 translate-y-8 delay-0'
+                  isActive ? 'opacity-100 translate-y-0 delay-900' : 'opacity-0 translate-y-6 delay-0'
                 }`}>
                   {slide.description}
                 </p>
 
                 {/* 5. CTA Buttons (Fades in at 1100ms) */}
                 <div className={`pt-4 flex flex-wrap items-center justify-center gap-4 transform transition-all duration-1000 ease-out ${
-                  isActive ? 'opacity-100 translate-y-0 delay-1000' : 'opacity-0 translate-y-8 delay-0'
+                  isActive ? 'opacity-100 translate-y-0 delay-1000' : 'opacity-0 translate-y-6 delay-0'
                 }`}>
                   <Link
                     href="/login"
