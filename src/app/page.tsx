@@ -137,10 +137,10 @@ export default function Home() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 space-y-20 pb-24">
+      <main className="flex-1 space-y-12 pb-20">
         
         {/* HERO SECTION - LOVESTORY ELEGANT STYLE */}
-        <section className="relative pt-12 pb-6 text-center space-y-8 animate-fade-in-up">
+        <section className="relative pt-8 pb-4 text-center space-y-8 animate-fade-in-up">
           
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             
@@ -175,18 +175,18 @@ export default function Home() {
           </div>
 
           {/* FULL SCREEN WIDTH HERO BANNER SLIDER (100vw Full Bleed) */}
-          <div className="pt-6 w-full">
+          <div className="pt-4 w-full">
             <HeroBannerSlider />
           </div>
         </section>
 
-        {/* BAROQUE FLORAL CREST DIVIDER */}
-        <BaroqueFloralCrestDivider />
-
         {/* PROPOSAL VALUE PILLARS SECTION (LOVESTORY STYLE WITH WHITE PHOTO FRAMES) */}
-        <section id="propuesta" className="py-12 bg-white border-y border-[#DBBB6E]/30 relative">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        <section id="propuesta" className="py-10 bg-white border-y border-[#DBBB6E]/30 relative">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
             
+            {/* Orla floral crest inside content section container */}
+            <BaroqueFloralCrestDivider />
+
             {/* LoveStory Section Header */}
             <div className="text-center max-w-3xl mx-auto space-y-2">
               <span className="font-handwriting text-3xl sm:text-4xl text-[#DBBB6E] font-normal block">
@@ -222,7 +222,7 @@ export default function Home() {
 
                   <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">1. Importación e Invitación</h3>
                   
-                  {/* Card 1 Image: Lista_invitados.png with LoveStory Inner White Border Frame */}
+                  {/* Card 1 Image */}
                   <div className="relative h-56 w-full rounded-lg overflow-hidden border border-[#DBBB6E]/40 shadow-md my-3 group bg-slate-100">
                     <Image 
                       src="/Lista_invitados.png" 
@@ -230,7 +230,6 @@ export default function Home() {
                       fill 
                       className="object-cover object-top group-hover:scale-105 transition-transform duration-700"
                     />
-                    {/* Inner White Margin Frame (Estilo Invitaciones LoveStory) */}
                     <div className="absolute inset-3 border-2 border-white pointer-events-none z-10 shadow-sm"></div>
                   </div>
 
@@ -270,7 +269,7 @@ export default function Home() {
 
                   <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">2. Recepción & Check-in QR</h3>
                   
-                  {/* Card 2 Image: Imagen_QR.jfif with LoveStory Inner White Border Frame */}
+                  {/* Card 2 Image */}
                   <div className="relative h-56 w-full rounded-lg overflow-hidden border border-[#DBBB6E]/40 shadow-md my-3 group bg-slate-100">
                     <Image 
                       src="/Imagen_QR.jfif" 
@@ -278,7 +277,6 @@ export default function Home() {
                       fill 
                       className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
                     />
-                    {/* Inner White Margin Frame (Estilo Invitaciones LoveStory) */}
                     <div className="absolute inset-3 border-2 border-white pointer-events-none z-10 shadow-sm"></div>
                   </div>
 
@@ -318,7 +316,7 @@ export default function Home() {
 
                   <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">3. Control en Vivo & Catering</h3>
                   
-                  {/* Card 3 Image: Control_catering.png with LoveStory Inner White Border Frame */}
+                  {/* Card 3 Image */}
                   <div className="relative h-56 w-full rounded-lg overflow-hidden border border-[#DBBB6E]/40 shadow-md my-3 group bg-slate-100">
                     <Image 
                       src="/Control_catering.png" 
@@ -326,7 +324,6 @@ export default function Home() {
                       fill 
                       className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
                     />
-                    {/* Inner White Margin Frame (Estilo Invitaciones LoveStory) */}
                     <div className="absolute inset-3 border-2 border-white pointer-events-none z-10 shadow-sm"></div>
                   </div>
 
@@ -350,16 +347,16 @@ export default function Home() {
           </div>
         </section>
 
-        {/* BAROQUE FLORAL CREST DIVIDER */}
-        <BaroqueFloralCrestDivider />
-
         {/* VISUAL WORKFLOW ILLUSTRATION SECTION */}
         <section id="flujo" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="card-luxury-gold p-8 sm:p-12 text-center space-y-8 relative border-2 border-[#DBBB6E]/50 shadow-xl">
+          <div className="card-luxury-gold p-8 sm:p-12 text-center space-y-6 relative border-2 border-[#DBBB6E]/50 shadow-xl">
             <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
             <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
             <div className="baroque-corner-bl"><BaroqueCornerSVG /></div>
             <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
+
+            {/* Orla floral crest inside content card */}
+            <BaroqueFloralCrestDivider />
 
             <div>
               <span className="font-handwriting text-3xl sm:text-4xl text-[#DBBB6E] font-normal block">
@@ -421,12 +418,12 @@ export default function Home() {
           </div>
         </section>
 
-        {/* BAROQUE FLORAL CREST DIVIDER */}
-        <BaroqueFloralCrestDivider />
-
         {/* PRICING SECTION (LOVESTORY STYLE) */}
-        <section id="planes" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        <section id="planes" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           
+          {/* Orla floral crest inside content section container */}
+          <BaroqueFloralCrestDivider />
+
           {/* LoveStory Section Header */}
           <div className="text-center max-w-3xl mx-auto space-y-2">
             <span className="font-handwriting text-3xl sm:text-4xl text-[#DBBB6E] font-normal block">
@@ -502,9 +499,6 @@ export default function Home() {
           </div>
         </section>
 
-        {/* BAROQUE FLORAL CREST DIVIDER */}
-        <BaroqueFloralCrestDivider />
-
         {/* DEVELOPER BRAND BRANDING SECTION: TECH INNOVA */}
         <section id="techinnova" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="card-luxury-gold p-8 sm:p-12 border-2 border-[#DBBB6E]/50 shadow-xl space-y-6 relative">
@@ -512,6 +506,9 @@ export default function Home() {
             <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
             <div className="baroque-corner-bl"><BaroqueCornerSVG /></div>
             <div className="baroque-corner-br"><BaroqueCornerSVG /></div>
+
+            {/* Orla floral crest inside content card */}
+            <BaroqueFloralCrestDivider />
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-6 border-b border-[#DBBB6E]/30 pb-6">
               <div className="flex items-center gap-4">
