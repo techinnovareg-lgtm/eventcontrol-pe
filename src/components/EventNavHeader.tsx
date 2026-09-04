@@ -4,9 +4,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   BarChart3, MapPin, QrCode, MessageSquare, FileSpreadsheet, 
-  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar
+  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar, User
 } from 'lucide-react';
-import { calculateRemainingDays, getAccountForSession } from '@/lib/superadmin-store';
+import { calculateRemainingDays, getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
 interface EventNavHeaderProps {
   currentTab: 'dashboard' | 'tables' | 'qr' | 'whatsapp' | 'import' | 'reports' | 'cuts';
@@ -20,10 +20,16 @@ export default function EventNavHeader({
   eventName = 'Cumpleaños Tavo 60 Años',
 }: EventNavHeaderProps) {
 
-  // Dynamic contract expiration check from active session account
+  // Dynamic contract account & active session check
   const contractAccount = getAccountForSession();
+  const session = getActiveSession();
   const remainingDays = calculateRemainingDays(contractAccount.contractEndDate);
   const isExpiringSoon = remainingDays <= 7;
+
+  // Active user name and email resolution
+  const userName = session?.user?.name || contractAccount.adminName || contractAccount.companyName;
+  const userEmail = session?.user?.email || contractAccount.contactEmail;
+  const userInitial = userName.charAt(0).toUpperCase();
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: '/dashboard' },
@@ -36,7 +42,7 @@ export default function EventNavHeader({
   ];
 
   return (
-    <header className="border-b border-[#C5A059]/30 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
+    <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
       
       {/* 1-WEEK EXPIRATION WARNING ALERT BANNER */}
       {isExpiringSoon && (
@@ -54,17 +60,17 @@ export default function EventNavHeader({
       )}
 
       {/* Top Navbar Row */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between border-b border-slate-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between border-b border-slate-100/80 gap-3">
         
         {/* Brand Logo & Active Event Breadcrumb / Context Selector */}
         <div className="flex items-center gap-3 min-w-0">
           <Link href="/dashboard" className="flex items-center gap-2.5 group shrink-0">
-            <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-sm border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
+            <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-sm border border-[#C5A059]/40 group-hover:scale-105 transition-transform bg-white p-0.5">
               <Image 
                 src="/logo-eventcontrol.jpg" 
                 alt="EventControl.pe Logo" 
                 fill 
-                className="object-cover"
+                className="object-cover rounded-lg"
               />
             </div>
             <div className="hidden xs:block">
@@ -77,46 +83,70 @@ export default function EventNavHeader({
           {/* ORGANIC ACTIVE EVENT BREADCRUMB BADGE (PRO PLATFORM STANDARD) */}
           <div className="flex items-center gap-2 pl-3 border-l border-slate-200 min-w-0">
             <span className="text-slate-300 text-sm hidden sm:inline">/</span>
-            <div className="flex items-center gap-1.5 bg-[#FAF8F5] px-3 py-1.5 rounded-xl border border-[#C5A059]/40 shadow-2xs min-w-0">
+            <div className="flex items-center gap-1.5 bg-[#FAF8F5] px-3 py-1 rounded-xl border border-[#C5A059]/40 shadow-2xs min-w-0">
               <Sparkles className="w-3.5 h-3.5 text-[#B8860B] shrink-0" />
-              <span className="text-xs font-serif font-bold text-[#1A1A1A] truncate max-w-[180px] sm:max-w-[280px] md:max-w-[380px]">
+              <span className="text-xs font-serif font-bold text-[#1A1A1A] truncate max-w-[150px] sm:max-w-[240px] md:max-w-[320px]">
                 {eventName}
               </span>
-              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 hidden md:inline shrink-0">
+              <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200 hidden lg:inline shrink-0">
                 ACTIVO
               </span>
             </div>
           </div>
         </div>
 
-        {/* Global Nav Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          <Link
-            href="/events"
-            className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-slate-300 hidden md:flex"
+        {/* LOGGED-IN USER PROFILE BADGE & GLOBAL NAV ACTIONS */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          
+          {/* USER PROFILE CARD (DISPLAY USER NAME & EMAIL CLEARLY IN HEADER) */}
+          <Link 
+            href="/workspace"
+            className="flex items-center gap-2 bg-[#FAF8F5] hover:bg-amber-50/80 px-2.5 py-1 rounded-xl border border-[#C5A059]/40 transition group"
+            title="Ver Mi Perfil / Cuenta"
           >
-            <LayoutGrid className="w-3.5 h-3.5 text-slate-600" /> Todos los Eventos
+            <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-[#C5A059] to-[#B8860B] text-white flex items-center justify-center font-bold text-xs shadow-2xs border border-amber-200 shrink-0">
+              {userInitial}
+            </div>
+            <div className="text-left hidden md:block leading-tight pr-1">
+              <span className="text-[11px] font-bold text-slate-900 group-hover:text-[#B8860B] transition block max-w-[160px] truncate">
+                {userName}
+              </span>
+              <span className="text-[9px] text-slate-500 font-mono block max-w-[160px] truncate">
+                {userEmail}
+              </span>
+            </div>
           </Link>
 
+          {/* Quick Nav Actions */}
           <Link
-            href="/workspace"
-            className="text-xs bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-[#C5A059]/40"
+            href="/events"
+            className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1.5 border border-slate-300 hidden lg:flex"
+            title="Todos los Eventos"
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-[#B8860B]" /> Mi Cuenta
+            <LayoutGrid className="w-3.5 h-3.5 text-slate-600" /> <span className="hidden xl:inline">Catálogo</span>
           </Link>
 
           <Link
             href="/scan"
-            className="text-xs gold-button font-bold px-3.5 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-sm"
+            className="text-xs gold-button font-bold px-3 py-1.5 rounded-xl transition flex items-center gap-1.5 shadow-xs"
+            title="Escáner PWA"
           >
-            <QrCode className="w-3.5 h-3.5 text-amber-100" /> Escáner PWA
+            <QrCode className="w-3.5 h-3.5 text-amber-100" /> <span className="hidden sm:inline">Escáner</span>
+          </Link>
+
+          <Link
+            href="/login"
+            className="p-1.5 text-slate-400 hover:text-red-600 transition"
+            title="Cerrar Sesión"
+          >
+            <LogOut className="w-4 h-4" />
           </Link>
         </div>
       </div>
 
-      {/* Navigation Sub-Header Tabs */}
+      {/* Navigation Sub-Header Tabs (Liebe & Lavelo Luxury Gold Gradient Active Tabs) */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 overflow-x-auto scrollbar-none">
-        <nav className="flex space-x-1 py-2" aria-label="Tabs de Evento">
+        <nav className="flex space-x-1 py-1.5" aria-label="Tabs de Evento">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = currentTab === tab.id;
@@ -125,13 +155,13 @@ export default function EventNavHeader({
               <Link
                 key={tab.id}
                 href={tab.href}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
                   isActive
-                    ? 'bg-gradient-to-r from-[#C5A059] to-[#B8860B] text-white shadow-md'
-                    : 'text-slate-600 hover:text-[#B8860B] hover:bg-amber-50/60'
+                    ? 'bg-gradient-to-r from-[#C5A059] to-[#B8860B] text-white shadow-sm border border-amber-300/40 font-serif'
+                    : 'text-slate-600 hover:text-[#B8860B] hover:bg-amber-50/70'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-white' : 'text-slate-400'}`} />
                 {tab.label}
               </Link>
             );

@@ -202,12 +202,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Super Admin Quick Helper Prompt */}
-        <div className="pt-2 border-t border-slate-100 text-center">
-          <span className="text-[11px] text-slate-400 font-medium">
-            Acceso Super Admin exclusivo para <strong className="text-slate-700 font-mono">tech.innova.reg@gmail.com</strong> (verificación 2FA vía correo).
-          </span>
-        </div>
+
       </div>
 
       {/* 2-STEP VERIFICATION TOKEN / PIN MODAL FOR SUPER ADMIN (PIN SECURELY DISPATCHED TO EMAIL, NOT DISPLAYED IN DOM) */}

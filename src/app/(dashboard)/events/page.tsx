@@ -10,11 +10,19 @@ import {
 } from 'lucide-react';
 import { getWorkspaceEvents, createEvent, updateEvent, deleteEvent } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
+import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
 export default function EventsCrudPage() {
   const currentWorkspaceId = 'ws-a-1111';
   const [events, setEvents] = useState<Event[]>(() => getWorkspaceEvents(currentWorkspaceId));
   
+  // Dynamic user profile resolution
+  const contractAccount = getAccountForSession();
+  const session = getActiveSession();
+  const userName = session?.user?.name || contractAccount.adminName || contractAccount.companyName;
+  const userEmail = session?.user?.email || contractAccount.contactEmail;
+  const userInitial = userName.charAt(0).toUpperCase();
+
   // Create Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [name, setName] = useState('');
@@ -81,17 +89,17 @@ export default function EventsCrudPage() {
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
       {/* Top Luxury Header */}
-      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           
           {/* Logo & Workspace */}
           <Link href="/" className="flex items-center gap-3 group shrink-0">
-            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
+            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 group-hover:scale-105 transition-transform bg-white p-0.5">
               <Image 
                 src="/logo-eventcontrol.jpg" 
                 alt="EventControl.pe Logo" 
                 fill 
-                className="object-cover"
+                className="object-cover rounded-lg"
               />
             </div>
             <div>
@@ -104,11 +112,31 @@ export default function EventsCrudPage() {
             </div>
           </Link>
 
-          {/* Navigation Action Buttons */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          {/* User Profile Badge & Navigation Actions */}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            
+            {/* USER PROFILE CARD */}
+            <Link 
+              href="/workspace"
+              className="flex items-center gap-2 bg-[#FAF8F5] hover:bg-amber-50/80 px-3 py-1.5 rounded-xl border border-[#C5A059]/40 transition group"
+              title="Ver Mi Perfil / Cuenta"
+            >
+              <div className="w-7.5 h-7.5 rounded-full bg-gradient-to-tr from-[#C5A059] to-[#B8860B] text-white flex items-center justify-center font-bold text-xs shadow-2xs border border-amber-200 shrink-0">
+                {userInitial}
+              </div>
+              <div className="text-left hidden md:block leading-tight pr-1">
+                <span className="text-xs font-bold text-slate-900 group-hover:text-[#B8860B] transition block max-w-[170px] truncate">
+                  {userName}
+                </span>
+                <span className="text-[9px] text-slate-500 font-mono block max-w-[170px] truncate">
+                  {userEmail}
+                </span>
+              </div>
+            </Link>
+
             <Link 
               href="/" 
-              className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-300"
+              className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-300 hidden sm:flex"
               title="Volver a la Página Principal Web"
             >
               <Home className="w-3.5 h-3.5 text-slate-600" /> Página Principal

@@ -57,15 +57,15 @@ export default function AccountProfilePage() {
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
       {/* Top Navbar Header */}
-      <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
+      <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
+            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 group-hover:scale-105 transition-transform bg-white p-0.5">
               <Image 
                 src="/logo-eventcontrol.jpg" 
                 alt="EventControl.pe Logo" 
                 fill 
-                className="object-cover"
+                className="object-cover rounded-lg"
               />
             </div>
             <div>
@@ -79,10 +79,22 @@ export default function AccountProfilePage() {
           </Link>
 
           <div className="flex items-center gap-3">
-            <Link href="/superadmin" className="text-xs font-bold text-slate-500 hover:text-[#B8860B] transition">
-              Panel Super User
-            </Link>
-            <Link href="/dashboard" className="text-xs text-slate-600 hover:text-[#C5A059] font-bold flex items-center gap-1">
+            {/* USER PROFILE CARD */}
+            <div className="flex items-center gap-2 bg-[#FAF8F5] px-3 py-1.5 rounded-xl border border-[#C5A059]/40">
+              <div className="w-7.5 h-7.5 rounded-full bg-gradient-to-tr from-[#C5A059] to-[#B8860B] text-white flex items-center justify-center font-bold text-xs shadow-2xs border border-amber-200 shrink-0">
+                {(session?.user?.name || contractInfo.adminName || 'A').charAt(0).toUpperCase()}
+              </div>
+              <div className="text-left hidden sm:block leading-tight pr-1">
+                <span className="text-xs font-bold text-slate-900 block max-w-[180px] truncate">
+                  {session?.user?.name || contractInfo.adminName || contractInfo.companyName}
+                </span>
+                <span className="text-[9px] text-slate-500 font-mono block max-w-[180px] truncate">
+                  {session?.user?.email || contractInfo.contactEmail}
+                </span>
+              </div>
+            </div>
+
+            <Link href="/dashboard" className="text-xs text-[#B8860B] hover:underline font-bold flex items-center gap-1 bg-amber-50 px-3 py-2 rounded-xl border border-[#C5A059]/30">
               <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
             </Link>
           </div>

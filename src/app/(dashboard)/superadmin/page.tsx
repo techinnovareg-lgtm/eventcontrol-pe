@@ -39,11 +39,11 @@ export default function SuperAdminPage() {
             No posees los privilegios de Super Administrador para acceder a esta consola global. Por favor inicia sesión con las credenciales autorizadas.
           </p>
           <Link
-            href="/dashboard"
+            href="/login"
             style={{ backgroundColor: '#DBBB6E' }}
             className="w-full py-3 text-white font-extrabold text-xs rounded-xl inline-block shadow-md hover:brightness-110"
           >
-            Volver al Dashboard de Eventos
+            Ir a Iniciar Sesión (Credenciales Superadmin)
           </Link>
         </div>
       </div>
@@ -132,11 +132,13 @@ export default function SuperAdminPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
-      {/* Top Luxury Super User Header */}
-      <header className="border-b border-[#C5A059]/30 bg-slate-900 text-white sticky top-0 z-40 shadow-md">
+      {/* Top Executive Super User Header (Strictly Isolated - No User Dashboard Links) */}
+      <header className="border-b-2 border-[#C5A059] bg-[#0B132B] text-white sticky top-0 z-40 shadow-xl select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 group-hover:scale-105 transition-transform bg-white p-1">
+          
+          {/* Executive Brand Logo & Global Badge */}
+          <div className="flex items-center gap-3">
+            <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border-2 border-[#C5A059] bg-white p-1">
               <Image 
                 src="/logo-eventcontrol.jpg" 
                 alt="EventControl Logo" 
@@ -146,26 +148,35 @@ export default function SuperAdminPage() {
             </div>
             <div>
               <span className="text-xl font-bold tracking-tight text-white font-serif flex items-center gap-2">
-                EventControl<span className="text-[#C5A059]">.pe</span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] bg-[#C5A059] text-white font-mono font-bold uppercase">
-                  SUPER ADMIN
+                EventControl<span className="text-[#DBBB6E]">.pe</span>
+                <span className="px-3 py-0.5 rounded-full text-[10px] bg-gradient-to-r from-[#DBBB6E] to-[#B8860B] text-white font-mono font-extrabold uppercase shadow-sm tracking-wider flex items-center gap-1 border border-amber-300/40">
+                  <ShieldCheck className="w-3 h-3 text-white" /> CONSOLA SUPERADMIN
                 </span>
               </span>
-              <span className="text-[10px] text-slate-300 uppercase tracking-widest font-semibold block font-mono">
-                tech.innova.reg@gmail.com
+              <span className="text-[10px] text-amber-200/90 uppercase tracking-widest font-semibold block font-mono">
+                Gestión Central de Plataforma & Licencias
               </span>
             </div>
-          </Link>
+          </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 border border-slate-700"
+          {/* Superadmin Active Profile & Logout */}
+          <div className="flex items-center gap-4">
+            <div className="hidden sm:flex items-center gap-2.5 bg-slate-800/80 px-3.5 py-1.5 rounded-xl border border-[#C5A059]/40 shadow-inner">
+              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#DBBB6E] to-[#B8860B] flex items-center justify-center text-white font-bold text-xs shadow-sm border border-amber-200">
+                TI
+              </div>
+              <div className="text-left">
+                <span className="text-xs font-bold text-white block leading-none">Tech Innova Super Admin</span>
+                <span className="text-[10px] text-slate-300 font-mono">tech.innova.reg@gmail.com</span>
+              </div>
+            </div>
+
+            <Link 
+              href="/login" 
+              className="px-3.5 py-2 bg-red-950/60 hover:bg-red-900 text-red-200 font-bold text-xs rounded-xl border border-red-800/60 transition flex items-center gap-1.5 shadow-sm" 
+              title="Cerrar Sesión Super User"
             >
-              <BarChart3 className="w-4 h-4 text-[#C5A059]" /> Dashboard Principal
-            </Link>
-            <Link href="/login" className="p-2 text-slate-400 hover:text-white transition" title="Cerrar Sesión Super User">
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4 text-red-400" /> <span className="hidden xs:inline">Cerrar Sesión</span>
             </Link>
           </div>
         </div>

@@ -77,52 +77,66 @@ export default function Home() {
       {/* Animated Soft Floating Gold Sparkles Overlay */}
       <FloatingGoldSparklesOverlay />
 
-      {/* LoveStory Luxury Header */}
-      <header className="border-b border-[#DBBB6E]/30 bg-[#FAF8F5]/90 backdrop-blur-md sticky top-0 z-50 transition-all shadow-sm">
+      {/* Liebe & Lavelo Inspired Luxury Header */}
+      <header className="border-b-2 border-[#C5A059]/40 bg-[#FAF8F5]/95 backdrop-blur-md sticky top-0 z-50 transition-all shadow-md select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
           
-          {/* Logo & Brand Title */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md border border-[#DBBB6E]/50 group-hover:scale-105 transition-transform">
+          {/* Logo Crest & Luxury Brand Title */}
+          <Link href="/" className="flex items-center gap-3.5 group">
+            <div className="relative w-12 h-12 rounded-2xl overflow-hidden shadow-md border-2 border-[#C5A059] group-hover:scale-105 transition-transform bg-white p-0.5">
               <Image 
                 src="/logo-eventcontrol.jpg" 
-                alt="EventControl.pe Isologo" 
+                alt="EventControl.pe Logo" 
                 fill 
-                className="object-cover"
+                className="object-cover rounded-xl"
               />
             </div>
             <div>
-              <span className="text-xl font-bold tracking-tight text-[#1A1A1A] flex items-center gap-1 font-serif">
-                EventControl<span className="text-[#DBBB6E]">.pe</span>
+              <span className="text-2xl font-serif font-extrabold tracking-tight text-[#1A1A1A] flex items-center gap-1">
+                EventControl<span className="gold-gradient-text">.pe</span>
               </span>
-              <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
-                SaaS Control de Eventos de Gala
+              <span className="text-[10px] text-[#B8860B] uppercase tracking-[0.2em] font-bold block font-sans">
+                Plataforma de Bodas & Eventos de Gala
               </span>
             </div>
           </Link>
 
-          {/* LoveStory Centered Navigation Links */}
-          <nav className="hidden md:flex items-center gap-8 text-xs font-bold uppercase tracking-widest text-slate-700 font-sans">
-            <a href="#propuesta" className="hover:text-[#DBBB6E] transition">Qué Ofrecemos</a>
-            <a href="#flujo" className="hover:text-[#DBBB6E] transition">Flujo Operativo</a>
-            <a href="#planes" className="hover:text-[#DBBB6E] transition">Planes</a>
-            <a href="#techinnova" className="hover:text-[#DBBB6E] transition">Tech Innova</a>
+          {/* Liebe / Lavelo Styled Navigation Links with Diamond Separators */}
+          <nav className="hidden md:flex items-center gap-6 text-xs font-serif font-bold uppercase tracking-widest text-slate-800">
+            <a href="#propuesta" className="hover:text-[#B8860B] transition relative py-1 group">
+              Qué Ofrecemos
+              <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-[#C5A059] group-hover:w-full transition-all duration-300"></span>
+            </a>
+            <span className="text-[#C5A059]/60 text-[10px]">✦</span>
+            <a href="#flujo" className="hover:text-[#B8860B] transition relative py-1 group">
+              Flujo Operativo
+              <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-[#C5A059] group-hover:w-full transition-all duration-300"></span>
+            </a>
+            <span className="text-[#C5A059]/60 text-[10px]">✦</span>
+            <a href="#planes" className="hover:text-[#B8860B] transition relative py-1 group">
+              Planes & Precios
+              <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-[#C5A059] group-hover:w-full transition-all duration-300"></span>
+            </a>
+            <span className="text-[#C5A059]/60 text-[10px]">✦</span>
+            <a href="#techinnova" className="hover:text-[#B8860B] transition relative py-1 group">
+              Tech Innova
+              <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-[#C5A059] group-hover:w-full transition-all duration-300"></span>
+            </a>
           </nav>
 
-          {/* Header Action Buttons */}
+          {/* Header Action Buttons (Liebe Luxury Gold Styling) */}
           <div className="flex items-center gap-3">
             <Link 
               href="/login" 
-              className="text-xs font-bold text-slate-700 hover:text-[#DBBB6E] transition px-3 py-2"
+              className="text-xs font-serif font-bold text-slate-800 hover:text-[#B8860B] transition px-4 py-2 rounded-xl border border-[#C5A059]/40 bg-white hover:bg-amber-50/50 shadow-2xs"
             >
               Iniciar Sesión
             </Link>
             <Link 
               href="/login" 
-              style={{ backgroundColor: '#DBBB6E' }}
-              className="text-xs font-bold text-white px-5 py-2.5 rounded-xl transition shadow-md flex items-center gap-1.5 hover:brightness-110"
+              className="text-xs font-bold text-white px-5 py-2.5 rounded-xl transition shadow-md flex items-center gap-1.5 bg-gradient-to-r from-[#C5A059] via-[#D4AF37] to-[#B8860B] border border-amber-200 hover:brightness-110"
             >
-              <Sparkles className="w-4 h-4 text-white" /> Acceso al Sistema
+              <Sparkles className="w-4 h-4 text-amber-100" /> Acceso al Sistema
             </Link>
           </div>
         </div>
