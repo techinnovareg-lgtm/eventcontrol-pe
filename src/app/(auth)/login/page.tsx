@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, Mail, ArrowRight, CheckSquare, KeyRound, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, ArrowRight, CheckSquare, KeyRound, AlertTriangle, RefreshCw, ArrowLeft, Home } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { 
   setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice,
@@ -115,12 +115,23 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAF8F5] p-4 selection:bg-[#C5A059] selection:text-white">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#FAF8F5] p-4 selection:bg-[#C5A059] selection:text-white">
+      
+      {/* Top Back to Landing Button */}
+      <div className="max-w-md w-full mb-3">
+        <Link 
+          href="/" 
+          className="inline-flex items-center gap-2 text-xs font-bold text-slate-600 hover:text-[#B8860B] transition bg-white px-3.5 py-2 rounded-xl border border-slate-200 shadow-2xs hover:border-[#C5A059]/40"
+        >
+          <ArrowLeft className="w-4 h-4 text-[#B8860B]" /> Volver a la Página Principal (Landing)
+        </Link>
+      </div>
+
       <div className="max-w-md w-full card-luxury p-8 space-y-6 shadow-xl border border-[#C5A059]/40">
         
         {/* Official Trademark Logo */}
         <div className="text-center space-y-2">
-          <Link href="/" className="inline-block group">
+          <Link href="/" className="inline-block group" title="Ir a la Página Principal">
             <div className="relative w-16 h-16 rounded-2xl overflow-hidden shadow-md border border-[#C5A059]/40 mx-auto group-hover:scale-105 transition-transform">
               <Image 
                 src="/logo-eventcontrol.jpg" 
@@ -202,7 +213,12 @@ export default function LoginPage() {
           </button>
         </form>
 
-
+        {/* Bottom Return to Landing Link */}
+        <div className="pt-3 border-t border-slate-100 text-center">
+          <Link href="/" className="text-xs text-slate-500 hover:text-[#B8860B] font-bold inline-flex items-center gap-1.5 transition">
+            <Home className="w-3.5 h-3.5 text-[#B8860B]" /> Volver al Inicio Web Oficial
+          </Link>
+        </div>
       </div>
 
       {/* 2-STEP VERIFICATION TOKEN / PIN MODAL FOR SUPER ADMIN (PIN SECURELY DISPATCHED TO EMAIL, NOT DISPLAYED IN DOM) */}
