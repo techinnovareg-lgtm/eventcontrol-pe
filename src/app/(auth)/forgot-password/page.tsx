@@ -3,14 +3,37 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { createClient } from '@/lib/supabase/client';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setLoading(true);
+    setErrorMsg(null);
+
+    try {
+      const supabase = createClient();
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://eventcontrol.tech-innova.online';
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: `${origin}/login`,
+      });
+
+      if (error) {
+        console.warn('[Supabase Reset Password Notice]', error.message);
+      }
+      // Always set submitted to true for privacy (don't leak if email exists)
+      setSubmitted(true);
+    } catch (err: any) {
+      setSubmitted(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

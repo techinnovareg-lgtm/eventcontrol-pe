@@ -69,8 +69,7 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       sentTo: superAdminEmail,
-      message: `PIN de seguridad enviado exitosamente a ${superAdminEmail}`,
-      devPin: pin,
+      message: `PIN de seguridad de 4 dígitos enviado exitosamente a ${superAdminEmail}`,
     });
   } catch (error: any) {
     return NextResponse.json(

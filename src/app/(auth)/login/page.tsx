@@ -58,11 +58,9 @@ export default function LoginPage() {
         });
         router.push('/superadmin');
       } else {
-        const pinRes = await generateAndSendSuperAdmin2FAPin();
+        await generateAndSendSuperAdmin2FAPin();
         setShow2FAModal(true);
-        if (pinRes?.devPin) {
-          setResendNotice(`PIN generado y despachado a tech.innova.reg@gmail.com (Código actual de seguridad: ${pinRes.devPin})`);
-        }
+        setResendNotice('Se ha despachado un código PIN de 4 dígitos a tech.innova.reg@gmail.com.');
       }
       setLoading(false);
       return;
@@ -148,9 +146,9 @@ export default function LoginPage() {
   };
 
   const handleResendPin = async () => {
-    const pinRes = await generateAndSendSuperAdmin2FAPin();
-    setResendNotice(`Se ha re-enviado un nuevo código PIN de 4 dígitos a tech.innova.reg@gmail.com. ${pinRes?.devPin ? `(PIN: ${pinRes.devPin})` : ''}`);
-    setTimeout(() => setResendNotice(null), 8000);
+    await generateAndSendSuperAdmin2FAPin();
+    setResendNotice('Se ha re-enviado un nuevo código PIN de 4 dígitos a la bandeja de tech.innova.reg@gmail.com.');
+    setTimeout(() => setResendNotice(null), 6000);
   };
 
   return (
