@@ -272,7 +272,7 @@ export default function Home() {
                   {/* Card 2 Image */}
                   <div className="relative h-56 w-full rounded-lg overflow-hidden border border-[#DBBB6E]/40 shadow-md my-3 group bg-slate-100">
                     <Image 
-                      src="/Imagen_QR.jfif" 
+                      src="/Imagen_QR.jpg" 
                       alt="Recepción y Escáner QR de Invitados" 
                       fill 
                       className="object-cover object-center group-hover:scale-105 transition-transform duration-700"
