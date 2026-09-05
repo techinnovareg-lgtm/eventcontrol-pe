@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
@@ -13,15 +13,25 @@ import { Event, EventStatus } from '@/lib/supabase/types';
 import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
 export default function EventsCrudPage() {
-  const currentWorkspaceId = 'ws-a-1111';
-  const [events, setEvents] = useState<Event[]>(() => getWorkspaceEvents(currentWorkspaceId));
-  
-  // Dynamic user profile resolution
-  const contractAccount = getAccountForSession();
-  const session = getActiveSession();
-  const userName = session?.user?.name || contractAccount.adminName || contractAccount.companyName;
-  const userEmail = session?.user?.email || contractAccount.contactEmail;
-  const userInitial = userName.charAt(0).toUpperCase();
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
+  const [events, setEvents] = useState<Event[]>([]);
+  const [userName, setUserName] = useState<string>('Cliente VIP');
+  const [userEmail, setUserEmail] = useState<string>('cliente@empresa.pe');
+  const [userInitial, setUserInitial] = useState<string>('C');
+
+  useEffect(() => {
+    const session = getActiveSession();
+    const contractAccount = getAccountForSession();
+    const wsId = session?.user?.workspaceId || contractAccount?.workspaceId || 'ws-a-1111';
+    const name = session?.user?.name || contractAccount?.adminName || contractAccount?.companyName || 'Cliente VIP';
+    const email = session?.user?.email || contractAccount?.contactEmail || 'cliente@empresa.pe';
+
+    setCurrentWorkspaceId(wsId);
+    setEvents(getWorkspaceEvents(wsId));
+    setUserName(name);
+    setUserEmail(email);
+    setUserInitial(name ? name.charAt(0).toUpperCase() : 'C');
+  }, []);
 
   // Create Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -40,7 +50,7 @@ export default function EventsCrudPage() {
     e.preventDefault();
     if (!name || !date) return;
 
-    const newEvt = createEvent({
+    createEvent({
       workspace_id: currentWorkspaceId,
       name,
       event_type: 'Boda / Gala',
@@ -179,108 +189,128 @@ export default function EventsCrudPage() {
           </button>
         </div>
 
-        {/* Events Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((evt) => (
-            <div key={evt.id} className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col justify-between space-y-4 hover-lift">
-              <div className="space-y-3">
-                {/* Header Row: Status Badge & Edit Button */}
-                <div className="flex items-center justify-between">
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                    evt.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                    evt.status === 'FINALIZADO' ? 'bg-slate-200 text-slate-700' :
-                    'bg-amber-100 text-amber-900 border border-amber-300'
-                  }`}>
-                    {evt.status}
-                  </span>
+        {/* Events Grid or Empty State */}
+        {events.length === 0 ? (
+          <div className="card-luxury p-10 text-center space-y-5 border border-[#C5A059]/40 shadow-lg max-w-xl mx-auto my-12 bg-white">
+            <div className="w-16 h-16 bg-amber-50 text-[#B8860B] rounded-2xl flex items-center justify-center mx-auto border border-[#C5A059]/40 shadow-sm">
+              <Calendar className="w-8 h-8 text-[#B8860B]" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">¡Bienvenido a tu Catálogo de Eventos!</h3>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                Actualmente no tienes ningún evento registrado en tu cuenta. Presiona el botón a continuación para crear tu primer evento y comenzar a gestionar asistencias, invitaciones QR y mapas de mesas.
+              </p>
+            </div>
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="gold-button font-bold text-xs px-6 py-3 rounded-xl transition shadow-md inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Crear Mi Primer Evento
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.map((evt) => (
+              <div key={evt.id} className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col justify-between space-y-4 hover-lift">
+                <div className="space-y-3">
+                  {/* Header Row: Status Badge & Edit Button */}
+                  <div className="flex items-center justify-between">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      evt.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                      evt.status === 'FINALIZADO' ? 'bg-slate-200 text-slate-700' :
+                      'bg-amber-100 text-amber-900 border border-amber-300'
+                    }`}>
+                      {evt.status}
+                    </span>
 
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleOpenEditModal(evt)}
-                      className="p-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] rounded-lg border border-[#C5A059]/30 transition"
-                      title="Editar Propiedades del Evento"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteEvent(evt.id, evt.name)}
-                      className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition"
-                      title="Eliminar Evento"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleOpenEditModal(evt)}
+                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] rounded-lg border border-[#C5A059]/30 transition"
+                        title="Editar Propiedades del Evento"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteEvent(evt.id, evt.name)}
+                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition"
+                        title="Eliminar Evento"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
+
+                  {/* CLICKABLE EVENT TITLE & HEADER */}
+                  <Link href="/dashboard" className="block group">
+                    <h3 className="text-lg font-serif font-bold text-[#1A1A1A] group-hover:text-[#B8860B] transition">
+                      {evt.name}
+                    </h3>
+                    <div className="space-y-1 text-xs text-slate-600 mt-2">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
+                        <span>{evt.event_date}</span>
+                      </div>
+                      {evt.venue_name && (
+                        <div className="flex items-center gap-2">
+                          <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                          <span>{evt.venue_name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+
+                  {/* PRIMARY ENTER EVENT BUTTON */}
+                  <Link
+                    href="/dashboard"
+                    className="w-full py-2.5 gold-button font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
+                  >
+                    <BarChart3 className="w-4 h-4" /> Ingresar al Evento (Dashboard) <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
 
-                {/* CLICKABLE EVENT TITLE & HEADER */}
-                <Link href="/dashboard" className="block group">
-                  <h3 className="text-lg font-serif font-bold text-[#1A1A1A] group-hover:text-[#B8860B] transition">
-                    {evt.name}
-                  </h3>
-                  <div className="space-y-1 text-xs text-slate-600 mt-2">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
-                      <span>{evt.event_date}</span>
-                    </div>
-                    {evt.venue_name && (
-                      <div className="flex items-center gap-2">
-                        <MapPin className="w-3.5 h-3.5 text-purple-600" />
-                        <span>{evt.venue_name}</span>
-                      </div>
-                    )}
-                  </div>
-                </Link>
-
-                {/* PRIMARY ENTER EVENT BUTTON */}
-                <Link
-                  href="/dashboard"
-                  className="w-full py-2.5 gold-button font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
-                >
-                  <BarChart3 className="w-4 h-4" /> Ingresar al Evento (Dashboard) <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                {/* Quick Sub-feature Actions Footer */}
+                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 pt-3 border-t border-slate-100 text-center text-[11px]">
+                  <Link
+                    href={`/events/${evt.id}/tables`}
+                    className="py-1.5 px-1 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-purple-200"
+                    title="Plano de Mesas"
+                  >
+                    <MapPin className="w-3.5 h-3.5 mb-0.5" /> Mesas
+                  </Link>
+                  <Link
+                    href={`/events/${evt.id}/qr`}
+                    className="py-1.5 px-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-indigo-200"
+                    title="Pases & QR"
+                  >
+                    <Users className="w-3.5 h-3.5 mb-0.5" /> QR
+                  </Link>
+                  <Link
+                    href={`/events/${evt.id}/whatsapp`}
+                    className="py-1.5 px-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-emerald-200"
+                    title="WhatsApp"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5 mb-0.5" /> WhatsApp
+                  </Link>
+                  <Link
+                    href={`/events/${evt.id}/import`}
+                    className="py-1.5 px-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-lg transition flex flex-col items-center justify-center border border-[#C5A059]/30"
+                    title="Importar Excel"
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 mb-0.5" /> Excel
+                  </Link>
+                  <Link
+                    href={`/events/${evt.id}/reports`}
+                    className="py-1.5 px-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition flex flex-col items-center justify-center shadow-sm"
+                    title="Reportes"
+                  >
+                    <Clock className="w-3.5 h-3.5 mb-0.5" /> Reportes
+                  </Link>
+                </div>
               </div>
-
-              {/* Quick Sub-feature Actions Footer */}
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 pt-3 border-t border-slate-100 text-center text-[11px]">
-                <Link
-                  href={`/events/${evt.id}/tables`}
-                  className="py-1.5 px-1 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-purple-200"
-                  title="Plano de Mesas"
-                >
-                  <MapPin className="w-3.5 h-3.5 mb-0.5" /> Mesas
-                </Link>
-                <Link
-                  href={`/events/${evt.id}/qr`}
-                  className="py-1.5 px-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-indigo-200"
-                  title="Pases & QR"
-                >
-                  <Users className="w-3.5 h-3.5 mb-0.5" /> QR
-                </Link>
-                <Link
-                  href={`/events/${evt.id}/whatsapp`}
-                  className="py-1.5 px-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-emerald-200"
-                  title="WhatsApp"
-                >
-                  <MessageSquare className="w-3.5 h-3.5 mb-0.5" /> WhatsApp
-                </Link>
-                <Link
-                  href={`/events/${evt.id}/import`}
-                  className="py-1.5 px-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-lg transition flex flex-col items-center justify-center border border-[#C5A059]/30"
-                  title="Importar Excel"
-                >
-                  <FileSpreadsheet className="w-3.5 h-3.5 mb-0.5" /> Excel
-                </Link>
-                <Link
-                  href={`/events/${evt.id}/reports`}
-                  className="py-1.5 px-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition flex flex-col items-center justify-center shadow-sm"
-                  title="Reportes"
-                >
-                  <Clock className="w-3.5 h-3.5 mb-0.5" /> Reportes
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </main>
 
       {/* CREATE EVENT MODAL */}

@@ -237,9 +237,25 @@ export function createAdminAccount(data: {
 
   adminAccountsStore.unshift(account);
 
+  // Trigger automatic welcome email dispatch to client
+  try {
+    fetch('/api/auth/send-client-welcome', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contactEmail: data.contactEmail,
+        adminName: data.adminName,
+        companyName: data.companyName,
+        initialPassword: assignedPassword,
+      }),
+    }).catch(err => console.error('[Welcome Email Fetch Error]', err));
+  } catch (err) {
+    console.error('[Welcome Email Trigger Error]', err);
+  }
+
   return {
     account,
-    tempPasswordNotice: `🎉 ¡Cuenta creada con éxito! Se ha asignado la contraseña inicial: ${assignedPassword}. Comparte estas credenciales con tu cliente (${data.contactEmail}). Podrá personalizar su clave en su primer ingreso.`,
+    tempPasswordNotice: `🎉 ¡Cuenta creada con éxito! Se ha despachado el correo de bienvenida con la contraseña inicial (${assignedPassword}) a ${data.contactEmail}.`,
   };
 }
 

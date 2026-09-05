@@ -11,16 +11,42 @@ import {
 import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
-export default function RealtimeDashboardPage() {
-  const eventId = 'evt-102';
-  const currentWorkspaceId = 'ws-a-1111';
+import { getWorkspaceEvents } from '@/lib/events';
+import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
+import { Calendar } from 'lucide-react';
 
-  const [metrics, setMetrics] = useState(() => calculateDashboardMetrics(eventId, currentWorkspaceId));
-  const [tablesStats, setTablesStats] = useState(() => getTablesOccupancyStats(eventId));
-  const [recentCheckIns, setRecentCheckIns] = useState(() => getRecentCheckInsFeed(eventId));
+export default function RealtimeDashboardPage() {
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
+  const [eventId, setEventId] = useState<string>('evt-102');
+  const [hasNoEvents, setHasNoEvents] = useState<boolean>(false);
+
+  const [metrics, setMetrics] = useState(() => calculateDashboardMetrics('evt-102', 'ws-a-1111'));
+  const [tablesStats, setTablesStats] = useState(() => getTablesOccupancyStats('evt-102'));
+  const [recentCheckIns, setRecentCheckIns] = useState(() => getRecentCheckInsFeed('evt-102'));
   const [realtimePulse, setRealtimePulse] = useState(false);
 
   useEffect(() => {
+    const session = getActiveSession();
+    const contract = getAccountForSession();
+    const wsId = session?.user?.workspaceId || contract?.workspaceId || 'ws-a-1111';
+    setCurrentWorkspaceId(wsId);
+
+    const userEvents = getWorkspaceEvents(wsId);
+    if (userEvents.length === 0) {
+      setHasNoEvents(true);
+    } else {
+      setHasNoEvents(false);
+      const activeEvtId = userEvents[0].id;
+      setEventId(activeEvtId);
+      setMetrics(calculateDashboardMetrics(activeEvtId, wsId));
+      setTablesStats(getTablesOccupancyStats(activeEvtId));
+      setRecentCheckIns(getRecentCheckInsFeed(activeEvtId));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (hasNoEvents) return;
+
     const unsubscribeFn = checkInRealtimeChannel.subscribe((payload) => {
       setMetrics(calculateDashboardMetrics(eventId, currentWorkspaceId));
       setTablesStats(getTablesOccupancyStats(eventId));
@@ -35,7 +61,7 @@ export default function RealtimeDashboardPage() {
         unsubscribeFn();
       }
     };
-  }, [eventId, currentWorkspaceId]);
+  }, [eventId, currentWorkspaceId, hasNoEvents]);
 
   // Calculated donut chart stroke
   const circumference = 2 * Math.PI * 40;
@@ -50,6 +76,53 @@ export default function RealtimeDashboardPage() {
     { hour: '21:00', count: 21, label: 'Tardíos' },
   ];
   const maxHourly = Math.max(...hourlyData.map(h => h.count));
+
+  if (hasNoEvents) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col justify-between selection:bg-[#C5A059] selection:text-white">
+        <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+            <Link href="/" className="flex items-center gap-3">
+              <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 bg-white p-0.5">
+                <Image src="/logo-eventcontrol.jpg" alt="EventControl.pe Logo" fill className="object-cover rounded-lg" />
+              </div>
+              <div>
+                <span className="text-xl font-bold tracking-tight font-serif text-[#1A1A1A]">
+                  EventControl<span className="text-[#C5A059]">.pe</span>
+                </span>
+                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
+                  Dashboard de Monitoreo
+                </span>
+              </div>
+            </Link>
+            <Link href="/events" className="text-xs gold-button font-bold px-4 py-2 rounded-xl shadow-sm flex items-center gap-1.5">
+              <Plus className="w-4 h-4" /> Mis Eventos
+            </Link>
+          </div>
+        </header>
+
+        <main className="flex-1 max-w-xl mx-auto px-4 py-16 text-center space-y-6 flex flex-col justify-center w-full">
+          <div className="card-luxury p-10 border border-[#C5A059]/40 shadow-xl space-y-5 bg-white">
+            <div className="w-16 h-16 bg-amber-50 text-[#B8860B] rounded-2xl flex items-center justify-center mx-auto border border-[#C5A059]/40 shadow-sm">
+              <Calendar className="w-8 h-8 text-[#B8860B]" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Sin Eventos Registrados</h2>
+              <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
+                Para visualizar el panel de asistencias en tiempo real y el plano de mesas, primero debes registrar tu evento desde el Catálogo de Eventos.
+              </p>
+            </div>
+            <Link
+              href="/events"
+              className="gold-button font-bold text-xs px-6 py-3 rounded-xl transition shadow-md inline-flex items-center gap-2"
+            >
+              <Plus className="w-4 h-4" /> Ir a Crear Mi Primer Evento
+            </Link>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] selection:bg-[#C5A059] selection:text-white flex flex-col select-none">
