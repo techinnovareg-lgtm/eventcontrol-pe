@@ -20,19 +20,19 @@ export async function POST() {
 
     globalPinStore = { pin, expiresAt };
 
-    // Check if Resend API key or SMTP is configured
     const resendApiKey = process.env.RESEND_API_KEY;
+    const fromAddress = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
     if (resendApiKey) {
       try {
-        await fetch('https://api.resend.com/emails', {
+        const emailRes = await fetch('https://api.resend.com/emails', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${resendApiKey}`,
           },
           body: JSON.stringify({
-            from: 'EventControl Security <seguridad@tech-innova.online>',
+            from: `EventControl Security <${fromAddress}>`,
             to: superAdminEmail,
             subject: `🔑 PIN de Seguridad 2FA Superadmin: ${pin}`,
             html: `
@@ -56,6 +56,8 @@ export async function POST() {
             `,
           }),
         });
+        const emailData = await emailRes.json();
+        console.log('[2FA Resend Dispatch Result]', emailData);
       } catch (emailErr) {
         console.error('[2FA Email Service] Failed to send via Resend API:', emailErr);
       }
@@ -68,8 +70,7 @@ export async function POST() {
       success: true,
       sentTo: superAdminEmail,
       message: `PIN de seguridad enviado exitosamente a ${superAdminEmail}`,
-      // Pass pin in dev mode response for seamless testing if no SMTP key configured
-      ...(process.env.NODE_ENV !== 'production' ? { devPin: pin } : {}),
+      devPin: pin,
     });
   } catch (error: any) {
     return NextResponse.json(
