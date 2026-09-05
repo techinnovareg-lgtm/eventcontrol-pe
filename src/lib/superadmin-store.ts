@@ -12,6 +12,7 @@ export interface AdminAccount {
   contractEndDate: string;
   status: 'ACTIVA' | 'SUSPENDIDA' | 'VENCIDA';
   mustChangePassword?: boolean;
+  initialPassword?: string;
   passwordHashMasked: string; // Password privacy: only stores hashed representation, never raw text
   created_at: string;
 }
@@ -208,12 +209,14 @@ export function createAdminAccount(data: {
   contactPhone?: string;
   planCode: PlanCode;
   durationDays: number;
+  initialPassword?: string;
 }): { account: AdminAccount; tempPasswordNotice: string } {
   const now = new Date();
   const endDate = new Date(now.getTime() + data.durationDays * 24 * 60 * 60 * 1000);
   
   const id = `usr-admin-${Date.now()}`;
   const workspaceId = `ws-${data.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString().slice(-4)}`;
+  const assignedPassword = data.initialPassword?.trim() || 'EventControl2026!';
 
   const account: AdminAccount = {
     id,
@@ -227,6 +230,7 @@ export function createAdminAccount(data: {
     contractEndDate: endDate.toISOString(),
     status: 'ACTIVA',
     mustChangePassword: true,
+    initialPassword: assignedPassword,
     passwordHashMasked: '••••••••••••',
     created_at: now.toISOString(),
   };
@@ -235,7 +239,7 @@ export function createAdminAccount(data: {
 
   return {
     account,
-    tempPasswordNotice: `Cuenta creada exitosamente. Se ha registrado a ${data.contactEmail}. El administrador establecerá su contraseña privada en su primer ingreso.`,
+    tempPasswordNotice: `🎉 ¡Cuenta creada con éxito! Se ha asignado la contraseña inicial: ${assignedPassword}. Comparte estas credenciales con tu cliente (${data.contactEmail}). Podrá personalizar su clave en su primer ingreso.`,
   };
 }
 

@@ -71,6 +71,7 @@ export default function LoginPage() {
     }
 
     // Client Administrator Login Verification
+    let authUser = null;
     try {
       const supabase = createClient();
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -79,51 +80,54 @@ export default function LoginPage() {
       });
 
       if (!authError && authData?.user) {
-        setActiveSession({
-          user: {
-            id: authData.user.id,
-            email: authData.user.email || inputEmail,
-            name: authData.user.user_metadata?.name || 'Administrador de Evento',
-            role: 'ADMIN',
-          },
-        });
-        router.push('/dashboard');
+        authUser = authData.user;
+      }
+    } catch (err: any) {
+      console.warn('[Supabase Auth Network Notice]', err);
+    }
+
+    if (authUser) {
+      setActiveSession({
+        user: {
+          id: authUser.id,
+          email: authUser.email || inputEmail,
+          name: authUser.user_metadata?.name || 'Administrador de Evento',
+          role: 'ADMIN',
+        },
+      });
+      router.push('/dashboard');
+      return;
+    }
+
+    // Check against registered accounts store (including accounts created in Superadmin console)
+    const registeredAccounts = getAllAdminAccounts();
+    const matchedAccount = registeredAccounts.find(
+      acc => acc.contactEmail.toLowerCase() === inputEmail
+    );
+
+    if (matchedAccount) {
+      if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
+        setErrorMsg(`Acceso denegado: Su cuenta se encuentra ${matchedAccount.status.toLowerCase()}. Contacte al soporte de Tech Innova.`);
+        setLoading(false);
         return;
       }
 
-      // Check against registered accounts store
-      const registeredAccounts = getAllAdminAccounts();
-      const matchedAccount = registeredAccounts.find(
-        acc => acc.contactEmail.toLowerCase() === inputEmail
-      );
-
-      if (matchedAccount) {
-        if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
-          setErrorMsg(`Acceso denegado: Su cuenta se encuentra ${matchedAccount.status.toLowerCase()}. Contacte al soporte de Tech Innova.`);
-          setLoading(false);
-          return;
-        }
-
-        // Successfully authenticate registered client account
-        setActiveSession({
-          user: {
-            id: matchedAccount.id,
-            email: matchedAccount.contactEmail,
-            name: matchedAccount.companyName || matchedAccount.adminName,
-            role: 'ADMIN',
-            workspaceId: matchedAccount.workspaceId,
-          },
-        });
-        router.push('/dashboard');
-      } else {
-        // Strict Rejection for unregistered emails or invalid credentials
-        setErrorMsg('Credenciales inválidas o correo no registrado en EventControl.pe. Verifique sus datos o contacte a su administrador.');
-      }
-    } catch (err: any) {
-      setErrorMsg('Error de conexión al servidor de autenticación. Intente nuevamente.');
-    } finally {
-      setLoading(false);
+      // Successfully authenticate registered client account
+      setActiveSession({
+        user: {
+          id: matchedAccount.id,
+          email: matchedAccount.contactEmail,
+          name: matchedAccount.companyName || matchedAccount.adminName,
+          role: 'ADMIN',
+          workspaceId: matchedAccount.workspaceId,
+        },
+      });
+      router.push('/dashboard');
+    } else {
+      // Strict Rejection for unregistered emails or invalid credentials
+      setErrorMsg('Credenciales inválidas o correo no registrado en EventControl.pe. Verifique sus datos o contacte a su administrador.');
     }
+    setLoading(false);
   };
 
   const handleVerify2FAPin = async (e: React.FormEvent) => {
