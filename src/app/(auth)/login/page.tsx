@@ -20,6 +20,8 @@ export default function LoginPage() {
   // 2FA Verification Modal State for tech.innova.reg@gmail.com
   const [show2FAModal, setShow2FAModal] = useState(false);
   const [twoFactorPin, setTwoFactorPin] = useState('');
+  const [twoFactorToken, setTwoFactorToken] = useState<string | undefined>(undefined);
+  const [twoFactorTimestamp, setTwoFactorTimestamp] = useState<number | undefined>(undefined);
   const [pinError, setPinError] = useState<string | null>(null);
   const [resendNotice, setResendNotice] = useState<string | null>(null);
 
@@ -58,7 +60,9 @@ export default function LoginPage() {
         });
         router.push('/superadmin');
       } else {
-        await generateAndSendSuperAdmin2FAPin();
+        const pinRes = await generateAndSendSuperAdmin2FAPin();
+        setTwoFactorToken(pinRes.token);
+        setTwoFactorTimestamp(pinRes.timestamp);
         setShow2FAModal(true);
         setResendNotice('Se ha despachado un código PIN de 4 dígitos a tech.innova.reg@gmail.com.');
       }
@@ -122,11 +126,13 @@ export default function LoginPage() {
     }
   };
 
-  const handleVerify2FAPin = (e: React.FormEvent) => {
+  const handleVerify2FAPin = async (e: React.FormEvent) => {
     e.preventDefault();
     setPinError(null);
 
-    if (verifySuperAdmin2FAPin(twoFactorPin)) {
+    const isValid = await verifySuperAdmin2FAPin(twoFactorPin, twoFactorToken, twoFactorTimestamp);
+
+    if (isValid) {
       if (rememberDeviceChecked) {
         rememberDevice(true);
       }
@@ -146,7 +152,9 @@ export default function LoginPage() {
   };
 
   const handleResendPin = async () => {
-    await generateAndSendSuperAdmin2FAPin();
+    const pinRes = await generateAndSendSuperAdmin2FAPin();
+    setTwoFactorToken(pinRes.token);
+    setTwoFactorTimestamp(pinRes.timestamp);
     setResendNotice('Se ha re-enviado un nuevo código PIN de 4 dígitos a la bandeja de tech.innova.reg@gmail.com.');
     setTimeout(() => setResendNotice(null), 6000);
   };

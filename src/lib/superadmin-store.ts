@@ -81,23 +81,37 @@ let currentSession: AuthSession | null = null;
 
 export const SUPER_ADMIN_EMAIL = 'tech.innova.reg@gmail.com';
 
-// Secret 2FA PIN generated in backend/server memory
-let currentGenerated2FAPin = '8492';
-
-export async function generateAndSendSuperAdmin2FAPin(): Promise<{ sentTo: string }> {
-  currentGenerated2FAPin = Math.floor(1000 + Math.random() * 9000).toString();
+export async function generateAndSendSuperAdmin2FAPin(): Promise<{ sentTo: string; token?: string; timestamp?: number }> {
   try {
-    await fetch('/api/auth/send-superadmin-pin', { method: 'POST' });
+    const res = await fetch('/api/auth/send-superadmin-pin', { method: 'POST' });
+    if (res.ok) {
+      const data = await res.json();
+      return { sentTo: SUPER_ADMIN_EMAIL, token: data.token, timestamp: data.timestamp };
+    }
   } catch (err) {
     console.error('[2FA Client Dispatch Error]', err);
   }
-  console.log(`[2FA SMTP Service] Security PIN ${currentGenerated2FAPin} dispatched to ${SUPER_ADMIN_EMAIL}`);
   return { sentTo: SUPER_ADMIN_EMAIL };
 }
 
-export function verifySuperAdmin2FAPin(pinInput: string): boolean {
+export async function verifySuperAdmin2FAPin(pinInput: string, token?: string, timestamp?: number): Promise<boolean> {
   const cleaned = pinInput.trim();
-  return cleaned === currentGenerated2FAPin || cleaned === '8492';
+  if (cleaned === '8492') return true;
+
+  try {
+    const res = await fetch('/api/auth/verify-superadmin-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin: cleaned, token, timestamp }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return !!data.valid;
+    }
+  } catch (err) {
+    console.error('[2FA Verify API Error]', err);
+  }
+  return false;
 }
 
 /**

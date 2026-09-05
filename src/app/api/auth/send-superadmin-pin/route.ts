@@ -1,24 +1,21 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 
-// Server-side pin store with expiration (5 minutes)
-let globalPinStore: { pin: string; expiresAt: number } | null = null;
+const SECRET_2FA = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eventcontrol-2fa-secret-key-2026';
 
-function getActiveServerPin(): string | null {
-  if (!globalPinStore) return null;
-  if (Date.now() > globalPinStore.expiresAt) {
-    globalPinStore = null;
-    return null;
-  }
-  return globalPinStore.pin;
+function generatePinToken(pin: string, timestamp: number): string {
+  return crypto
+    .createHmac('sha256', SECRET_2FA)
+    .update(`${pin}:${timestamp}`)
+    .digest('hex');
 }
 
 export async function POST() {
   try {
     const superAdminEmail = 'tech.innova.reg@gmail.com';
     const pin = Math.floor(1000 + Math.random() * 9000).toString();
-    const expiresAt = Date.now() + 5 * 60 * 1000; // 5 mins
-
-    globalPinStore = { pin, expiresAt };
+    const timestamp = Date.now();
+    const token = generatePinToken(pin, timestamp);
 
     const resendApiKey = process.env.RESEND_API_KEY;
     const fromAddress = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
@@ -64,11 +61,13 @@ export async function POST() {
     }
 
     // Log security record on server
-    console.log(`[SECURITY 2FA DISPATCH] Email: ${superAdminEmail} | PIN: ${pin} | Expires: ${new Date(expiresAt).toISOString()}`);
+    console.log(`[SECURITY 2FA DISPATCH] Email: ${superAdminEmail} | PIN: ${pin} | Timestamp: ${timestamp}`);
 
     return NextResponse.json({
       success: true,
       sentTo: superAdminEmail,
+      token,
+      timestamp,
       message: `PIN de seguridad de 4 dígitos enviado exitosamente a ${superAdminEmail}`,
     });
   } catch (error: any) {
@@ -77,12 +76,4 @@ export async function POST() {
       { status: 500 }
     );
   }
-}
-
-export async function GET() {
-  const pin = getActiveServerPin();
-  return NextResponse.json({
-    active: !!pin,
-    pin: process.env.NODE_ENV !== 'production' ? pin : undefined,
-  });
 }
