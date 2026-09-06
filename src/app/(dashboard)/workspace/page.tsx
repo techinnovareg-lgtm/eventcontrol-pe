@@ -1,31 +1,50 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
   Building2, Users, ShieldCheck, UserPlus, Lock, Key, 
   ArrowLeft, CheckCircle2, AlertTriangle, Play, Calendar, 
-  Clock, ShieldAlert, Check, User, Mail, Phone, Sparkles, CheckSquare
+  Clock, ShieldAlert, Check, User, Mail, Phone, Sparkles, CheckSquare,
+  X, MessageSquare
 } from 'lucide-react';
 import { testCrossWorkspaceIsolation } from '@/lib/workspace';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
+import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
 
 export default function AccountProfilePage() {
   const session = getActiveSession();
   const contractInfo = getAccountForSession();
 
+  const currentWorkspaceId = session?.user?.workspaceId || contractInfo.workspaceId || 'ws-a-1111';
   const plan = PLAN_LIMITS[contractInfo.planCode];
   const remainingDays = calculateRemainingDays(contractInfo.contractEndDate);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'team'>('profile');
+
+  // Team Members Dynamic State
+  const [teamMembers, setTeamMembers] = useState<WorkspaceMemberUser[]>([]);
+
+  useEffect(() => {
+    setTeamMembers(getWorkspaceMembers(currentWorkspaceId));
+  }, [currentWorkspaceId]);
 
   // Change Password Form State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Sub-User Invitation Modal State
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberPassword, setNewMemberPassword] = useState('puerta2026');
+  const [newMemberPhone, setNewMemberPhone] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState<WorkspaceUserRole>('OPERATOR');
+  const [createdMemberSuccess, setCreatedMemberSuccess] = useState<{ member: WorkspaceMemberUser; rawPass: string } | null>(null);
 
   // Cross Isolation Test State
   const [isolationResult, setIsolationResult] = useState<{ passed: boolean; logs: string[] } | null>(null);
@@ -54,8 +73,48 @@ export default function AccountProfilePage() {
     setIsolationResult(res);
   };
 
+  const handleCreateSubUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMemberName.trim() || !newMemberEmail.trim()) return;
+
+    const pass = newMemberPassword.trim() || 'puerta2026';
+    const created = createWorkspaceMember({
+      workspaceId: currentWorkspaceId,
+      name: newMemberName,
+      email: newMemberEmail,
+      password: pass,
+      role: newMemberRole,
+    });
+
+    setTeamMembers(getWorkspaceMembers(currentWorkspaceId));
+    setCreatedMemberSuccess({ member: created, rawPass: pass });
+  };
+
+  const resetInviteModal = () => {
+    setShowInviteModal(false);
+    setCreatedMemberSuccess(null);
+    setNewMemberName('');
+    setNewMemberEmail('');
+    setNewMemberPassword('puerta2026');
+    setNewMemberPhone('');
+    setNewMemberRole('OPERATOR');
+  };
+
+  const getWhatsAppDispatchLink = () => {
+    if (!createdMemberSuccess) return '#';
+    const text = encodeURIComponent(
+      `Hola ${createdMemberSuccess.member.name}, se ha creado tu acceso a la plataforma EventControl.pe.\n\n` +
+      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `📧 Usuario/Correo: ${createdMemberSuccess.member.email}\n` +
+      `🔑 Contraseña: ${createdMemberSuccess.rawPass}\n` +
+      `👤 Rol Asignado: ${createdMemberSuccess.member.roleLabel}`
+    );
+    const phoneCleaned = newMemberPhone.replace(/[^0-9]/g, '');
+    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+  };
+
   return (
-    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
+    <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white relative">
       {/* Top Navbar Header */}
       <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -148,7 +207,7 @@ export default function AccountProfilePage() {
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              <Users className="w-3.5 h-3.5 inline mr-1" /> Equipo & Roles
+              <Users className="w-3.5 h-3.5 inline mr-1" /> Equipo & Roles ({teamMembers.length})
             </button>
           </div>
         </div>
@@ -162,7 +221,7 @@ export default function AccountProfilePage() {
               <div className="card-luxury p-5 border-2 border-[#C5A059]">
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Plan Contratado</span>
                 <strong className="text-2xl font-serif font-bold text-[#B8860B] mt-1 block">Plan {plan.name}</strong>
-                <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">S/{plan.monthlyPricePEN} / mes</span>
+                <span className="text-[10px] text-slate-500 font-semibold block mt-0.5">S/ {plan.monthlyPricePEN.toFixed(2)} / mes</span>
               </div>
 
               <div className="card-luxury p-5 border border-slate-200">
@@ -226,10 +285,12 @@ export default function AccountProfilePage() {
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-700 uppercase">Integrantes de Equipo</span>
-                    <strong className="text-slate-900 font-bold">1 / {plan.maxWorkspaceUsers} usuarios</strong>
+                    <strong className="text-slate-900 font-bold">
+                      {teamMembers.length} / {plan.maxWorkspaceUsers} usuarios
+                    </strong>
                   </div>
                   <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                    <div className="bg-purple-600 h-full w-1/5"></div>
+                    <div className="bg-purple-600 h-full w-1/3"></div>
                   </div>
                   <span className="text-[10px] text-slate-500 block">Accesos RBAC para coordinadores y seguridad</span>
                 </div>
@@ -332,44 +393,78 @@ export default function AccountProfilePage() {
           <div className="space-y-6 animate-fade-in-up">
             <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
-                  <Users className="w-5 h-5 text-[#B8860B]" /> Integrantes del Equipo (Workspace A)
-                </h3>
-                <button className="gold-button font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm flex items-center gap-1.5">
-                  <UserPlus className="w-3.5 h-3.5" /> Invitar Usuario
+                <div>
+                  <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                    <Users className="w-5 h-5 text-[#B8860B]" /> Integrantes del Equipo ({contractInfo.companyName})
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Gestiona los accesos de tu personal de coordinadores y escáner de puerta.
+                  </p>
+                </div>
+                <button 
+                  onClick={() => setShowInviteModal(true)}
+                  className="gold-button font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-1.5"
+                >
+                  <UserPlus className="w-4 h-4" /> Invitar Usuario / Operador
                 </button>
               </div>
 
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600 uppercase">
-                    <th className="py-3 px-4">Usuario</th>
-                    <th className="py-3 px-4">Rol Asignado</th>
-                    <th className="py-3 px-4">Alcance de Permisos</th>
-                    <th className="py-3 px-4">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-bold text-slate-900">Ana María Gamarra (ana@amgweddings.pe)</td>
-                    <td className="py-3 px-4 font-bold text-emerald-700">OWNER (Propietario)</td>
-                    <td className="py-3 px-4 text-slate-600">Acceso total, facturación, usuarios y eventos</td>
-                    <td className="py-3 px-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Activo</span></td>
-                  </tr>
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-bold text-slate-900">Carlos Pérez (carlos@amgweddings.pe)</td>
-                    <td className="py-3 px-4 font-bold text-indigo-700">COORDINADOR</td>
-                    <td className="py-3 px-4 text-slate-600">Edición de eventos, invitados, mesas y cortes</td>
-                    <td className="py-3 px-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Activo</span></td>
-                  </tr>
-                  <tr className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-bold text-slate-900">Puerta Principal 1 (puerta1@amgweddings.pe)</td>
-                    <td className="py-3 px-4 font-bold text-amber-800">SEGURIDAD (Puerta)</td>
-                    <td className="py-3 px-4 text-slate-600">Escaneo de QR y registro de check-in únicamente</td>
-                    <td className="py-3 px-4"><span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold">Activo</span></td>
-                  </tr>
-                </tbody>
-              </table>
+              {teamMembers.length === 0 ? (
+                <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 space-y-3">
+                  <div className="w-12 h-12 bg-amber-50 text-[#B8860B] rounded-2xl border border-[#C5A059]/30 flex items-center justify-center mx-auto">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800">No hay colaboradores adicionales registrados</h4>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md mx-auto">
+                      Agrega a los coordinadores y operadores de puerta que realizarán los escaneos el día de tus eventos.
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => setShowInviteModal(true)}
+                    className="gold-button font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md inline-flex items-center gap-1.5"
+                  >
+                    <UserPlus className="w-4 h-4" /> Crear Primer Sub-usuario
+                  </button>
+                </div>
+              ) : (
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600 uppercase">
+                      <th className="py-3 px-4">Usuario</th>
+                      <th className="py-3 px-4">Rol Asignado</th>
+                      <th className="py-3 px-4">Alcance de Permisos</th>
+                      <th className="py-3 px-4">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {teamMembers.map((m) => (
+                      <tr key={m.id} className="hover:bg-slate-50">
+                        <td className="py-3 px-4">
+                          <span className="font-bold text-slate-900 block">{m.name}</span>
+                          <span className="text-[11px] text-slate-500 font-mono">{m.email}</span>
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`font-bold ${
+                            m.role === 'OWNER' ? 'text-amber-800 font-extrabold' :
+                            m.role === 'ADMIN' ? 'text-purple-700' :
+                            m.role === 'COORDINADOR' ? 'text-indigo-700' :
+                            'text-emerald-700 font-bold'
+                          }`}>
+                            {m.roleLabel}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-slate-600">{m.permissionsScope}</td>
+                        <td className="py-3 px-4">
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
+                            {m.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
             </div>
 
             {/* Security Isolation Test Runner */}
@@ -406,6 +501,147 @@ export default function AccountProfilePage() {
           </div>
         )}
       </main>
+
+      {/* MODAL PARA CREAR / INVITAR SUB-USUARIO (OPERADOR DE PUERTA / COORDINADOR) */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border-2 border-[#C5A059] shadow-2xl space-y-6 relative">
+            <button
+              onClick={resetInviteModal}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {!createdMemberSuccess ? (
+              <>
+                <div className="text-center space-y-1">
+                  <div className="w-12 h-12 bg-amber-50 text-[#B8860B] rounded-2xl border border-[#C5A059]/40 flex items-center justify-center mx-auto shadow-sm">
+                    <UserPlus className="w-6 h-6" />
+                  </div>
+                  <h2 className="text-xl font-serif font-bold text-[#1A1A1A]">Invitar Colaborador / Sub-usuario</h2>
+                  <p className="text-xs text-slate-500">
+                    Crea un acceso para tu personal de puerta (escáner) o coordinadores.
+                  </p>
+                </div>
+
+                <form onSubmit={handleCreateSubUser} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Nombre Completo del Colaborador
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newMemberName}
+                      onChange={(e) => setNewMemberName(e.target.value)}
+                      placeholder="Ej. Juan Operador Puerta Norte"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Correo Electrónico de Ingreso
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={newMemberEmail}
+                      onChange={(e) => setNewMemberEmail(e.target.value)}
+                      placeholder="puerta.norte@miestudio.pe"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Contraseña de Ingreso
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newMemberPassword}
+                        onChange={(e) => setNewMemberPassword(e.target.value)}
+                        placeholder="puerta2026"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                        Teléfono WhatsApp (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={newMemberPhone}
+                        onChange={(e) => setNewMemberPhone(e.target.value)}
+                        placeholder="+51 987654321"
+                        className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      Rol y Permisos
+                    </label>
+                    <select
+                      value={newMemberRole}
+                      onChange={(e) => setNewMemberRole(e.target.value as WorkspaceUserRole)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                    >
+                      <option value="OPERATOR">OPERADOR / SEGURIDAD (Escáner de Puerta únicamente)</option>
+                      <option value="COORDINADOR">COORDINADOR (Edición de Eventos, Mesas e Invitados)</option>
+                      <option value="ADMIN">ADMINISTRADOR (Acceso completo)</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 gold-button font-bold text-xs rounded-xl transition shadow-md mt-2"
+                  >
+                    Crear Sub-usuario e Integrar
+                  </button>
+                </form>
+              </>
+            ) : (
+              <div className="space-y-4 text-center">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
+                  <Check className="w-6 h-6" />
+                </div>
+                <h3 className="text-xl font-serif font-bold text-slate-900">¡Sub-usuario Registrado con Éxito!</h3>
+                
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-2 font-mono">
+                  <p><strong>Nombre:</strong> {createdMemberSuccess.member.name}</p>
+                  <p><strong>Correo:</strong> {createdMemberSuccess.member.email}</p>
+                  <p><strong>Clave:</strong> {createdMemberSuccess.rawPass}</p>
+                  <p><strong>Rol:</strong> {createdMemberSuccess.member.roleLabel}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <a
+                    href={getWhatsAppDispatchLink()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20ba5a] text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md transition"
+                  >
+                    <MessageSquare className="w-4 h-4" /> Enviar Credenciales por WhatsApp
+                  </a>
+
+                  <button
+                    onClick={resetInviteModal}
+                    className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition"
+                  >
+                    Listo / Cerrar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

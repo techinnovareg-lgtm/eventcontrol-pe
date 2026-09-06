@@ -28,8 +28,9 @@ export interface AuthSession {
   };
 }
 
-// In-Memory Store for Super Admin managed client accounts
-const adminAccountsStore: AdminAccount[] = [
+const ACCOUNTS_STORAGE_KEY = 'eventcontrol_admin_accounts';
+
+const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
   {
     id: 'usr-admin-01',
     workspaceId: 'ws-a-1111',
@@ -77,6 +78,43 @@ const adminAccountsStore: AdminAccount[] = [
   },
 ];
 
+let accountsMemoryStore: AdminAccount[] | null = null;
+
+function loadAccountsFromStorage(): AdminAccount[] {
+  if (typeof window === 'undefined') return INITIAL_ADMIN_ACCOUNTS;
+  try {
+    const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[AdminAccountsStore] Failed to load from localStorage', err);
+  }
+  saveAccountsToStorage(INITIAL_ADMIN_ACCOUNTS);
+  return INITIAL_ADMIN_ACCOUNTS;
+}
+
+export function saveAccountsToStorage(accounts: AdminAccount[]) {
+  accountsMemoryStore = accounts;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+    } catch (err) {
+      console.warn('[AdminAccountsStore] Failed to save to localStorage', err);
+    }
+  }
+}
+
+export function getAdminAccountsStore(): AdminAccount[] {
+  if (!accountsMemoryStore) {
+    accountsMemoryStore = loadAccountsFromStorage();
+  }
+  return accountsMemoryStore;
+}
+
 // Current active session state
 let currentSession: AuthSession | null = null;
 
@@ -119,13 +157,21 @@ export async function verifySuperAdmin2FAPin(pinInput: string, token?: string, t
  * Check and enforce account expiration status automatically
  */
 export function checkAccountExpirations(): void {
+  const store = getAdminAccountsStore();
   const now = new Date().getTime();
-  adminAccountsStore.forEach(acc => {
-    const endMs = new Date(acc.contractEndDate).getTime();
-    if (endMs < now && acc.status !== 'SUSPENDIDA') {
+  let changed = false;
+
+  store.forEach((acc) => {
+    const endDate = new Date(acc.contractEndDate).getTime();
+    if (now > endDate && acc.status === 'ACTIVA') {
       acc.status = 'VENCIDA';
+      changed = true;
     }
   });
+
+  if (changed) {
+    saveAccountsToStorage(store);
+  }
 }
 
 /**
@@ -133,7 +179,7 @@ export function checkAccountExpirations(): void {
  */
 export function getAllAdminAccounts(): AdminAccount[] {
   checkAccountExpirations();
-  return [...adminAccountsStore];
+  return [...getAdminAccountsStore()];
 }
 
 /**
@@ -142,13 +188,14 @@ export function getAllAdminAccounts(): AdminAccount[] {
 export function getAccountForSession(): AdminAccount {
   checkAccountExpirations();
   const session = getActiveSession();
+  const store = getAdminAccountsStore();
   if (session && session.user) {
-    const found = adminAccountsStore.find(
+    const found = store.find(
       a => a.workspaceId === session.user.workspaceId || a.contactEmail === session.user.email
     );
     if (found) return found;
   }
-  return adminAccountsStore[0]; // fallback to first active client account
+  return store[0]; // fallback to first active client account
 }
 
 /**
@@ -178,11 +225,11 @@ export function extendAdminContract(
   extensionDays: number, 
   newPlanCode?: PlanCode
 ): { success: boolean; newEndDate: string; message: string } {
-  const acc = adminAccountsStore.find(a => a.id === accountId);
+  const store = getAdminAccountsStore();
+  const acc = store.find(a => a.id === accountId);
   if (!acc) return { success: false, newEndDate: '', message: 'Cuenta no encontrada.' };
 
   const currentEnd = new Date(acc.contractEndDate);
-  // Start from the day after the previous plan's end date
   const startFromDate = new Date(currentEnd.getTime() + 24 * 60 * 60 * 1000);
   const newEndDate = new Date(startFromDate.getTime() + extensionDays * 24 * 60 * 60 * 1000);
 
@@ -190,7 +237,8 @@ export function extendAdminContract(
   if (newPlanCode) {
     acc.planCode = newPlanCode;
   }
-  acc.status = 'ACTIVA'; // Reactivate account automatically upon extension payment
+  acc.status = 'ACTIVA';
+  saveAccountsToStorage(store);
 
   return {
     success: true,
@@ -279,7 +327,9 @@ export function createAdminAccount(data: {
     created_at: now.toISOString(),
   };
 
-  adminAccountsStore.unshift(account);
+  const store = getAdminAccountsStore();
+  store.unshift(account);
+  saveAccountsToStorage(store);
 
   return {
     account,
@@ -294,9 +344,11 @@ export function updateAdminAccount(
   accountId: string, 
   data: Partial<Pick<AdminAccount, 'planCode' | 'status' | 'contractEndDate' | 'contactEmail' | 'contactPhone' | 'companyName' | 'adminName'>>
 ): AdminAccount | undefined {
-  const acc = adminAccountsStore.find(a => a.id === accountId);
+  const store = getAdminAccountsStore();
+  const acc = store.find(a => a.id === accountId);
   if (acc) {
     Object.assign(acc, data);
+    saveAccountsToStorage(store);
   }
   return acc;
 }
@@ -305,10 +357,12 @@ export function updateAdminAccount(
  * Super Admin: Trigger Password Reset for an Administrator
  */
 export function triggerPasswordReset(accountId: string): { success: boolean; message: string } {
-  const acc = adminAccountsStore.find(a => a.id === accountId);
+  const store = getAdminAccountsStore();
+  const acc = store.find(a => a.id === accountId);
   if (!acc) return { success: false, message: 'Cuenta no encontrada.' };
 
   acc.mustChangePassword = true;
+  saveAccountsToStorage(store);
   return {
     success: true,
     message: `Se ha enviado un enlace de restablecimiento al correo ${acc.contactEmail}. El cliente definirá su clave privada en su próximo ingreso.`,

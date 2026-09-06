@@ -10,6 +10,7 @@ import {
   setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice,
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts 
 } from '@/lib/superadmin-store';
+import { authenticateWorkspaceMember } from '@/lib/workspace-users';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -124,10 +125,32 @@ export default function LoginPage() {
         },
       });
       router.push('/dashboard');
-    } else {
-      // Strict Rejection for unregistered emails or invalid credentials
-      setErrorMsg('Credenciales inválidas o correo no registrado en EventControl.pe. Verifique sus datos o contacte a su administrador.');
+      return;
     }
+
+    // Check against sub-users / team members store (e.g. Door scanner operators & coordinators)
+    const matchedSubUser = authenticateWorkspaceMember(inputEmail, password);
+    if (matchedSubUser) {
+      setActiveSession({
+        user: {
+          id: matchedSubUser.id,
+          email: matchedSubUser.email,
+          name: matchedSubUser.name,
+          role: matchedSubUser.role === 'OPERATOR' ? 'OPERATOR' : 'ADMIN',
+          workspaceId: matchedSubUser.workspaceId,
+        },
+      });
+
+      if (matchedSubUser.role === 'OPERATOR') {
+        router.push('/scan');
+      } else {
+        router.push('/dashboard');
+      }
+      return;
+    }
+
+    // Strict Rejection for unregistered emails or invalid credentials
+    setErrorMsg('Credenciales inválidas o correo no registrado en EventControl.pe. Verifique sus datos o contacte a su administrador.');
     setLoading(false);
   };
 
