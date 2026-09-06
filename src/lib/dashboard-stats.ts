@@ -1,4 +1,4 @@
-import { getEventGuestGroups } from '@/lib/events';
+import { getEventGuestGroups, getEventById } from '@/lib/events';
 import { getEventTables, getEventTableAssignments } from '@/lib/tables';
 import { getEventCheckInLogs } from '@/lib/checkin';
 import { CheckIn } from '@/lib/supabase/types';
@@ -27,6 +27,8 @@ export interface TableOccupancyStat {
 
 export function calculateDashboardMetrics(eventId: string, workspaceId?: string): DashboardEventMetrics {
   const groups = getEventGuestGroups(eventId);
+  const evt = eventId ? getEventById(eventId, workspaceId) : undefined;
+  const eventName = evt ? evt.name : 'Evento Principal';
 
   let totalAuthorized = 0;
   let totalEntered = 0;
@@ -54,7 +56,7 @@ export function calculateDashboardMetrics(eventId: string, workspaceId?: string)
   const occupancyPercentage = totalAuthorized > 0 ? Math.round((totalEntered / totalAuthorized) * 100) : 0;
 
   return {
-    eventName: 'Cumpleaños Tavo 60 Años',
+    eventName,
     totalAuthorized,
     totalEntered,
     totalPending,

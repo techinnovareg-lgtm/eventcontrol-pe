@@ -42,7 +42,7 @@ export function executeAtomicCheckIn(
     checkInsLogStore.unshift({
       id: `ci-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       event_id: eventId,
-      workspace_id: 'ws-a-1111',
+      workspace_id: tokenResult.token?.workspace_id || 'ws-active',
       operator_user_id: operatorId,
       passes_entered: passesRequested,
       passes_accumulated: 0,

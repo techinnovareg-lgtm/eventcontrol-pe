@@ -153,7 +153,7 @@ export default function EventsCrudPage() {
             </Link>
 
             <Link 
-              href="/dashboard" 
+              href={events.length > 0 ? `/dashboard?eventId=${events[0].id}` : '/dashboard'} 
               className="text-xs gold-button font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm"
               title="Ir al Dashboard Activo"
             >

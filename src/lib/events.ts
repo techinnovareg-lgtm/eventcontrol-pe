@@ -47,8 +47,11 @@ export function getWorkspaceEvents(workspaceId: string): Event[] {
   return eventsStore.filter(e => e.workspace_id === workspaceId);
 }
 
-export function getEventById(eventId: string, workspaceId: string): Event | undefined {
-  return eventsStore.find(e => e.id === eventId && e.workspace_id === workspaceId);
+export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
+  if (workspaceId) {
+    return eventsStore.find(e => e.id === eventId && e.workspace_id === workspaceId);
+  }
+  return eventsStore.find(e => e.id === eventId);
 }
 
 export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Event {
