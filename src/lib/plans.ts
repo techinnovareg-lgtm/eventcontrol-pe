@@ -19,8 +19,8 @@ export const PLAN_LIMITS: Record<PlanCode, PlanDefinition> = {
   STARTER: {
     code: 'STARTER',
     name: 'Starter',
-    monthlyPricePEN: 29,
-    annualPricePEN: 299,
+    monthlyPricePEN: 29.99,
+    annualPricePEN: 299.99,
     maxActiveEvents: 3,
     maxPassesPerEvent: 150,
     maxWorkspaceUsers: 1,
@@ -46,8 +46,8 @@ export const PLAN_LIMITS: Record<PlanCode, PlanDefinition> = {
   PROFESSIONAL: {
     code: 'PROFESSIONAL',
     name: 'Professional',
-    monthlyPricePEN: 59,
-    annualPricePEN: 599,
+    monthlyPricePEN: 59.99,
+    annualPricePEN: 599.99,
     maxActiveEvents: 10,
     maxPassesPerEvent: 500,
     maxWorkspaceUsers: 5,
@@ -72,8 +72,8 @@ export const PLAN_LIMITS: Record<PlanCode, PlanDefinition> = {
   BUSINESS: {
     code: 'BUSINESS',
     name: 'Business',
-    monthlyPricePEN: 99,
-    annualPricePEN: 1199,
+    monthlyPricePEN: 99.99,
+    annualPricePEN: 999.99,
     maxActiveEvents: -1,
     maxPassesPerEvent: 1000,
     maxWorkspaceUsers: 10,

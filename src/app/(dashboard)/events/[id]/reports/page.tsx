@@ -111,22 +111,35 @@ export default function EventReportsPage() {
               <ShieldCheck className="w-4 h-4 text-brand-600" /> 1. Resumen Ejecutivo de Asistencia
             </h2>
 
-            <div className="grid grid-cols-4 gap-4 text-center">
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                <span className="text-xs text-slate-500 uppercase font-semibold block">Pases Autorizados</span>
-                <strong className="text-2xl font-black text-slate-900 mt-1 block">{metrics.totalAuthorized}</strong>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+              <div className="p-3.5 bg-blue-50/70 rounded-xl border border-blue-200 text-blue-950">
+                <span className="text-[11px] text-blue-700 uppercase font-bold block tracking-wider">Pases Autorizados</span>
+                <strong className="text-2xl font-black text-blue-900 mt-1 block">{metrics.totalGroupsCount} <span className="text-xs font-semibold text-blue-600">pases</span></strong>
+                <span className="text-[10px] text-blue-600 block mt-0.5 font-medium">Grupos / Familias</span>
               </div>
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900">
-                <span className="text-xs text-emerald-700 uppercase font-semibold block">Ingresados (Presentes)</span>
-                <strong className="text-2xl font-black text-emerald-600 mt-1 block">{metrics.totalEntered}</strong>
+
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200">
+                <span className="text-[11px] text-slate-600 uppercase font-bold block tracking-wider">Total Invitados</span>
+                <strong className="text-2xl font-black text-slate-900 mt-1 block">{metrics.totalAuthorized} <span className="text-xs font-semibold text-slate-500">pers.</span></strong>
+                <span className="text-[10px] text-slate-500 block mt-0.5 font-medium">Capacidad Autorizada</span>
               </div>
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
-                <span className="text-xs text-amber-700 uppercase font-semibold block">Pases Pendientes</span>
-                <strong className="text-2xl font-black text-amber-600 mt-1 block">{metrics.totalPending}</strong>
+
+              <div className="p-3.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900">
+                <span className="text-[11px] text-emerald-700 uppercase font-bold block tracking-wider">Invitados Presentes</span>
+                <strong className="text-2xl font-black text-emerald-600 mt-1 block">{metrics.totalEntered} <span className="text-xs font-semibold text-emerald-600">pers.</span></strong>
+                <span className="text-[10px] text-emerald-600 block mt-0.5 font-medium">Ingresados en Puerta</span>
               </div>
-              <div className="p-4 bg-slate-900 text-white rounded-xl">
-                <span className="text-xs text-slate-400 uppercase font-semibold block">% Asistencia</span>
+
+              <div className="p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900">
+                <span className="text-[11px] text-amber-700 uppercase font-bold block tracking-wider">Invitados Pendientes</span>
+                <strong className="text-2xl font-black text-amber-600 mt-1 block">{metrics.totalPending} <span className="text-xs font-semibold text-amber-600">pers.</span></strong>
+                <span className="text-[10px] text-amber-600 block mt-0.5 font-medium">Por Ingresar</span>
+              </div>
+
+              <div className="p-3.5 bg-slate-900 text-white rounded-xl col-span-2 sm:col-span-1">
+                <span className="text-[11px] text-slate-400 uppercase font-bold block tracking-wider">% Asistencia</span>
                 <strong className="text-2xl font-black text-emerald-400 mt-1 block">{metrics.occupancyPercentage}%</strong>
+                <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">Ratio sobre Invitados</span>
               </div>
             </div>
           </div>
@@ -201,7 +214,7 @@ export default function EventReportsPage() {
                 <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
                   <th className="py-2.5 px-4">#</th>
                   <th className="py-2.5 px-4">Grupo / Responsable</th>
-                  <th className="py-2.5 px-4">Pases Autorizados</th>
+                  <th className="py-2.5 px-4">Invitados Permitidos (Máx)</th>
                   <th className="py-2.5 px-4">Ingresados</th>
                   <th className="py-2.5 px-4">Pendientes</th>
                   <th className="py-2.5 px-4">Estado</th>

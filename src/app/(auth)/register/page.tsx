@@ -35,7 +35,7 @@ export default function RegisterPage() {
             </div>
           </Link>
           <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Crear Cuenta</h2>
-          <p className="text-xs text-slate-500">Registra tu estudio o negocio de eventos (Plan Starter S/29)</p>
+          <p className="text-xs text-slate-500">Registra tu estudio o negocio de eventos (Plan Starter S/ 29.99)</p>
         </div>
 
         <form onSubmit={handleRegister} className="space-y-4">

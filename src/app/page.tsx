@@ -2,7 +2,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   Calendar, Users, QrCode, Grid, Clock, FileSpreadsheet, 
-  ShieldCheck, CheckCircle2, ArrowRight, Utensils, HelpCircle, Sparkles, ExternalLink, Video, Star
+  ShieldCheck, CheckCircle2, ArrowRight, Utensils, HelpCircle, Sparkles, ExternalLink, Video, Star,
+  Mail, Phone, MessageSquare
 } from 'lucide-react';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 import HeroBannerSlider from '@/components/HeroBannerSlider';
@@ -118,6 +119,11 @@ export default function Home() {
               <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-[#C5A059] group-hover:w-full transition-all duration-300"></span>
             </a>
             <span className="text-[#C5A059] text-[10px]">✦</span>
+            <a href="#contacto" className="hover:text-[#DBBB6E] transition relative py-1 group">
+              Contáctanos
+              <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-[#C5A059] group-hover:w-full transition-all duration-300"></span>
+            </a>
+            <span className="text-[#C5A059] text-[10px]">✦</span>
             <a href="#techinnova" className="hover:text-[#DBBB6E] transition relative py-1 group">
               Tech Innova
               <span className="absolute bottom-0 left-0 w-0 h-[2px] bg-[#C5A059] group-hover:w-full transition-all duration-300"></span>
@@ -169,7 +175,7 @@ export default function Home() {
                 href="/pricing"
                 className="w-full sm:w-auto px-8 py-4 bg-white hover:bg-slate-50 text-slate-800 font-extrabold text-sm rounded-2xl border border-[#DBBB6E]/60 transition shadow-sm"
               >
-                Ver Planes (Starter S/29 • Pro S/59 • Business S/99)
+                Ver Planes (Starter S/ 29.99 • Pro S/ 59.99 • Business S/ 99.99)
               </Link>
             </div>
           </div>
@@ -517,7 +523,7 @@ export default function Home() {
                     <p className="text-xs text-slate-500 min-h-[32px] mb-3">{plan.profile}</p>
 
                     <div className="my-4 pb-4 border-b border-slate-100">
-                      <span className="text-4xl font-serif font-bold text-[#1A1A1A]">S/{plan.monthlyPricePEN}</span>
+                      <span className="text-4xl font-serif font-bold text-[#1A1A1A]">S/ {plan.monthlyPricePEN.toFixed(2)}</span>
                       <span className="text-slate-500 text-xs font-medium"> / mes</span>
                     </div>
 
@@ -545,6 +551,68 @@ export default function Home() {
                 </div>
               );
             })}
+          </div>
+        </section>
+
+        {/* CONTACT SECTION: TECH INNOVA */}
+        <section id="contacto" className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-white rounded-3xl p-8 sm:p-12 border-2 border-[#DBBB6E]/40 shadow-xl space-y-8 relative overflow-hidden">
+            <div className="baroque-corner-tl"><BaroqueCornerSVG /></div>
+            <div className="baroque-corner-tr"><BaroqueCornerSVG /></div>
+
+            <div className="text-center max-w-2xl mx-auto space-y-2">
+              <span className="font-handwriting text-3xl text-[#DBBB6E] font-normal block">
+                estamos para servirte
+              </span>
+              <h2 className="text-3xl font-serif text-[#1A1A1A] font-bold tracking-tight uppercase">
+                Contáctanos Directamente
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-600">
+                Resuelve tus dudas, solicita una demostración personalizada o contrata tu plan con el equipo oficial de <strong>Tech Innova</strong>.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+              {/* WhatsApp Contact Box */}
+              <a
+                href="https://wa.me/51947515529?text=Hola%20Tech%20Innova,%20quisiera%20más%20información%20sobre%20EventControl.pe"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-6 bg-emerald-50/60 rounded-2xl border-2 border-emerald-300/80 hover:border-emerald-500 transition flex items-center justify-between group shadow-sm hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#25D366] text-white flex items-center justify-center font-bold shadow-md">
+                    <MessageSquare className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-extrabold uppercase text-emerald-800 tracking-wider block">WhatsApp Oficial</span>
+                    <strong className="text-xl font-black text-slate-900 font-mono block">+51 947 515 529</strong>
+                    <span className="text-[11px] text-slate-500 block">Atención directa por WhatsApp</span>
+                  </div>
+                </div>
+                <span className="text-emerald-700 font-extrabold text-xl group-hover:translate-x-1 transition-transform">→</span>
+              </a>
+
+              {/* Email Contact Box */}
+              <a
+                href="mailto:tech.innova.reg@gmail.com?subject=Consulta%20EventControl.pe"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-6 bg-amber-50/60 rounded-2xl border-2 border-[#C5A059]/50 hover:border-[#C5A059] transition flex items-center justify-between group shadow-sm hover:shadow-md"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#0B132B] text-amber-300 flex items-center justify-center font-bold shadow-md border border-[#C5A059]">
+                    <Mail className="w-6 h-6 text-amber-300" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-extrabold uppercase text-[#B8860B] tracking-wider block">Correo Electrónico</span>
+                    <strong className="text-base font-bold text-slate-900 font-mono block">tech.innova.reg@gmail.com</strong>
+                    <span className="text-[11px] text-slate-500 block">Escríbenos para propuestas y cotizaciones</span>
+                  </div>
+                </div>
+                <span className="text-[#B8860B] font-extrabold text-xl group-hover:translate-x-1 transition-transform">→</span>
+              </a>
+            </div>
           </div>
         </section>
 
@@ -649,7 +717,10 @@ export default function Home() {
             <div className="w-8 h-8 relative rounded-lg overflow-hidden border border-[#DBBB6E]/40">
               <Image src="/logo-eventcontrol.jpg" alt="EventControl" fill className="object-cover" />
             </div>
-            <span className="font-bold text-slate-900">EventControl.pe © 2026</span>
+            <div>
+              <span className="font-bold text-slate-900 block">EventControl.pe © 2026</span>
+              <span className="text-[11px] text-slate-500">Tech Innova: tech.innova.reg@gmail.com • +51 947 515 529</span>
+            </div>
           </div>
 
           <div className="text-center sm:text-right text-slate-600">
@@ -665,6 +736,22 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      {/* FLOATING WHATSAPP BUTTON */}
+      <a
+        href="https://wa.me/51947515529?text=Hola%20Tech%20Innova,%20quisiera%20más%20información%20sobre%20la%20plataforma%20EventControl.pe."
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 bg-[#25D366] hover:bg-[#20ba5a] text-white p-4 rounded-full shadow-2xl transition-all duration-300 hover:scale-110 flex items-center justify-center border-2 border-white group"
+        title="Escríbenos directamente por WhatsApp (+51 947 515 529)"
+      >
+        <svg className="w-7 h-7 fill-current" viewBox="0 0 24 24">
+          <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-1.157 4.228 4.316-1.132z"/>
+        </svg>
+        <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-xs transition-all duration-500 ease-in-out font-bold text-xs pl-0 group-hover:pl-2">
+          WhatsApp (+51 947 515 529)
+        </span>
+      </a>
     </div>
   );
 }
