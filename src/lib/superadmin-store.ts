@@ -404,10 +404,12 @@ export function setActiveSession(session: AuthSession | null): void {
  * Change Current User Password
  */
 export function changeUserPassword(userId: string, newPassword: string): { success: boolean; message: string } {
-  const acc = adminAccountsStore.find(a => a.id === userId);
+  const store = getAdminAccountsStore();
+  const acc = store.find(a => a.id === userId);
   if (acc) {
     acc.mustChangePassword = false;
     acc.passwordHashMasked = '••••••••••••';
+    saveAccountsToStorage(store);
   }
   if (currentSession && currentSession.user.id === userId) {
     currentSession.user.mustChangePassword = false;
