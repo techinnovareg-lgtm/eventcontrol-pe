@@ -6,11 +6,13 @@ import Image from 'next/image';
 import { 
   ShieldCheck, Plus, Calendar, Clock, Mail, Phone, Lock, 
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
-  Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles
+  Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles,
+  Copy, Check, Send, ExternalLink, Eye, Info
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
-  triggerPasswordReset, calculateRemainingDays, extendAdminContract, AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL 
+  triggerPasswordReset, calculateRemainingDays, extendAdminContract, 
+  AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL, sendClientWelcomeEmail 
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
@@ -22,12 +24,29 @@ export default function SuperAdminPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [editingAccount, setEditingAccount] = useState<AdminAccount | null>(null);
   const [extendingAccount, setExtendingAccount] = useState<AdminAccount | null>(null);
+  const [viewingCredentialsAccount, setViewingCredentialsAccount] = useState<AdminAccount | null>(null);
   
+  // Notice & Feedback States
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [createdNoticeModal, setCreatedNoticeModal] = useState<{
+    account: AdminAccount;
+    initialPassword: string;
+    emailStatus: { success: boolean; message: string; isSandboxRestriction?: boolean; error?: string };
+  } | null>(null);
+
   // Extension Modal State
   const [extensionDays, setExtensionDays] = useState(365);
   const [selectedExtensionPlan, setSelectedExtensionPlan] = useState<PlanCode>('PROFESSIONAL');
-  
-  const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
+
+  // New Account Form State
+  const [companyName, setCompanyName] = useState('');
+  const [adminName, setAdminName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [planCode, setPlanCode] = useState<PlanCode>('PROFESSIONAL');
+  const [durationDays, setDurationDays] = useState(365);
 
   if (!isAuthorized) {
     return (
@@ -50,23 +69,22 @@ export default function SuperAdminPage() {
     );
   }
 
-  // New Account Form State
-  const [companyName, setCompanyName] = useState('');
-  const [adminName, setAdminName] = useState('');
-  const [contactEmail, setContactEmail] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
-  const [planCode, setPlanCode] = useState<PlanCode>('PROFESSIONAL');
-  const [durationDays, setDurationDays] = useState(365);
-
   const refreshList = () => {
     setAccounts(getAllAdminAccounts());
   };
 
-  const handleCreateAccount = (e: React.FormEvent) => {
+  const handleCopyText = (text: string, key: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey(null), 2500);
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!companyName || !adminName || !contactEmail) return;
 
-    const result = createAdminAccount({
+    setIsSubmitting(true);
+    const { account, assignedPassword } = createAdminAccount({
       companyName,
       adminName,
       contactEmail,
@@ -75,14 +93,49 @@ export default function SuperAdminPage() {
       durationDays,
     });
 
+    const emailStatus = await sendClientWelcomeEmail({
+      contactEmail,
+      adminName,
+      companyName,
+      initialPassword: assignedPassword,
+    });
+
+    setIsSubmitting(false);
     setCompanyName('');
     setAdminName('');
     setContactEmail('');
     setContactPhone('');
     setIsCreateModalOpen(false);
     refreshList();
-    setNoticeMessage(result.tempPasswordNotice);
-    setTimeout(() => setNoticeMessage(null), 8000);
+
+    setCreatedNoticeModal({
+      account,
+      initialPassword: assignedPassword,
+      emailStatus,
+    });
+  };
+
+  const handleResendEmail = async (account: AdminAccount) => {
+    setIsSubmitting(true);
+    const pass = account.initialPassword || 'EventControl2026!';
+    const emailStatus = await sendClientWelcomeEmail({
+      contactEmail: account.contactEmail,
+      adminName: account.adminName,
+      companyName: account.companyName,
+      initialPassword: pass,
+    });
+    setIsSubmitting(false);
+
+    if (emailStatus.success) {
+      setNoticeMessage(`✅ Correo de bienvenida re-enviado exitosamente a ${account.contactEmail}.`);
+      setTimeout(() => setNoticeMessage(null), 8000);
+    } else {
+      setCreatedNoticeModal({
+        account,
+        initialPassword: pass,
+        emailStatus,
+      });
+    }
   };
 
   const handleOpenExtendModal = (account: AdminAccount) => {
@@ -102,7 +155,7 @@ export default function SuperAdminPage() {
   };
 
   const handleTriggerReset = (account: AdminAccount) => {
-    if (confirm(`¿Restablecer contraseña para la cuenta de "${account.companyName}"? Se enviará un enlace para definir su nueva clave.`)) {
+    if (confirm(`¿Restablecer contraseña para la cuenta de "${account.companyName}"? Se activará el cambio de clave obligatorio para su próximo ingreso.`)) {
       const res = triggerPasswordReset(account.id);
       refreshList();
       setNoticeMessage(res.message);
@@ -132,11 +185,11 @@ export default function SuperAdminPage() {
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
-      {/* Top Executive Super User Header (Strictly Isolated - No User Dashboard Links) */}
+      {/* Top Executive Super User Header */}
       <header className="border-b-2 border-[#C5A059] bg-[#0B132B] text-white sticky top-0 z-40 shadow-xl select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-24 flex items-center justify-between gap-4">
           
-          {/* Executive Brand Logo, Title & Separated Global Badge */}
+          {/* Executive Brand Logo & Title */}
           <div className="flex items-center gap-4 min-w-0">
             <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-md border-2 border-[#C5A059] bg-white p-1 shrink-0">
               <Image 
@@ -156,7 +209,6 @@ export default function SuperAdminPage() {
               </span>
             </div>
 
-            {/* Separated Badge (No collision with .pe) */}
             <div className="hidden md:flex items-center pl-4 border-l border-slate-700/80 h-10">
               <span className="px-3.5 py-1.5 rounded-xl text-xs bg-gradient-to-r from-[#C5A059] to-[#B8860B] text-white font-serif font-bold uppercase shadow-sm flex items-center gap-1.5 border border-amber-300/40">
                 <ShieldCheck className="w-4 h-4 text-white" /> Consola Superadmin
@@ -164,7 +216,7 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
-          {/* Superadmin Active Profile & Harmonized Logout Button */}
+          {/* Superadmin Active Profile */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center gap-3 bg-slate-800/80 px-4 h-11 rounded-xl border border-[#C5A059]/40 shadow-inner">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#DBBB6E] to-[#B8860B] flex items-center justify-center text-white font-bold text-xs shadow-sm border border-amber-200">
@@ -176,7 +228,6 @@ export default function SuperAdminPage() {
               </div>
             </div>
 
-            {/* Harmonized Logout Button (Matching Profile Height & Border Style) */}
             <Link 
               href="/login" 
               className="h-11 px-4 bg-slate-800/80 hover:bg-red-950/80 text-slate-200 hover:text-red-200 font-bold text-xs rounded-xl border border-[#C5A059]/40 hover:border-red-800/60 transition flex items-center gap-2 shadow-sm" 
@@ -203,8 +254,8 @@ export default function SuperAdminPage() {
         <div className="card-luxury p-6 border border-[#C5A059]/40 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Panel Super Administrador (Admin de Admins)</span>
-            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Gestión de Cuentas y Extensión de Contratos</h1>
-            <p className="text-xs text-slate-500">Administra todos los atributos de las cuentas cliente, actualiza planes y renueva contratos.</p>
+            <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Gestión de Cuentas y Contraseñas de Acceso</h1>
+            <p className="text-xs text-slate-500">Administra cuentas cliente, visualiza claves de acceso iniciales y re-envía correos de bienvenida.</p>
           </div>
 
           <button
@@ -242,13 +293,13 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
-        {/* Managed Client Accounts List (Clean Layout without Contraseña column) */}
+        {/* Managed Client Accounts List */}
         <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
               <Building className="w-5 h-5 text-[#B8860B]" /> Cuentas Administradoras de Eventos ({accounts.length})
             </h3>
-            <span className="text-xs text-slate-500 font-medium">Límites de plan aplicados automáticamente</span>
+            <span className="text-xs text-slate-500 font-medium">Visualización de credenciales y envío de correos activos</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -260,7 +311,7 @@ export default function SuperAdminPage() {
                   <th className="py-3.5 px-4">Plan Contratado</th>
                   <th className="py-3.5 px-4">Vencimiento & Días</th>
                   <th className="py-3.5 px-4">Estado</th>
-                  <th className="py-3.5 px-4 text-right">Acciones</th>
+                  <th className="py-3.5 px-4 text-right">Acciones de Cuenta</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -291,7 +342,7 @@ export default function SuperAdminPage() {
                         )}
                       </td>
 
-                      {/* Clean Non-Overflowing Plan Contratado Column */}
+                      {/* Plan Contratado */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border font-bold text-xs shadow-sm bg-amber-50 text-[#B8860B] border-[#DBBB6E]/50">
                           <span>Plan {plan.name}</span>
@@ -325,28 +376,37 @@ export default function SuperAdminPage() {
                       {/* Acciones */}
                       <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                         <button
+                          onClick={() => setViewingCredentialsAccount(acc)}
+                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-300 font-bold rounded-lg transition text-[11px] shadow-sm inline-flex items-center gap-1"
+                          title="Ver Credenciales y Clave de Acceso"
+                        >
+                          <KeyRound className="w-3.5 h-3.5 text-amber-300" /> Clave
+                        </button>
+
+                        <button
+                          onClick={() => handleResendEmail(acc)}
+                          disabled={isSubmitting}
+                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition text-[11px] inline-flex items-center gap-1"
+                          title="Enviar o Re-enviar Correo de Bienvenida con Credenciales"
+                        >
+                          <Send className="w-3.5 h-3.5 text-emerald-600" /> Reenviar Correo
+                        </button>
+
+                        <button
                           onClick={() => handleOpenExtendModal(acc)}
                           style={{ backgroundColor: '#DBBB6E' }}
-                          className="px-3 py-1.5 text-white font-bold rounded-lg transition text-[11px] shadow-sm hover:brightness-110"
+                          className="px-2.5 py-1.5 text-white font-bold rounded-lg transition text-[11px] shadow-sm hover:brightness-110"
                           title="Extender Contrato / Renovar Plan"
                         >
-                          Extender Contrato
+                          Extender
                         </button>
 
                         <button
                           onClick={() => setEditingAccount({ ...acc })}
-                          className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
+                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
                           title="Editar Todos los Atributos"
                         >
                           Editar
-                        </button>
-                        
-                        <button
-                          onClick={() => handleTriggerReset(acc)}
-                          className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
-                          title="Restablecer Contraseña (Enviar Link por Correo)"
-                        >
-                          Reset Clave
                         </button>
                       </td>
                     </tr>
@@ -358,13 +418,163 @@ export default function SuperAdminPage() {
         </div>
       </main>
 
-      {/* EXTEND CONTRACT MODAL (WITH PLAN UPGRADE / CHANGE OPTION) */}
+      {/* MODAL: VIEW CLIENT CREDENTIALS & QUICK COPY */}
+      {viewingCredentialsAccount && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#C5A059] space-y-4 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-[#B8860B]" /> Credenciales del Cliente
+              </h3>
+              <span className="text-[10px] text-slate-400 font-mono">ID: {viewingCredentialsAccount.id}</span>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <div>
+                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Empresa / Planner:</span>
+                  <strong className="text-slate-900 text-sm font-serif">{viewingCredentialsAccount.companyName}</strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Administrador:</span>
+                  <span className="text-slate-800 font-semibold">{viewingCredentialsAccount.adminName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Correo de Acceso:</span>
+                  <span className="font-mono text-slate-900 font-bold">{viewingCredentialsAccount.contactEmail}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Contraseña Asignada:</span>
+                  <span className="font-mono text-[#B8860B] font-bold text-sm bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
+                    {viewingCredentialsAccount.initialPassword || 'EventControl2026!'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block uppercase text-[10px] font-bold">URL de Login:</span>
+                  <span className="font-mono text-blue-700 text-[11px]">https://eventcontrol-pe.vercel.app/login</span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
+                <Info className="w-4 h-4 text-[#B8860B] shrink-0 mt-0.5" />
+                <span>
+                  Puedes copiar estos datos de acceso y entregárselos al cliente directamente por WhatsApp o correo privado.
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setViewingCredentialsAccount(null)}
+                className="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const pass = viewingCredentialsAccount.initialPassword || 'EventControl2026!';
+                  const text = `🎉 ¡Hola ${viewingCredentialsAccount.adminName}! Tu cuenta para "${viewingCredentialsAccount.companyName}" en EventControl.pe está activa.\n\nAcceso Web: https://eventcontrol-pe.vercel.app/login\nCorreo: ${viewingCredentialsAccount.contactEmail}\nContraseña: ${pass}`;
+                  handleCopyText(text, 'viewing-copy');
+                }}
+                className="w-2/3 py-2.5 gold-button font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+              >
+                {copiedKey === 'viewing-copy' ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
+                {copiedKey === 'viewing-copy' ? '¡Copiado!' : 'Copiar Credenciales'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: POST-CREATION NOTICE & EMAIL STATUS FEEDBACK */}
+      {createdNoticeModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="max-w-lg w-full card-luxury p-6 shadow-2xl border-2 border-[#C5A059] space-y-4 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-xl font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#B8860B]" /> Resultado de Creación de Cuenta
+              </h3>
+            </div>
+
+            {/* Email Dispatch Result Badge */}
+            {createdNoticeModal.emailStatus.success ? (
+              <div className="p-3.5 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 flex items-start gap-2.5">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="font-bold block">¡Correo despachado exitosamente!</strong>
+                  <span>Se ha enviado el correo de bienvenida con las credenciales a <strong>{createdNoticeModal.account.contactEmail}</strong> vía Resend API.</span>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3.5 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <strong className="font-bold block">Atención sobre el Envío de Correo:</strong>
+                  <span>{createdNoticeModal.emailStatus.message}</span>
+                  {createdNoticeModal.emailStatus.isSandboxRestriction && (
+                    <p className="text-[11px] text-amber-800 font-medium pt-1">
+                      💡 <strong>Causa Resend Sandbox:</strong> Al usar el remite gratuito de prueba (<code className="font-mono">onboarding@resend.dev</code>), Resend solo permite enviar correos a tu propia cuenta registrada (<code className="font-mono">tech.innova.reg@gmail.com</code>). Para enviar a dominios de clientes finales sin restricción, debes verificar un dominio propio en Resend. Puedes copiar la contraseña a continuación y entregársela al cliente manualmente.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Account Credentials Card */}
+            <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-2 text-xs border border-[#C5A059]/40 shadow-inner">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Empresa / Cliente:</span>
+                <span className="font-serif font-bold text-amber-300 text-sm">{createdNoticeModal.account.companyName}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Correo de Usuario:</span>
+                <span className="font-mono text-slate-200">{createdNoticeModal.account.contactEmail}</span>
+              </div>
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Contraseña Asignada:</span>
+                <span className="font-mono font-bold text-amber-400 text-sm bg-slate-800 px-2 py-0.5 rounded border border-amber-500/40">
+                  {createdNoticeModal.initialPassword}
+                </span>
+              </div>
+              <div className="flex justify-between items-center pt-1">
+                <span className="text-slate-400 font-bold uppercase text-[10px]">Enlace de Login:</span>
+                <span className="font-mono text-slate-300 text-[11px]">https://eventcontrol-pe.vercel.app/login</span>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setCreatedNoticeModal(null)}
+                className="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+              >
+                Cerrar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const text = `🎉 ¡Hola ${createdNoticeModal.account.adminName}! Tu cuenta para "${createdNoticeModal.account.companyName}" en EventControl.pe está activa.\n\nAcceso Web: https://eventcontrol-pe.vercel.app/login\nCorreo: ${createdNoticeModal.account.contactEmail}\nContraseña: ${createdNoticeModal.initialPassword}`;
+                  handleCopyText(text, 'created-modal-copy');
+                }}
+                className="w-2/3 py-2.5 gold-button font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+              >
+                {copiedKey === 'created-modal-copy' ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
+                {copiedKey === 'created-modal-copy' ? '¡Copiado al Portapapeles!' : 'Copiar Credenciales'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EXTEND CONTRACT MODAL */}
       {extendingAccount && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#DBBB6E] space-y-4">
             <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Extender Contrato / Renovar Plan</h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Extiende la suscripción para <strong className="text-slate-900">{extendingAccount.companyName}</strong>. La nueva fecha de vencimiento se calculará **desde el día siguiente del fin del plan anterior**.
+              Extiende la suscripción para <strong className="text-slate-900">{extendingAccount.companyName}</strong>. La nueva fecha de vencimiento se calculará desde el día siguiente del fin del plan anterior.
             </p>
 
             <form onSubmit={handleExtendContractSubmit} className="space-y-4 text-xs">
@@ -430,7 +640,7 @@ export default function SuperAdminPage() {
           <div className="max-w-lg w-full card-luxury p-6 shadow-2xl border border-[#C5A059]/40 space-y-4">
             <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Crear Nueva Cuenta de Administrador</h3>
             <p className="text-xs text-slate-500">
-              Registra una cuenta de empresa cliente, asigna su plan y configura las limitaciones automáticamente.
+              Registra una cuenta de empresa cliente, asigna su plan y genera su acceso automático.
             </p>
 
             <form onSubmit={handleCreateAccount} className="space-y-4 text-xs">
@@ -526,23 +736,31 @@ export default function SuperAdminPage() {
               </div>
 
               <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900">
-                🔒 <strong>Privacidad de Contraseñas:</strong> El cliente recibirá un enlace inicial para definir su clave privada en su primer acceso.
+                🔒 <strong>Asignación Automática:</strong> Se generará una contraseña inicial (por defecto <code className="font-mono font-bold">EventControl2026!</code>) y se despachará el correo de bienvenida. Podrás copiar las credenciales inmediatamente tras crear la cuenta.
               </div>
 
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(false)}
+                  disabled={isSubmitting}
                   className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
+                  disabled={isSubmitting}
                   style={{ backgroundColor: '#DBBB6E' }}
-                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
+                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110 flex items-center justify-center gap-1.5"
                 >
-                  Crear Cuenta Administradora
+                  {isSubmitting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" /> Procesando...
+                    </>
+                  ) : (
+                    'Crear Cuenta Administradora'
+                  )}
                 </button>
               </div>
             </form>

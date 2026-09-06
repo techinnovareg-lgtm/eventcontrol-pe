@@ -200,6 +200,50 @@ export function extendAdminContract(
 }
 
 /**
+ * Dispatch Welcome Email via Resend API with full status feedback
+ */
+export async function sendClientWelcomeEmail(account: {
+  contactEmail: string;
+  adminName: string;
+  companyName: string;
+  initialPassword?: string;
+}): Promise<{ success: boolean; message: string; isSandboxRestriction?: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/auth/send-client-welcome', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contactEmail: account.contactEmail,
+        adminName: account.adminName,
+        companyName: account.companyName,
+        initialPassword: account.initialPassword || 'EventControl2026!',
+      }),
+    });
+
+    const data = await res.json();
+    if (res.ok && data.success) {
+      return {
+        success: true,
+        message: `¡Correo de bienvenida despachado exitosamente a ${account.contactEmail}!`,
+      };
+    } else {
+      return {
+        success: false,
+        message: data.error || 'Resend rehusó enviar el correo.',
+        isSandboxRestriction: !!data.isSandboxRestriction,
+        error: data.error,
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || 'Error de conexión enviando correo de bienvenida.',
+      error: err.message,
+    };
+  }
+}
+
+/**
  * Super Admin: Create a new Client / Admin Account with automatic plan limits enforcement
  */
 export function createAdminAccount(data: {
@@ -210,7 +254,7 @@ export function createAdminAccount(data: {
   planCode: PlanCode;
   durationDays: number;
   initialPassword?: string;
-}): { account: AdminAccount; tempPasswordNotice: string } {
+}): { account: AdminAccount; assignedPassword: string } {
   const now = new Date();
   const endDate = new Date(now.getTime() + data.durationDays * 24 * 60 * 60 * 1000);
   
@@ -237,25 +281,9 @@ export function createAdminAccount(data: {
 
   adminAccountsStore.unshift(account);
 
-  // Trigger automatic welcome email dispatch to client
-  try {
-    fetch('/api/auth/send-client-welcome', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contactEmail: data.contactEmail,
-        adminName: data.adminName,
-        companyName: data.companyName,
-        initialPassword: assignedPassword,
-      }),
-    }).catch(err => console.error('[Welcome Email Fetch Error]', err));
-  } catch (err) {
-    console.error('[Welcome Email Trigger Error]', err);
-  }
-
   return {
     account,
-    tempPasswordNotice: `🎉 ¡Cuenta creada con éxito! Se ha despachado el correo de bienvenida con la contraseña inicial (${assignedPassword}) a ${data.contactEmail}.`,
+    assignedPassword,
   };
 }
 
