@@ -17,12 +17,12 @@ import { Calendar } from 'lucide-react';
 
 export default function RealtimeDashboardPage() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
-  const [eventId, setEventId] = useState<string>('evt-102');
+  const [eventId, setEventId] = useState<string>('');
   const [hasNoEvents, setHasNoEvents] = useState<boolean>(false);
 
-  const [metrics, setMetrics] = useState(() => calculateDashboardMetrics('evt-102', 'ws-a-1111'));
-  const [tablesStats, setTablesStats] = useState(() => getTablesOccupancyStats('evt-102'));
-  const [recentCheckIns, setRecentCheckIns] = useState(() => getRecentCheckInsFeed('evt-102'));
+  const [metrics, setMetrics] = useState(() => calculateDashboardMetrics('', 'ws-a-1111'));
+  const [tablesStats, setTablesStats] = useState<any[]>([]);
+  const [recentCheckIns, setRecentCheckIns] = useState<any[]>([]);
   const [realtimePulse, setRealtimePulse] = useState(false);
 
   useEffect(() => {
@@ -36,7 +36,17 @@ export default function RealtimeDashboardPage() {
       setHasNoEvents(true);
     } else {
       setHasNoEvents(false);
-      const activeEvtId = userEvents[0].id;
+
+      // Check if URL has ?eventId=
+      let selectedId = '';
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        selectedId = urlParams.get('eventId') || '';
+      }
+
+      const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
+      const activeEvtId = activeEvt.id;
+
       setEventId(activeEvtId);
       setMetrics(calculateDashboardMetrics(activeEvtId, wsId));
       setTablesStats(getTablesOccupancyStats(activeEvtId));

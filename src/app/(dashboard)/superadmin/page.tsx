@@ -7,7 +7,7 @@ import {
   ShieldCheck, Plus, Calendar, Clock, Mail, Phone, Lock, 
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
   Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles,
-  Copy, Check, Send, ExternalLink, Eye, Info
+  Copy, Check, Send, ExternalLink, Eye, Info, MessageSquare
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
@@ -372,17 +372,8 @@ export default function SuperAdminPage() {
                           {acc.status}
                         </span>
                       </td>
-
                       {/* Acciones */}
                       <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
-                        <button
-                          onClick={() => setViewingCredentialsAccount(acc)}
-                          className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-900 text-amber-300 font-bold rounded-lg transition text-[11px] shadow-sm inline-flex items-center gap-1"
-                          title="Ver Credenciales y Clave de Acceso"
-                        >
-                          <KeyRound className="w-3.5 h-3.5 text-amber-300" /> Clave
-                        </button>
-
                         <button
                           onClick={() => handleResendEmail(acc)}
                           disabled={isSubmitting}
@@ -404,9 +395,17 @@ export default function SuperAdminPage() {
                         <button
                           onClick={() => setEditingAccount({ ...acc })}
                           className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
-                          title="Editar Todos los Atributos"
+                          title="Editar Atributos de Cuenta"
                         >
                           Editar
+                        </button>
+
+                        <button
+                          onClick={() => handleTriggerReset(acc)}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
+                          title="Restablecer Contraseña Privada del Cliente"
+                        >
+                          Reset Clave
                         </button>
                       </td>
                     </tr>
@@ -418,77 +417,7 @@ export default function SuperAdminPage() {
         </div>
       </main>
 
-      {/* MODAL: VIEW CLIENT CREDENTIALS & QUICK COPY */}
-      {viewingCredentialsAccount && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#C5A059] space-y-4 bg-white">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
-                <KeyRound className="w-5 h-5 text-[#B8860B]" /> Credenciales del Cliente
-              </h3>
-              <span className="text-[10px] text-slate-400 font-mono">ID: {viewingCredentialsAccount.id}</span>
-            </div>
-
-            <div className="space-y-3 text-xs">
-              <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
-                <div>
-                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Empresa / Planner:</span>
-                  <strong className="text-slate-900 text-sm font-serif">{viewingCredentialsAccount.companyName}</strong>
-                </div>
-                <div>
-                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Administrador:</span>
-                  <span className="text-slate-800 font-semibold">{viewingCredentialsAccount.adminName}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Correo de Acceso:</span>
-                  <span className="font-mono text-slate-900 font-bold">{viewingCredentialsAccount.contactEmail}</span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block uppercase text-[10px] font-bold">Contraseña Asignada:</span>
-                  <span className="font-mono text-[#B8860B] font-bold text-sm bg-amber-50 px-2 py-0.5 rounded border border-amber-200 inline-block mt-0.5">
-                    {viewingCredentialsAccount.initialPassword || 'EventControl2026!'}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-slate-500 block uppercase text-[10px] font-bold">URL de Login:</span>
-                  <span className="font-mono text-blue-700 text-[11px]">https://eventcontrol-pe.vercel.app/login</span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
-                <Info className="w-4 h-4 text-[#B8860B] shrink-0 mt-0.5" />
-                <span>
-                  Puedes copiar estos datos de acceso y entregárselos al cliente directamente por WhatsApp o correo privado.
-                </span>
-              </div>
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setViewingCredentialsAccount(null)}
-                className="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
-              >
-                Cerrar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const pass = viewingCredentialsAccount.initialPassword || 'EventControl2026!';
-                  const text = `🎉 ¡Hola ${viewingCredentialsAccount.adminName}! Tu cuenta para "${viewingCredentialsAccount.companyName}" en EventControl.pe está activa.\n\nAcceso Web: https://eventcontrol-pe.vercel.app/login\nCorreo: ${viewingCredentialsAccount.contactEmail}\nContraseña: ${pass}`;
-                  handleCopyText(text, 'viewing-copy');
-                }}
-                className="w-2/3 py-2.5 gold-button font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
-              >
-                {copiedKey === 'viewing-copy' ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
-                {copiedKey === 'viewing-copy' ? '¡Copiado!' : 'Copiar Credenciales'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: POST-CREATION NOTICE & EMAIL STATUS FEEDBACK */}
+      {/* MODAL: POST-CREATION NOTICE & EMAIL / WHATSAPP STATUS FEEDBACK */}
       {createdNoticeModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="max-w-lg w-full card-luxury p-6 shadow-2xl border-2 border-[#C5A059] space-y-4 bg-white">
@@ -515,7 +444,7 @@ export default function SuperAdminPage() {
                   <span>{createdNoticeModal.emailStatus.message}</span>
                   {createdNoticeModal.emailStatus.isSandboxRestriction && (
                     <p className="text-[11px] text-amber-800 font-medium pt-1">
-                      💡 <strong>Causa Resend Sandbox:</strong> Al usar el remite gratuito de prueba (<code className="font-mono">onboarding@resend.dev</code>), Resend solo permite enviar correos a tu propia cuenta registrada (<code className="font-mono">tech.innova.reg@gmail.com</code>). Para enviar a dominios de clientes finales sin restricción, debes verificar un dominio propio en Resend. Puedes copiar la contraseña a continuación y entregársela al cliente manualmente.
+                      💡 <strong>Causa Resend Sandbox:</strong> Al usar el remite gratuito de prueba (<code className="font-mono">onboarding@resend.dev</code>), Resend solo permite enviar correos a tu propia cuenta registrada (<code className="font-mono">tech.innova.reg@gmail.com</code>). Puedes enviar las credenciales directamente por WhatsApp con el botón a continuación.
                     </p>
                   )}
                 </div>
@@ -544,24 +473,42 @@ export default function SuperAdminPage() {
               </div>
             </div>
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex flex-col sm:flex-row gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setCreatedNoticeModal(null)}
-                className="w-1/3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                className="w-full sm:w-1/4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
               >
                 Cerrar
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const rawPhone = createdNoticeModal.account.contactPhone || '';
+                  const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+                  const phoneParam = cleanPhone.length > 0 ? (cleanPhone.startsWith('51') ? cleanPhone : `51${cleanPhone}`) : '';
+                  const msg = `🎉 ¡Hola ${createdNoticeModal.account.adminName}! Tu cuenta para "${createdNoticeModal.account.companyName}" en EventControl.pe ya está activa.\n\n🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n📧 Usuario: ${createdNoticeModal.account.contactEmail}\n🔑 Contraseña Inicial: ${createdNoticeModal.initialPassword}\n\nPor seguridad, te recomendamos cambiar tu clave al ingresar.`;
+                  const waUrl = phoneParam 
+                    ? `https://api.whatsapp.com/send?phone=${phoneParam}&text=${encodeURIComponent(msg)}`
+                    : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+                  window.open(waUrl, '_blank');
+                }}
+                className="w-full sm:w-2/5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition"
+              >
+                <MessageSquare className="w-4 h-4 text-emerald-100" /> Enviar por WhatsApp
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
                   const text = `🎉 ¡Hola ${createdNoticeModal.account.adminName}! Tu cuenta para "${createdNoticeModal.account.companyName}" en EventControl.pe está activa.\n\nAcceso Web: https://eventcontrol-pe.vercel.app/login\nCorreo: ${createdNoticeModal.account.contactEmail}\nContraseña: ${createdNoticeModal.initialPassword}`;
                   handleCopyText(text, 'created-modal-copy');
                 }}
-                className="w-2/3 py-2.5 gold-button font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+                className="w-full sm:w-1/3 py-2.5 gold-button font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
               >
                 {copiedKey === 'created-modal-copy' ? <Check className="w-4 h-4 text-emerald-800" /> : <Copy className="w-4 h-4" />}
-                {copiedKey === 'created-modal-copy' ? '¡Copiado al Portapapeles!' : 'Copiar Credenciales'}
+                {copiedKey === 'created-modal-copy' ? '¡Copiado!' : 'Copiar Textos'}
               </button>
             </div>
           </div>

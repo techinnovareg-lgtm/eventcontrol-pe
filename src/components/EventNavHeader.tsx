@@ -9,15 +9,15 @@ import {
 import { calculateRemainingDays, getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
 interface EventNavHeaderProps {
-  currentTab: 'dashboard' | 'tables' | 'qr' | 'whatsapp' | 'import' | 'reports' | 'cuts';
+  currentTab: 'dashboard' | 'import' | 'tables' | 'qr' | 'whatsapp' | 'cuts' | 'reports' | 'scan';
   eventId?: string;
   eventName?: string;
 }
 
 export default function EventNavHeader({
   currentTab,
-  eventId = 'evt-102',
-  eventName = 'Cumpleaños Tavo 60 Años',
+  eventId = 'evt-active',
+  eventName = 'Evento Activo',
 }: EventNavHeaderProps) {
 
   // Dynamic contract account & active session check
@@ -29,16 +29,16 @@ export default function EventNavHeader({
   // Active user name and email resolution
   const userName = session?.user?.name || contractAccount.adminName || contractAccount.companyName;
   const userEmail = session?.user?.email || contractAccount.contactEmail;
-  const userInitial = userName.charAt(0).toUpperCase();
+  const userInitial = userName ? userName.charAt(0).toUpperCase() : 'A';
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: '/dashboard' },
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: eventId && eventId !== 'evt-active' ? `/dashboard?eventId=${eventId}` : '/dashboard' },
+    { id: 'import', label: 'Importar Excel', icon: FileSpreadsheet, href: `/events/${eventId}/import` },
     { id: 'tables', label: 'Plano de Mesas', icon: MapPin, href: `/events/${eventId}/tables` },
     { id: 'qr', label: 'Pases & QR', icon: QrCode, href: `/events/${eventId}/qr` },
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: `/events/${eventId}/whatsapp` },
-    { id: 'import', label: 'Importar Excel', icon: FileSpreadsheet, href: `/events/${eventId}/import` },
-    { id: 'reports', label: 'Reportes', icon: Clock, href: `/events/${eventId}/reports` },
     { id: 'cuts', label: 'Cortes Catering', icon: Scissors, href: `/events/${eventId}/cuts` },
+    { id: 'reports', label: 'Reportes', icon: Clock, href: `/events/${eventId}/reports` },
     { id: 'scan', label: 'Escáner PWA', icon: QrCode, href: `/scan` },
   ];
 

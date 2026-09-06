@@ -242,7 +242,7 @@ export default function EventsCrudPage() {
                   </div>
 
                   {/* CLICKABLE EVENT TITLE & HEADER */}
-                  <Link href="/dashboard" className="block group">
+                  <Link href={`/dashboard?eventId=${evt.id}`} className="block group">
                     <h3 className="text-lg font-serif font-bold text-[#1A1A1A] group-hover:text-[#B8860B] transition">
                       {evt.name}
                     </h3>
@@ -262,7 +262,7 @@ export default function EventsCrudPage() {
 
                   {/* PRIMARY ENTER EVENT BUTTON */}
                   <Link
-                    href="/dashboard"
+                    href={`/dashboard?eventId=${evt.id}`}
                     className="w-full py-2.5 gold-button font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
                   >
                     <BarChart3 className="w-4 h-4" /> Ingresar al Evento (Dashboard) <ArrowRight className="w-3.5 h-3.5" />
