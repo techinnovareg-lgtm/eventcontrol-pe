@@ -156,7 +156,7 @@ export default function Home() {
             </span>
 
             <h1 className="text-4xl sm:text-6xl font-serif text-[#1A1A1A] tracking-tight max-w-5xl mx-auto leading-tight uppercase font-bold">
-              Gestión de Invitados, Plano de Mesas y Check-in QR en <span className="gold-gradient-text italic font-serif">Bodas de Gala</span>.
+              Gestión de Invitados, Plano de Mesas y Check-in QR en <span className="gold-gradient-text italic font-serif">Eventos de Gala</span>.
             </h1>
 
             <p className="text-base sm:text-xl text-slate-600 max-w-3xl mx-auto leading-relaxed font-normal">

@@ -196,14 +196,24 @@ export function deleteWorkspaceMember(memberId: string): boolean {
   return false;
 }
 
-export function authenticateWorkspaceMember(email: string, passwordInput: string): WorkspaceMemberUser | undefined {
+export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: string): WorkspaceMemberUser | undefined {
   const store = getStore();
-  const cleanedEmail = email.trim().toLowerCase();
+  const cleanedInput = emailOrUser.trim().toLowerCase();
   const trimmedPassword = passwordInput.trim();
-  
-  return store.find(m => 
-    m.email.toLowerCase() === cleanedEmail && 
-    m.status === 'ACTIVO' &&
-    (m.initialPassword ? m.initialPassword === trimmedPassword : trimmedPassword === 'puerta2026')
-  );
+
+  return store.find(m => {
+    const emailClean = (m.email || '').trim().toLowerCase();
+    const nameClean = (m.name || '').trim().toLowerCase();
+    const userPartClean = emailClean.includes('@') ? emailClean.split('@')[0] : emailClean;
+
+    const isMatch = emailClean === cleanedInput || nameClean === cleanedInput || userPartClean === cleanedInput;
+    if (!isMatch) return false;
+    if (m.status !== 'ACTIVO') return false;
+
+    const expectedPass = (m.initialPassword || 'puerta2026').trim();
+    if (expectedPass.toLowerCase() === 'puerta2026' && trimmedPassword.toLowerCase() === 'puerta2026') {
+      return true;
+    }
+    return expectedPass === trimmedPassword;
+  });
 }
