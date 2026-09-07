@@ -16,47 +16,7 @@ export interface WorkspaceMemberUser {
 
 const STORAGE_KEY = 'eventcontrol_workspace_users';
 
-const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [
-  {
-    id: 'wm-01',
-    workspaceId: 'ws-a-1111',
-    eventId: 'evt-102',
-    name: 'Ana María Gamarra',
-    email: 'ana@amgweddings.pe',
-    role: 'OWNER',
-    roleLabel: 'PROPIETARIO',
-    permissionsScope: 'Acceso total, facturación, usuarios y eventos',
-    status: 'ACTIVO',
-    initialPassword: 'EventControl2026!',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'wm-02',
-    workspaceId: 'ws-a-1111',
-    eventId: 'evt-102',
-    name: 'Carlos Pérez',
-    email: 'carlos@amgweddings.pe',
-    role: 'COORDINADOR',
-    roleLabel: 'COORDINADOR',
-    permissionsScope: 'Edición de eventos, invitados, mesas y cortes',
-    status: 'ACTIVO',
-    initialPassword: 'coordinador2026',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'wm-03',
-    workspaceId: 'ws-a-1111',
-    eventId: 'evt-102',
-    name: 'Puerta Principal 1',
-    email: 'puerta1@amgweddings.pe',
-    role: 'OPERATOR',
-    roleLabel: 'SEGURIDAD (Puerta)',
-    permissionsScope: 'Escaneo de QR y registro de check-in únicamente',
-    status: 'ACTIVO',
-    initialPassword: 'puerta2026',
-    created_at: new Date().toISOString(),
-  },
-];
+const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [];
 
 let membersMemoryStore: WorkspaceMemberUser[] | null = null;
 
@@ -67,7 +27,7 @@ function loadMembersFromStorage(): WorkspaceMemberUser[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        return parsed.filter(m => m.id !== 'wm-01' && m.id !== 'wm-02' && m.id !== 'wm-03');
       }
     }
   } catch (err) {

@@ -30,15 +30,17 @@ export default function MobileScanCheckInPage() {
   const [selectedEventId, setSelectedEventId] = useState<string>(session?.user?.eventId || '');
 
   useEffect(() => {
-    const events = getWorkspaceEvents(currentWorkspaceId);
-    
-    // Operator Role restriction: limit event list strictly to assigned event if specified
+    let events = getWorkspaceEvents(currentWorkspaceId);
     const operatorEventId = session?.user?.eventId;
-    let filteredEvents = events;
-    if (isOperator && operatorEventId && events.some(e => e.id === operatorEventId)) {
-      filteredEvents = events.filter(e => e.id === operatorEventId);
+
+    if (isOperator && operatorEventId) {
+      const opEvt = getEventById(operatorEventId);
+      if (opEvt) {
+        events = [opEvt];
+      }
     }
-    setWorkspaceEvents(filteredEvents);
+
+    setWorkspaceEvents(events);
     
     // Check URL params for event or token
     if (typeof window !== 'undefined') {
@@ -46,12 +48,12 @@ export default function MobileScanCheckInPage() {
       const urlEvt = params.get('event');
       const urlToken = params.get('token');
 
-      if (urlEvt && filteredEvents.some(e => e.id === urlEvt)) {
+      if (urlEvt) {
         setSelectedEventId(urlEvt);
-      } else if (isOperator && operatorEventId && filteredEvents.some(e => e.id === operatorEventId)) {
+      } else if (isOperator && operatorEventId) {
         setSelectedEventId(operatorEventId);
-      } else if (filteredEvents.length > 0) {
-        setSelectedEventId(filteredEvents[0].id);
+      } else if (events.length > 0) {
+        setSelectedEventId(events[0].id);
       }
 
       if (urlToken) {

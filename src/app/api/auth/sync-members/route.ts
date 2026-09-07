@@ -15,47 +15,7 @@ export interface WorkspaceMemberUser {
 }
 
 // Global server-side memory store for sub-users and door operators across devices
-let globalServerMembersStore: WorkspaceMemberUser[] = [
-  {
-    id: 'wm-01',
-    workspaceId: 'ws-a-1111',
-    eventId: 'evt-102',
-    name: 'Ana María Gamarra',
-    email: 'ana@amgweddings.pe',
-    role: 'OWNER',
-    roleLabel: 'PROPIETARIO',
-    permissionsScope: 'Acceso total, facturación, usuarios y eventos',
-    status: 'ACTIVO',
-    initialPassword: 'EventControl2026!',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'wm-02',
-    workspaceId: 'ws-a-1111',
-    eventId: 'evt-102',
-    name: 'Carlos Pérez',
-    email: 'carlos@amgweddings.pe',
-    role: 'COORDINADOR',
-    roleLabel: 'COORDINADOR',
-    permissionsScope: 'Edición de eventos, invitados, mesas y cortes',
-    status: 'ACTIVO',
-    initialPassword: 'coordinador2026',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'wm-03',
-    workspaceId: 'ws-a-1111',
-    eventId: 'evt-102',
-    name: 'Puerta Principal 1',
-    email: 'puerta1@amgweddings.pe',
-    role: 'OPERATOR',
-    roleLabel: 'SEGURIDAD (Puerta)',
-    permissionsScope: 'Escaneo de QR y registro de check-in únicamente',
-    status: 'ACTIVO',
-    initialPassword: 'puerta2026',
-    created_at: new Date().toISOString(),
-  },
-];
+let globalServerMembersStore: WorkspaceMemberUser[] = [];
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);

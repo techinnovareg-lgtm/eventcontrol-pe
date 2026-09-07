@@ -3,47 +3,9 @@ import { Event, EventStatus, GuestGroup } from '@/lib/supabase/types';
 const EVENTS_STORAGE_KEY = 'eventcontrol_events';
 const GROUPS_STORAGE_KEY = 'eventcontrol_guest_groups';
 
-const INITIAL_EVENTS: Event[] = [
-  {
-    id: 'evt-101',
-    workspace_id: 'ws-a-1111',
-    name: 'Boda Ronny & Diana',
-    event_type: 'Boda',
-    event_date: '2026-10-15',
-    event_time: '16:00',
-    venue_name: 'Hacienda Fundo El Carmen, Lurín',
-    status: 'ACTIVO',
-    created_at: new Date('2026-08-01').toISOString(),
-    updated_at: new Date('2026-08-01').toISOString(),
-  },
-  {
-    id: 'evt-102',
-    workspace_id: 'ws-a-1111',
-    name: 'Cumpleaños Tavo 60 Años',
-    event_type: 'Cumpleaños',
-    event_date: '2026-09-20',
-    event_time: '19:00',
-    venue_name: 'Club Germania, Miraflores',
-    status: 'PREPARACION',
-    created_at: new Date('2026-08-15').toISOString(),
-    updated_at: new Date('2026-08-15').toISOString(),
-  },
-];
+const INITIAL_EVENTS: Event[] = [];
 
-const INITIAL_GROUPS: Record<string, GuestGroup[]> = {
-  'evt-102': [
-    { id: 'grp-001', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Mamami', max_passes: 1, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-002', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Lili, Lucho, Moico, Gaby, Sra. Ernestina', max_passes: 6, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-003', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Nathali, German, Lula, Tati', max_passes: 4, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-004', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Nidia, Emo', max_passes: 2, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-005', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Pepe', max_passes: 1, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-006', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Melo, Nidia, Enamorado, Nico', max_passes: 4, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-007', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Miguel, Nicol', max_passes: 2, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-008', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Claudia, Jorge Matias', max_passes: 3, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-009', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Familia Lapo & Gasdy', max_passes: 5, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-    { id: 'grp-010', event_id: 'evt-102', workspace_id: 'ws-a-1111', group_name: 'Tavo & Amigos VIP', max_passes: 6, checked_in_count: 0, status: 'PENDIENTE', created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
-  ]
-};
+const INITIAL_GROUPS: Record<string, GuestGroup[]> = {};
 
 let eventsMemoryStore: Event[] | null = null;
 let guestGroupsMemoryStore: Record<string, GuestGroup[]> | null = null;
@@ -55,7 +17,9 @@ function loadEventsFromStorage(): Event[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return parsed;
+        // Clean out legacy demo events (evt-101, evt-102) from browser storage
+        const cleaned = parsed.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102');
+        return cleaned;
       }
     }
   } catch (err) {
@@ -83,6 +47,8 @@ function loadGroupsFromStorage(): Record<string, GuestGroup[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
+        delete parsed['evt-102'];
+        delete parsed['evt-101'];
         return parsed;
       }
     }
