@@ -11,7 +11,7 @@ import {
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts,
   verifySuperAdminPassword 
 } from '@/lib/superadmin-store';
-import { authenticateWorkspaceMember } from '@/lib/workspace-users';
+import { authenticateWorkspaceMemberAsync } from '@/lib/workspace-users';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -44,8 +44,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (!password || password.trim().length < 4) {
-      setErrorMsg('La contraseña debe tener al menos 4 caracteres.');
+    if (!password || password.trim().length < 8) {
+      setErrorMsg('La contraseña debe tener al menos 8 caracteres.');
       setLoading(false);
       return;
     }
@@ -151,8 +151,8 @@ export default function LoginPage() {
       return;
     }
 
-    // Check against sub-users / team members store (e.g. Door scanner operators & coordinators)
-    const matchedSubUser = authenticateWorkspaceMember(inputEmail, password);
+    // Check against sub-users / team members store (with cross-device central API fallback)
+    const matchedSubUser = await authenticateWorkspaceMemberAsync(inputEmail, password);
     if (matchedSubUser) {
       setActiveSession({
         user: {

@@ -149,6 +149,16 @@ export function createWorkspaceMember(data: {
 
   const updatedStore = [newMember, ...store];
   saveMembersToStorage(updatedStore);
+
+  // Sync with central server API for cross-device access (Mobile phones, PCs, tablets)
+  if (typeof window !== 'undefined') {
+    fetch('/api/auth/sync-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'CREATE', member: newMember }),
+    }).catch(err => console.warn('[Sync API dispatch warning]', err));
+  }
+
   return newMember;
 }
 
@@ -183,6 +193,15 @@ export function updateWorkspaceMember(
   }
 
   saveMembersToStorage(store);
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/auth/sync-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UPSERT', member }),
+    }).catch(err => console.warn('[Sync API dispatch warning]', err));
+  }
+
   return member;
 }
 
@@ -191,6 +210,15 @@ export function deleteWorkspaceMember(memberId: string): boolean {
   const updatedStore = store.filter(m => m.id !== memberId);
   if (updatedStore.length !== store.length) {
     saveMembersToStorage(updatedStore);
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/auth/sync-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'DELETE', memberId }),
+      }).catch(err => console.warn('[Sync API dispatch warning]', err));
+    }
+
     return true;
   }
   return false;
@@ -216,4 +244,36 @@ export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: 
     }
     return expectedPass === trimmedPassword;
   });
+}
+
+/**
+ * Async Authentication with Cross-Device Central Server Fallback
+ */
+export async function authenticateWorkspaceMemberAsync(emailOrUser: string, passwordInput: string): Promise<WorkspaceMemberUser | undefined> {
+  // 1. Try local browser localStorage first
+  const localMatch = authenticateWorkspaceMember(emailOrUser, passwordInput);
+  if (localMatch) return localMatch;
+
+  // 2. Query central server API to fetch collaborator created on another device
+  try {
+    const url = `/api/auth/sync-members?email=${encodeURIComponent(emailOrUser.trim())}&password=${encodeURIComponent(passwordInput.trim())}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.member) {
+        // Save fetched member to local browser storage for offline access
+        const store = getStore();
+        const exists = store.some(m => m.id === data.member.id);
+        if (!exists) {
+          const updated = [data.member, ...store];
+          saveMembersToStorage(updated);
+        }
+        return data.member;
+      }
+    }
+  } catch (err) {
+    console.warn('[SyncMembers API Query Error]', err);
+  }
+
+  return undefined;
 }
