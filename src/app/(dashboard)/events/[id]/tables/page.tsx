@@ -20,6 +20,7 @@ import {
   getEventVenueElements, createVenueElement, updateVenueElement, updateVenueElementPosition, 
   deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions 
 } from '@/lib/tables';
+import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
 
 type LayoutMode = 'SPATIAL_CIRCULAR' | 'SPATIAL_MULTI_ZONE' | 'GRID_CARDS';
@@ -28,7 +29,14 @@ type TableShape = 'ROUND' | 'RECTANGULAR' | 'VIP_HONOR';
 export default function TablesManagementPage() {
   const params = useParams();
   const eventId = String(params.id || 'evt-102');
-  const currentWorkspaceId = 'ws-a-1111';
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
+
+  useEffect(() => {
+    const session = getActiveSession();
+    const account = getAccountForSession();
+    const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+    setCurrentWorkspaceId(wsId);
+  }, []);
 
   const event = getEventById(eventId, currentWorkspaceId);
   const groups = getEventGuestGroups(eventId);

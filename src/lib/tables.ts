@@ -116,7 +116,7 @@ function loadTablesFromStorage(): Record<string, Table[]> {
   if (typeof window === 'undefined') return INITIAL_TABLES;
   try {
     const raw = localStorage.getItem(TABLES_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         tablesMemoryStore = parsed;
@@ -146,7 +146,7 @@ function loadAssignmentsFromStorage(): Record<string, TableAssignment[]> {
   if (typeof window === 'undefined') return INITIAL_ASSIGNMENTS;
   try {
     const raw = localStorage.getItem(ASSIGNMENTS_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         assignmentsMemoryStore = parsed;
@@ -176,7 +176,7 @@ function loadVenueElementsFromStorage(): Record<string, VenueElement[]> {
   if (typeof window === 'undefined') return INITIAL_VENUE_ELEMENTS;
   try {
     const raw = localStorage.getItem(VENUE_ELEMENTS_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         venueElementsMemoryStore = parsed;

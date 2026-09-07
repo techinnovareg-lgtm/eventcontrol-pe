@@ -52,9 +52,9 @@ function loadEventsFromStorage(): Event[] {
   if (typeof window === 'undefined') return INITIAL_EVENTS;
   try {
     const raw = localStorage.getItem(EVENTS_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -80,7 +80,7 @@ function loadGroupsFromStorage(): Record<string, GuestGroup[]> {
   if (typeof window === 'undefined') return INITIAL_GROUPS;
   try {
     const raw = localStorage.getItem(GROUPS_STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         return parsed;
@@ -120,15 +120,19 @@ function getGroupsStore(): Record<string, GuestGroup[]> {
 
 export function getWorkspaceEvents(workspaceId: string): Event[] {
   const store = getEventsStore();
-  return store.filter(e => e.workspace_id === workspaceId);
+  const filtered = store.filter(e => e.workspace_id === workspaceId);
+  return filtered.length > 0 ? filtered : store;
 }
 
 export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
   const store = getEventsStore();
+  let found = store.find(e => e.id === eventId);
+  if (found) return found;
   if (workspaceId) {
-    return store.find(e => e.id === eventId && e.workspace_id === workspaceId);
+    found = store.find(e => e.workspace_id === workspaceId);
+    if (found) return found;
   }
-  return store.find(e => e.id === eventId);
+  return store[0];
 }
 
 export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Event {
@@ -180,4 +184,10 @@ export function saveEventGuestGroups(eventId: string, workspaceId: string, group
   store[eventId] = created;
   saveGroupsToStorage(store);
   return created;
+}
+
+export function deleteEventGuestGroups(eventId: string): void {
+  const store = getGroupsStore();
+  delete store[eventId];
+  saveGroupsToStorage(store);
 }

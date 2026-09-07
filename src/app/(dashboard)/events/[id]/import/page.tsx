@@ -1,17 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { 
   FileSpreadsheet, ArrowLeft, Upload, CheckCircle2, AlertTriangle, 
-  Download, ArrowRight, Table as TableIcon, Layers, FileCheck, FileText, Sparkles
+  Download, ArrowRight, Table as TableIcon, Layers, FileCheck, FileText, Sparkles,
+  Trash2, Edit3, UserCheck, Users, RefreshCw
 } from 'lucide-react';
 import { 
   parseExcelFile, validateMappedRows, generateErrorReportExcel, generateTemplateExcel,
   RawExcelSheet, ColumnMapping, ImportValidationResult 
 } from '@/lib/excel-parser';
-import { getEventById, saveEventGuestGroups } from '@/lib/events';
+import { getEventById, saveEventGuestGroups, getEventGuestGroups, deleteEventGuestGroups } from '@/lib/events';
+import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
+import { GuestGroup } from '@/lib/supabase/types';
 import EventNavHeader from '@/components/EventNavHeader';
 
 type WizardStep = 1 | 2 | 3;
@@ -20,7 +23,21 @@ export default function ExcelImportWizardPage() {
   const router = useRouter();
   const params = useParams();
   const eventId = String(params.id || 'evt-102');
-  const currentWorkspaceId = 'ws-a-1111';
+
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
+  const [existingGroups, setExistingGroups] = useState<GuestGroup[]>([]);
+
+  useEffect(() => {
+    const session = getActiveSession();
+    const account = getAccountForSession();
+    const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+    setCurrentWorkspaceId(wsId);
+    setExistingGroups(getEventGuestGroups(eventId));
+  }, [eventId]);
+
+  const refreshGuestGroups = () => {
+    setExistingGroups(getEventGuestGroups(eventId));
+  };
 
   const event = getEventById(eventId, currentWorkspaceId);
 
@@ -72,23 +89,6 @@ export default function ExcelImportWizardPage() {
       { 'PASES O GRUPOS': 'Claudia , Jorge Matias', 'NRO DE PERSONAS': '3', 'RESPONSABLE GRUPO/PASE': 'Claudia', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 12 },
       { 'PASES O GRUPOS': 'Lapo , Gasdy', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Lapo', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 13 },
       { 'PASES O GRUPOS': 'Opal , Yovana', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Opal', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 14 },
-      { 'PASES O GRUPOS': 'Shen, Esposa', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Esposa', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 15 },
-      { 'PASES O GRUPOS': 'Tato, Gardenia', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Gardenia', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 16 },
-      { 'PASES O GRUPOS': 'Gorky , Lucy', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Gorky', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 17 },
-      { 'PASES O GRUPOS': 'Helsby, Mary', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Mary', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 18 },
-      { 'PASES O GRUPOS': 'Renan, Eli', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Eli', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 19 },
-      { 'PASES O GRUPOS': 'Melcocha, Yovana', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Yovana', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 20 },
-      { 'PASES O GRUPOS': 'Reptilio , Esposa', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Reptilio', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 21 },
-      { 'PASES O GRUPOS': 'Piolin', 'NRO DE PERSONAS': '1', 'RESPONSABLE GRUPO/PASE': 'Piolin', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 22 },
-      { 'PASES O GRUPOS': 'Lucho Jimenez y Esposa', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Lucho', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 23 },
-      { 'PASES O GRUPOS': 'Luis Rodriguez y esposa', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Luis', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 24 },
-      { 'PASES O GRUPOS': 'Papás de Jorge', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Papá de Jorge', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 25 },
-      { 'PASES O GRUPOS': 'Nacho y Esposa', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Nacho', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 26 },
-      { 'PASES O GRUPOS': 'Hermano jorge y esposa', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Hermano', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 27 },
-      { 'PASES O GRUPOS': 'Totita', 'NRO DE PERSONAS': '1', 'RESPONSABLE GRUPO/PASE': 'Totita', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 28 },
-      { 'PASES O GRUPOS': 'Hans y ñora', 'NRO DE PERSONAS': '2', 'RESPONSABLE GRUPO/PASE': 'Hans', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 29 },
-      { 'PASES O GRUPOS': 'Zancudo Percy', 'NRO DE PERSONAS': '1', 'RESPONSABLE GRUPO/PASE': 'Percy', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 30 },
-      { 'PASES O GRUPOS': 'Zinia', 'NRO DE PERSONAS': '1', 'RESPONSABLE GRUPO/PASE': 'Zinia', 'NRO DE TELÉFONO (WhatsApp)': '912345678', _rowNum: 31 },
     ];
 
     setSheets([{ sheetName: 'Hoja1', headers: demoHeaders, rows: demoRows }]);
@@ -114,10 +114,19 @@ export default function ExcelImportWizardPage() {
       setSheets(parsedSheets);
       setSelectedSheetIndex(0);
 
-      // Auto-detect columns based on Formato_ejemplo.xlsx keywords
+      // Auto-detect columns accurately matching "PASES O GRUPOS" and "NRO DE PERSONAS"
       const headers = parsedSheets[0].headers;
-      const groupCol = headers.find(h => /pases|grupos|invitado|lista/i.test(h)) || headers.find(h => /nombre/i.test(h)) || headers[0] || '';
-      const passesCol = headers.find(h => /personas|cantidad|pase|nro|num/i.test(h)) || headers[1] || '';
+      
+      const groupCol = headers.find(h => /^pases\s*o\s*grupos$/i.test(h.trim()))
+        || headers.find(h => /pases|grupos|invitado|lista/i.test(h) && !/personas|nro|cantidad/i.test(h))
+        || headers.find(h => /nombre/i.test(h))
+        || headers[0] || '';
+
+      const passesCol = headers.find(h => /^nro\s*de\s*personas$/i.test(h.trim()))
+        || headers.find(h => /nro\s*de\s*personas|personas|cantidad|pases\s*autorizados|num\s*personas/i.test(h))
+        || headers.find(h => /nro|num/i.test(h) && !/grupos|lista/i.test(h))
+        || headers[1] || '';
+
       const respCol = headers.find(h => /responsable/i.test(h)) || '';
       const phoneCol = headers.find(h => /tel[eé]fono|celular|whatsapp|phone/i.test(h)) || '';
 
@@ -172,8 +181,17 @@ export default function ExcelImportWizardPage() {
     }));
 
     saveEventGuestGroups(eventId, currentWorkspaceId, guestGroups);
+    refreshGuestGroups();
     alert(`¡Éxito! Se han importado ${validationResult.validCount} pases/grupos de invitados con ${validationResult.totalPasses} personas autorizadas totales.`);
-    router.push('/events');
+    setStep(1);
+  };
+
+  const handleClearAllGuests = () => {
+    if (confirm(`¿Estás seguro de eliminar y limpiar toda la lista de ${existingGroups.length} pases cargados para este evento? Esta acción permitirá subir un nuevo archivo Excel.`)) {
+      deleteEventGuestGroups(eventId);
+      refreshGuestGroups();
+      alert('La lista de invitados ha sido eliminada exitosamente. Puedes proceder a cargar un nuevo archivo Excel.');
+    }
   };
 
   return (
@@ -489,6 +507,83 @@ export default function ExcelImportWizardPage() {
             </div>
           </div>
         )}
+
+        {/* SECTION: CURRENTLY IMPORTED GUEST LIST TABLE WITH DELETE & EDIT ACTIONS */}
+        <div className="card-luxury p-6 border border-[#C5A059]/40 shadow-md space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-3">
+            <div>
+              <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                <Users className="w-5 h-5 text-[#B8860B]" /> Lista de Invitados Registrada Actualmente ({existingGroups.length} Pases)
+              </h3>
+              <p className="text-xs text-slate-500">
+                Total de personas autorizadas en este evento: <strong className="text-amber-900 font-bold">{existingGroups.reduce((sum, g) => sum + g.max_passes, 0)} personas</strong>.
+              </p>
+            </div>
+
+            {existingGroups.length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-1.5"
+                >
+                  <Upload className="w-3.5 h-3.5" /> Re-importar / Reemplazar Excel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleClearAllGuests}
+                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs rounded-xl border border-red-200 transition flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" /> Vaciar / Eliminar Lista
+                </button>
+              </div>
+            )}
+          </div>
+
+          {existingGroups.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-xs text-slate-500 space-y-2">
+              <FileSpreadsheet className="w-8 h-8 text-slate-400 mx-auto" />
+              <p className="font-bold text-slate-700">Aún no hay invitados importados en este evento.</p>
+              <p className="text-slate-500">Utiliza el asistente de arriba para cargar tu plantilla Excel o CSV.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto max-h-96 overflow-y-auto border border-slate-200 rounded-xl">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead className="bg-slate-100 sticky top-0 border-b border-slate-300 font-bold text-slate-700 uppercase">
+                  <tr>
+                    <th className="py-3 px-4">#</th>
+                    <th className="py-3 px-4">Pase / Grupo (Invitados)</th>
+                    <th className="py-3 px-4">Nro Personas (Pases)</th>
+                    <th className="py-3 px-4">Notas / Responsable</th>
+                    <th className="py-3 px-4">Teléfono WhatsApp</th>
+                    <th className="py-3 px-4">Estado</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {existingGroups.map((g, idx) => (
+                    <tr key={g.id || idx} className="hover:bg-amber-50/40 transition">
+                      <td className="py-2.5 px-4 font-mono text-slate-400">{idx + 1}</td>
+                      <td className="py-2.5 px-4 font-bold text-slate-900">{g.group_name}</td>
+                      <td className="py-2.5 px-4 font-extrabold text-[#B8860B]">{g.max_passes} personas</td>
+                      <td className="py-2.5 px-4 text-slate-600">{g.notes || '-'}</td>
+                      <td className="py-2.5 px-4 font-mono text-slate-500">{g.responsible_phone || '-'}</td>
+                      <td className="py-2.5 px-4 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          g.status === 'COMPLETO' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                          g.status === 'PARCIAL' ? 'bg-amber-100 text-amber-800 border-amber-300' :
+                          'bg-slate-100 text-slate-700 border-slate-300'
+                        }`}>
+                          {g.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );

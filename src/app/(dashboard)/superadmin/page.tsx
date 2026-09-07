@@ -7,13 +7,14 @@ import {
   ShieldCheck, Plus, Calendar, Clock, Mail, Phone, Lock, 
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
   Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles,
-  Copy, Check, Send, ExternalLink, Eye, Info, MessageSquare, Search, Filter
+  Copy, Check, Send, ExternalLink, Eye, EyeOff, Info, MessageSquare, Search, Filter
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
   triggerPasswordReset, calculateRemainingDays, extendAdminContract, 
   AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL, sendClientWelcomeEmail,
-  setSuperAdminPassword, verifySuperAdminPassword 
+  setSuperAdminPassword, verifySuperAdminPassword,
+  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
@@ -33,6 +34,18 @@ export default function SuperAdminPage() {
   const [superNewPass, setSuperNewPass] = useState('');
   const [superConfirmPass, setSuperConfirmPass] = useState('');
   const [superPassMsg, setSuperPassMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Eye Icon States for Password Visibility
+  const [showCurrentPassEye, setShowCurrentPassEye] = useState(false);
+  const [showNewPassEye, setShowNewPassEye] = useState(false);
+  const [showConfirmPassEye, setShowConfirmPassEye] = useState(false);
+
+  // 2FA Email PIN Verification States for Superadmin Pass Change
+  const [super2FAStep, setSuper2FAStep] = useState(false);
+  const [super2FAPinInput, setSuper2FAPinInput] = useState('');
+  const [super2FAToken, setSuper2FAToken] = useState<string | undefined>(undefined);
+  const [super2FATimestamp, setSuper2FATimestamp] = useState<number | undefined>(undefined);
+  const [isSending2FAPin, setIsSending2FAPin] = useState(false);
 
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
@@ -86,7 +99,7 @@ export default function SuperAdminPage() {
     setAccounts(getAllAdminAccounts());
   };
 
-  const handleSuperPassSubmit = (e: React.FormEvent) => {
+  const handleStartSuperPass2FA = async (e: React.FormEvent) => {
     e.preventDefault();
     setSuperPassMsg(null);
 
@@ -106,15 +119,45 @@ export default function SuperAdminPage() {
       return;
     }
 
+    // Step 1 Passed: Trigger 2FA PIN dispatch to tech.innova.reg@gmail.com
+    setIsSending2FAPin(true);
+    const pinRes = await generateAndSendSuperAdmin2FAPin();
+    setIsSending2FAPin(false);
+
+    setSuper2FAToken(pinRes.token);
+    setSuper2FATimestamp(pinRes.timestamp);
+    setSuper2FAStep(true);
+    setSuperPassMsg({ type: 'success', text: '✉️ Se ha despachado un código PIN de 4 dígitos a tech.innova.reg@gmail.com. Ingrésalo a continuación para autorizar el cambio.' });
+  };
+
+  const handleConfirmSuperPassChangeWith2FA = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuperPassMsg(null);
+
+    if (!super2FAPinInput || super2FAPinInput.trim().length < 4) {
+      setSuperPassMsg({ type: 'error', text: 'Ingrese el código PIN de 4 dígitos recibido en su correo.' });
+      return;
+    }
+
+    const isValid = await verifySuperAdmin2FAPin(super2FAPinInput, super2FAToken, super2FATimestamp);
+    if (!isValid) {
+      setSuperPassMsg({ type: 'error', text: 'Código PIN 2FA incorrecto o expirado. Revisa tu correo tech.innova.reg@gmail.com.' });
+      return;
+    }
+
+    // 2FA Validated -> Persist new Superadmin Password
     setSuperAdminPassword(superNewPass);
     setSuperCurrentPass('');
     setSuperNewPass('');
     setSuperConfirmPass('');
-    setSuperPassMsg({ type: 'success', text: '¡Contraseña de Superadmin actualizada exitosamente!' });
+    setSuper2FAPinInput('');
+    setSuper2FAStep(false);
+    setSuperPassMsg({ type: 'success', text: '🎉 ¡Contraseña de Superadmin actualizada y verificada con 2FA exitosamente!' });
+
     setTimeout(() => {
       setShowSuperPassModal(false);
       setSuperPassMsg(null);
-    }, 2000);
+    }, 2500);
   };
 
   const filteredAccounts = accounts.filter((acc) => {
@@ -1011,69 +1054,156 @@ export default function SuperAdminPage() {
               </div>
             )}
 
-            <form onSubmit={handleSuperPassSubmit} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Contraseña Actual de Superadmin
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={superCurrentPass}
-                  onChange={(e) => setSuperCurrentPass(e.target.value)}
-                  placeholder="••••••••••••"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
-                />
-              </div>
+            {!super2FAStep ? (
+              /* STEP 1: ENTER PASSWORDS WITH EYE TOGGLE ICONS */
+              <form onSubmit={handleStartSuperPass2FA} className="space-y-4 text-xs">
+                {/* Current Password Field */}
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Contraseña Actual de Superadmin
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showCurrentPassEye ? 'text' : 'password'}
+                      required
+                      value={superCurrentPass}
+                      onChange={(e) => setSuperCurrentPass(e.target.value)}
+                      placeholder="••••••••••••"
+                      className="w-full pl-3 pr-10 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassEye(!showCurrentPassEye)}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      {showCurrentPassEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Nueva Contraseña Privada
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={superNewPass}
-                  onChange={(e) => setSuperNewPass(e.target.value)}
-                  placeholder="Mínimo 8 caracteres"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
-                />
-              </div>
+                {/* New Password Field */}
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Nueva Contraseña Privada
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showNewPassEye ? 'text' : 'password'}
+                      required
+                      value={superNewPass}
+                      onChange={(e) => setSuperNewPass(e.target.value)}
+                      placeholder="Mínimo 8 caracteres"
+                      className="w-full pl-3 pr-10 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassEye(!showNewPassEye)}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      {showNewPassEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Confirmar Nueva Contraseña
-                </label>
-                <input
-                  type="password"
-                  required
-                  value={superConfirmPass}
-                  onChange={(e) => setSuperConfirmPass(e.target.value)}
-                  placeholder="Repite la contraseña"
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
-                />
-              </div>
+                {/* Confirm New Password Field */}
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Confirmar Nueva Contraseña
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showConfirmPassEye ? 'text' : 'password'}
+                      required
+                      value={superConfirmPass}
+                      onChange={(e) => setSuperConfirmPass(e.target.value)}
+                      placeholder="Repite la contraseña"
+                      className="w-full pl-3 pr-10 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassEye(!showConfirmPassEye)}
+                      className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                    >
+                      {showConfirmPassEye ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSuperPassModal(false);
-                    setSuperPassMsg(null);
-                  }}
-                  className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  style={{ backgroundColor: '#DBBB6E' }}
-                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
-                >
-                  Guardar Clave Superadmin
-                </button>
-              </div>
-            </form>
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowSuperPassModal(false);
+                      setSuperPassMsg(null);
+                    }}
+                    className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSending2FAPin}
+                    style={{ backgroundColor: '#DBBB6E' }}
+                    className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110 flex items-center justify-center gap-2"
+                  >
+                    {isSending2FAPin ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" /> Enviando PIN...
+                      </>
+                    ) : (
+                      'Continuar a 2FA'
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* STEP 2: 2FA EMAIL PIN VERIFICATION */
+              <form onSubmit={handleConfirmSuperPassChangeWith2FA} className="space-y-4 text-xs">
+                <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 space-y-1">
+                  <strong className="font-bold block text-amber-950 flex items-center gap-1.5">
+                    <KeyRound className="w-4 h-4 text-[#B8860B]" /> Verificación 2FA Requerida
+                  </strong>
+                  <p className="text-[11px] text-amber-800">
+                    Se envió un código PIN de 4 dígitos a <code className="font-mono font-bold">tech.innova.reg@gmail.com</code> para autorizar la actualización de contraseña.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Código PIN de 4 Dígitos
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={4}
+                    value={super2FAPinInput}
+                    onChange={(e) => setSuper2FAPinInput(e.target.value.replace(/[^0-9]/g, ''))}
+                    placeholder="1234"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-center text-xl font-mono tracking-widest font-extrabold focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSuper2FAStep(false);
+                      setSuperPassMsg(null);
+                    }}
+                    className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                  >
+                    Atrás
+                  </button>
+                  <button
+                    type="submit"
+                    style={{ backgroundColor: '#DBBB6E' }}
+                    className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
+                  >
+                    Verificar y Guardar
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
