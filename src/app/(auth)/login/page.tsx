@@ -8,7 +8,8 @@ import { ShieldCheck, Lock, Mail, ArrowRight, CheckSquare, KeyRound, AlertTriang
 import { createClient } from '@/lib/supabase/client';
 import { 
   setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice,
-  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts 
+  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts,
+  verifySuperAdminPassword 
 } from '@/lib/superadmin-store';
 import { authenticateWorkspaceMember } from '@/lib/workspace-users';
 
@@ -51,6 +52,13 @@ export default function LoginPage() {
 
     // Mandatory Super Admin Check: ONLY tech.innova.reg@gmail.com can access Super Admin
     if (inputEmail === SUPER_ADMIN_EMAIL.toLowerCase()) {
+      const isPassValid = verifySuperAdminPassword(password);
+      if (!isPassValid) {
+        setErrorMsg('Contraseña de Superadmin incorrecta. Verifique sus datos o contacte con soporte.');
+        setLoading(false);
+        return;
+      }
+
       if (isDeviceRemembered()) {
         setActiveSession({
           user: {

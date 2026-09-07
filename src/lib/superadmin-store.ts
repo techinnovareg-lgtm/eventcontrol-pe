@@ -123,6 +123,35 @@ let currentSession: AuthSession | null = null;
 
 export const SUPER_ADMIN_EMAIL = 'tech.innova.reg@gmail.com';
 
+const SUPER_ADMIN_PASS_KEY = 'eventcontrol_superadmin_password';
+
+export function getSuperAdminPassword(): string {
+  if (typeof window !== 'undefined') {
+    try {
+      const saved = localStorage.getItem(SUPER_ADMIN_PASS_KEY);
+      if (saved) return saved;
+    } catch (err) {}
+  }
+  return 'EventControl2026!';
+}
+
+export function setSuperAdminPassword(newPassword: string): void {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(SUPER_ADMIN_PASS_KEY, newPassword.trim());
+    } catch (err) {}
+  }
+}
+
+export function verifySuperAdminPassword(passwordInput: string): boolean {
+  const currentPass = getSuperAdminPassword();
+  const trimmed = passwordInput.trim();
+  if (currentPass.toLowerCase() === 'eventcontrol2026!' && trimmed.toLowerCase() === 'eventcontrol2026!') {
+    return true;
+  }
+  return currentPass === trimmed;
+}
+
 export async function generateAndSendSuperAdmin2FAPin(): Promise<{ sentTo: string; token?: string; timestamp?: number }> {
   try {
     const res = await fetch('/api/auth/send-superadmin-pin', { method: 'POST' });

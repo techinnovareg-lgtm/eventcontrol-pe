@@ -7,12 +7,13 @@ import {
   ShieldCheck, Plus, Calendar, Clock, Mail, Phone, Lock, 
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
   Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles,
-  Copy, Check, Send, ExternalLink, Eye, Info, MessageSquare
+  Copy, Check, Send, ExternalLink, Eye, Info, MessageSquare, Search, Filter
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
   triggerPasswordReset, calculateRemainingDays, extendAdminContract, 
-  AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL, sendClientWelcomeEmail 
+  AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL, sendClientWelcomeEmail,
+  setSuperAdminPassword, verifySuperAdminPassword 
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
@@ -26,6 +27,18 @@ export default function SuperAdminPage() {
   const [extendingAccount, setExtendingAccount] = useState<AdminAccount | null>(null);
   const [viewingCredentialsAccount, setViewingCredentialsAccount] = useState<AdminAccount | null>(null);
   
+  // Superadmin Password Change Modal State
+  const [showSuperPassModal, setShowSuperPassModal] = useState(false);
+  const [superCurrentPass, setSuperCurrentPass] = useState('');
+  const [superNewPass, setSuperNewPass] = useState('');
+  const [superConfirmPass, setSuperConfirmPass] = useState('');
+  const [superPassMsg, setSuperPassMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Filters State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVA' | 'EXPIRING_SOON' | 'VENCIDA'>('ALL');
+  const [planFilter, setPlanFilter] = useState<'ALL' | PlanCode>('ALL');
+
   // Notice & Feedback States
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [noticeMessage, setNoticeMessage] = useState<string | null>(null);
@@ -72,6 +85,56 @@ export default function SuperAdminPage() {
   const refreshList = () => {
     setAccounts(getAllAdminAccounts());
   };
+
+  const handleSuperPassSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSuperPassMsg(null);
+
+    const isCurrentValid = verifySuperAdminPassword(superCurrentPass);
+    if (!isCurrentValid) {
+      setSuperPassMsg({ type: 'error', text: 'La contraseña actual ingresada es incorrecta.' });
+      return;
+    }
+
+    if (!superNewPass || superNewPass.trim().length < 8) {
+      setSuperPassMsg({ type: 'error', text: 'La nueva contraseña debe tener al menos 8 caracteres.' });
+      return;
+    }
+
+    if (superNewPass !== superConfirmPass) {
+      setSuperPassMsg({ type: 'error', text: 'Las nuevas contraseñas no coinciden.' });
+      return;
+    }
+
+    setSuperAdminPassword(superNewPass);
+    setSuperCurrentPass('');
+    setSuperNewPass('');
+    setSuperConfirmPass('');
+    setSuperPassMsg({ type: 'success', text: '¡Contraseña de Superadmin actualizada exitosamente!' });
+    setTimeout(() => {
+      setShowSuperPassModal(false);
+      setSuperPassMsg(null);
+    }, 2000);
+  };
+
+  const filteredAccounts = accounts.filter((acc) => {
+    const term = searchTerm.trim().toLowerCase();
+    if (term) {
+      const matchCompany = acc.companyName.toLowerCase().includes(term);
+      const matchAdmin = acc.adminName.toLowerCase().includes(term);
+      const matchEmail = acc.contactEmail.toLowerCase().includes(term);
+      if (!matchCompany && !matchAdmin && !matchEmail) return false;
+    }
+
+    const remDays = calculateRemainingDays(acc.contractEndDate);
+    if (statusFilter === 'ACTIVA' && acc.status !== 'ACTIVA') return false;
+    if (statusFilter === 'EXPIRING_SOON' && (remDays > 7 || acc.status === 'VENCIDA')) return false;
+    if (statusFilter === 'VENCIDA' && acc.status === 'ACTIVA') return false;
+
+    if (planFilter !== 'ALL' && acc.planCode !== planFilter) return false;
+
+    return true;
+  });
 
   const handleCopyText = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -216,7 +279,7 @@ export default function SuperAdminPage() {
             </div>
           </div>
 
-          {/* Superadmin Active Profile */}
+          {/* Superadmin Active Profile & Password Action */}
           <div className="flex items-center gap-3 shrink-0">
             <div className="flex items-center gap-3 bg-slate-800/80 px-4 h-11 rounded-xl border border-[#C5A059]/40 shadow-inner">
               <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#DBBB6E] to-[#B8860B] flex items-center justify-center text-white font-bold text-xs shadow-sm border border-amber-200">
@@ -227,6 +290,15 @@ export default function SuperAdminPage() {
                 <span className="text-[10px] text-slate-300 font-mono block">tech.innova.reg@gmail.com</span>
               </div>
             </div>
+
+            <button
+              onClick={() => setShowSuperPassModal(true)}
+              className="h-11 px-3.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs rounded-xl border border-amber-400/40 transition flex items-center gap-1.5 shadow-sm"
+              title="Cambiar Contraseña de Superadmin"
+            >
+              <Lock className="w-4 h-4 text-[#DBBB6E]" />
+              <span className="hidden sm:inline">Cambiar Clave Superadmin</span>
+            </button>
 
             <Link 
               href="/login" 
@@ -267,25 +339,40 @@ export default function SuperAdminPage() {
           </button>
         </div>
 
-        {/* Executive KPI Summary Cards */}
+        {/* Executive KPI Summary Cards with Interactive Filter Triggers */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-center">
-          <div className="card-luxury p-5 border border-[#C5A059]/30">
+          <div 
+            onClick={() => { setStatusFilter('ALL'); setPlanFilter('ALL'); setSearchTerm(''); }}
+            className={`card-luxury p-5 border cursor-pointer transition hover-lift ${statusFilter === 'ALL' && planFilter === 'ALL' && !searchTerm ? 'border-[#C5A059] bg-amber-50/60 ring-2 ring-[#C5A059]/40' : 'border-[#C5A059]/30'}`}
+          >
             <span className="text-xs text-slate-500 uppercase font-semibold block">Cuentas Administradoras</span>
             <strong className="text-3xl font-serif font-bold text-[#1A1A1A] mt-1 block">{accounts.length}</strong>
           </div>
-          <div className="card-luxury p-5 border border-emerald-200 bg-emerald-50/50">
+
+          <div 
+            onClick={() => setStatusFilter('ACTIVA')}
+            className={`card-luxury p-5 border cursor-pointer transition hover-lift ${statusFilter === 'ACTIVA' ? 'border-emerald-500 bg-emerald-100/70 ring-2 ring-emerald-400' : 'border-emerald-200 bg-emerald-50/50'}`}
+          >
             <span className="text-xs text-emerald-800 uppercase font-semibold block">Cuentas Activas</span>
             <strong className="text-3xl font-serif font-bold text-emerald-700 mt-1 block">
               {accounts.filter(a => a.status === 'ACTIVA').length}
             </strong>
           </div>
-          <div className="card-luxury p-5 border border-amber-200 bg-amber-50/50">
+
+          <div 
+            onClick={() => setStatusFilter('EXPIRING_SOON')}
+            className={`card-luxury p-5 border cursor-pointer transition hover-lift ${statusFilter === 'EXPIRING_SOON' ? 'border-amber-500 bg-amber-100/80 ring-2 ring-amber-400' : 'border-amber-200 bg-amber-50/50'}`}
+          >
             <span className="text-xs text-amber-800 uppercase font-semibold block">Próximos a Vencer (&lt; 7 días)</span>
             <strong className="text-3xl font-serif font-bold text-amber-700 mt-1 block">
               {accounts.filter(a => calculateRemainingDays(a.contractEndDate) <= 7).length}
             </strong>
           </div>
-          <div className="card-luxury p-5 border border-purple-200 bg-purple-50/50">
+
+          <div 
+            onClick={() => { setPlanFilter('ALL'); setStatusFilter('ALL'); }}
+            className="card-luxury p-5 border border-purple-200 bg-purple-50/50 cursor-pointer transition hover-lift"
+          >
             <span className="text-xs text-purple-900 uppercase font-semibold block">Planes Professional / Business</span>
             <strong className="text-3xl font-serif font-bold text-purple-800 mt-1 block">
               {accounts.filter(a => a.planCode !== 'STARTER').length}
@@ -293,35 +380,92 @@ export default function SuperAdminPage() {
           </div>
         </div>
 
+        {/* INTERACTIVE FILTERS BAR */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-200 text-xs">
+          {/* Search Input */}
+          <div className="relative">
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Buscar por Empresa, Administrador o Correo..."
+              className="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#C5A059] focus:outline-none text-slate-800 font-medium"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+          </div>
+
+          {/* Status Filter */}
+          <div className="flex items-center gap-2">
+            <label className="font-bold text-slate-600 shrink-0 uppercase tracking-wider text-[11px]">Estado:</label>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as any)}
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-semibold text-slate-800"
+            >
+              <option value="ALL">Todas las Cuentas ({accounts.length})</option>
+              <option value="ACTIVA">Cuentas Activas</option>
+              <option value="EXPIRING_SOON">⚠️ Próximos a Vencer (&lt;= 7 días)</option>
+              <option value="VENCIDA">Vencidas / Suspendidas</option>
+            </select>
+          </div>
+
+          {/* Plan Filter */}
+          <div className="flex items-center gap-2">
+            <label className="font-bold text-slate-600 shrink-0 uppercase tracking-wider text-[11px]">Plan:</label>
+            <select
+              value={planFilter}
+              onChange={(e) => setPlanFilter(e.target.value as any)}
+              className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-semibold text-slate-800"
+            >
+              <option value="ALL">Todos los Planes</option>
+              <option value="STARTER">Plan Starter (S/29.99)</option>
+              <option value="PROFESSIONAL">Plan Professional (S/59.99)</option>
+              <option value="BUSINESS">Plan Business (S/99.99)</option>
+            </select>
+          </div>
+        </div>
+
         {/* Managed Client Accounts List */}
         <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
-              <Building className="w-5 h-5 text-[#B8860B]" /> Cuentas Administradoras de Eventos ({accounts.length})
+              <Building className="w-5 h-5 text-[#B8860B]" /> Cuentas Administradoras ({filteredAccounts.length} de {accounts.length})
             </h3>
-            <span className="text-xs text-slate-500 font-medium">Visualización de credenciales y envío de correos activos</span>
+            <span className="text-xs text-slate-500 font-medium">Filtros activos aplicados</span>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
-                  <th className="py-3.5 px-4">Empresa / Planner</th>
-                  <th className="py-3.5 px-4">Administrador & Correo</th>
-                  <th className="py-3.5 px-4">Plan Contratado</th>
-                  <th className="py-3.5 px-4">Vencimiento & Días</th>
-                  <th className="py-3.5 px-4">Estado</th>
-                  <th className="py-3.5 px-4 text-right">Acciones de Cuenta</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {accounts.map((acc) => {
-                  const remDays = calculateRemainingDays(acc.contractEndDate);
-                  const plan = PLAN_LIMITS[acc.planCode];
-                  const isNearExpiration = remDays <= 7;
+          {filteredAccounts.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-xs text-slate-500 space-y-2">
+              <Filter className="w-6 h-6 text-slate-400 mx-auto" />
+              <p className="font-bold text-slate-700">No se encontraron cuentas con los filtros seleccionados.</p>
+              <button 
+                onClick={() => { setSearchTerm(''); setStatusFilter('ALL'); setPlanFilter('ALL'); }}
+                className="text-[#B8860B] font-bold underline"
+              >
+                Limpiar Filtros
+              </button>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
+                    <th className="py-3.5 px-4">Empresa / Planner</th>
+                    <th className="py-3.5 px-4">Administrador & Correo</th>
+                    <th className="py-3.5 px-4">Plan Contratado</th>
+                    <th className="py-3.5 px-4">Vencimiento & Días</th>
+                    <th className="py-3.5 px-4">Estado</th>
+                    <th className="py-3.5 px-4 text-right">Acciones de Cuenta</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {filteredAccounts.map((acc) => {
+                    const remDays = calculateRemainingDays(acc.contractEndDate);
+                    const plan = PLAN_LIMITS[acc.planCode];
+                    const isNearExpiration = remDays <= 7;
 
-                  return (
-                    <tr key={acc.id} className={`hover:bg-amber-50/40 transition ${isNearExpiration ? 'bg-amber-50/70' : ''}`}>
+                    return (
+                      <tr key={acc.id} className={`hover:bg-amber-50/40 transition ${isNearExpiration ? 'bg-amber-50/70' : ''}`}>
                       
                       {/* Empresa / Planner */}
                       <td className="py-3.5 px-4">
@@ -414,8 +558,9 @@ export default function SuperAdminPage() {
               </tbody>
             </table>
           </div>
-        </div>
-      </main>
+        )}
+      </div>
+    </main>
 
       {/* MODAL: POST-CREATION NOTICE & EMAIL / WHATSAPP STATUS FEEDBACK */}
       {createdNoticeModal && (
@@ -837,6 +982,95 @@ export default function SuperAdminPage() {
                   className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
                 >
                   Guardar Todos los Atributos
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CAMBIAR CONTRASEÑA DE SUPERADMIN */}
+      {showSuperPassModal && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+          <div className="max-w-md w-full card-luxury p-6 shadow-2xl border-2 border-[#C5A059] space-y-4 bg-white">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <h3 className="text-xl font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                <Lock className="w-5 h-5 text-[#B8860B]" /> Cambiar Contraseña de Superadmin
+              </h3>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Actualiza la clave privada del Super Administrador (<strong className="text-slate-900 font-mono">tech.innova.reg@gmail.com</strong>).
+            </p>
+
+            {superPassMsg && (
+              <div className={`p-3 text-xs rounded-xl border ${
+                superPassMsg.type === 'success' ? 'bg-emerald-50 text-emerald-900 border-emerald-300' : 'bg-red-50 text-red-900 border-red-300'
+              }`}>
+                {superPassMsg.text}
+              </div>
+            )}
+
+            <form onSubmit={handleSuperPassSubmit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Contraseña Actual de Superadmin
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={superCurrentPass}
+                  onChange={(e) => setSuperCurrentPass(e.target.value)}
+                  placeholder="••••••••••••"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nueva Contraseña Privada
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={superNewPass}
+                  onChange={(e) => setSuperNewPass(e.target.value)}
+                  placeholder="Mínimo 8 caracteres"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Confirmar Nueva Contraseña
+                </label>
+                <input
+                  type="password"
+                  required
+                  value={superConfirmPass}
+                  onChange={(e) => setSuperConfirmPass(e.target.value)}
+                  placeholder="Repite la contraseña"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-sm focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuperPassModal(false);
+                    setSuperPassMsg(null);
+                  }}
+                  className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{ backgroundColor: '#DBBB6E' }}
+                  className="w-1/2 py-2.5 text-white font-bold rounded-xl shadow-md hover:brightness-110"
+                >
+                  Guardar Clave Superadmin
                 </button>
               </div>
             </form>
