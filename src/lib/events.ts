@@ -90,6 +90,28 @@ export function getWorkspaceEvents(workspaceId: string): Event[] {
   return store.filter(e => e.workspace_id === workspaceId);
 }
 
+export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
+  const local = getWorkspaceEvents(workspaceId);
+  if (local.length > 0) return local;
+
+  try {
+    const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.events) && data.events.length > 0) {
+        const store = getEventsStore();
+        const merged = [...data.events, ...store.filter(e => !data.events.some((de: Event) => de.id === e.id))];
+        saveEventsToStorage(merged);
+        return merged.filter((e: Event) => e.workspace_id === workspaceId);
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync Events API Query Warning]', err);
+  }
+
+  return local;
+}
+
 export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
   const store = getEventsStore();
   let found = store.find(e => e.id === eventId);
@@ -98,6 +120,41 @@ export function getEventById(eventId: string, workspaceId?: string): Event | und
     found = store.find(e => e.workspace_id === workspaceId);
     if (found) return found;
   }
+  return undefined;
+}
+
+export async function getEventByIdAsync(eventId: string, workspaceId?: string): Promise<Event | undefined> {
+  const local = getEventById(eventId, workspaceId);
+  if (local) return local;
+
+  try {
+    const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.event) {
+        const store = getEventsStore();
+        const idx = store.findIndex(e => e.id === data.event.id);
+        if (idx !== -1) {
+          store[idx] = data.event;
+        } else {
+          store.unshift(data.event);
+        }
+        saveEventsToStorage(store);
+
+        // Also save fetched groups if present
+        if (Array.isArray(data.groups) && data.groups.length > 0) {
+          const gStore = getGroupsStore();
+          gStore[eventId] = data.groups;
+          saveGroupsToStorage(gStore);
+        }
+
+        return data.event;
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync EventById API Query Warning]', err);
+  }
+
   return undefined;
 }
 
@@ -111,6 +168,15 @@ export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'
   };
   const updated = [newEvt, ...store];
   saveEventsToStorage(updated);
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SYNC_EVENT', event: newEvt }),
+    }).catch(err => console.warn('[Sync Event API dispatch warning]', err));
+  }
+
   return newEvt;
 }
 
@@ -120,6 +186,14 @@ export function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'c
   if (evt) {
     Object.assign(evt, data, { updated_at: new Date().toISOString() });
     saveEventsToStorage(store);
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+      }).catch(err => console.warn('[Sync Event API dispatch warning]', err));
+    }
   }
   return evt;
 }
@@ -138,6 +212,28 @@ export function getEventGuestGroups(eventId: string): GuestGroup[] {
   return store[eventId] || [];
 }
 
+export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGroup[]> {
+  const local = getEventGuestGroups(eventId);
+  if (local.length > 0) return local;
+
+  try {
+    const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.groups) && data.groups.length > 0) {
+        const store = getGroupsStore();
+        store[eventId] = data.groups;
+        saveGroupsToStorage(store);
+        return data.groups;
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync GuestGroups API Query Warning]', err);
+  }
+
+  return local;
+}
+
 export function saveEventGuestGroups(eventId: string, workspaceId: string, groups: Omit<GuestGroup, 'id' | 'created_at' | 'updated_at'>[]): GuestGroup[] {
   const store = getGroupsStore();
   const created: GuestGroup[] = groups.map((g, idx) => ({
@@ -149,6 +245,15 @@ export function saveEventGuestGroups(eventId: string, workspaceId: string, group
 
   store[eventId] = created;
   saveGroupsToStorage(store);
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: created }),
+    }).catch(err => console.warn('[Sync Groups API dispatch warning]', err));
+  }
+
   return created;
 }
 

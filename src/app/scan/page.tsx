@@ -14,7 +14,10 @@ import {
   downloadEventOfflineManifest, executeOfflineCheckIn, 
   syncOfflineQueueToServer, getPendingOfflineQueueCount 
 } from '@/lib/offline-db';
-import { getEventGuestGroups, getWorkspaceEvents, getEventById } from '@/lib/events';
+import { 
+  getEventGuestGroups, getWorkspaceEvents, getEventById,
+  getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync 
+} from '@/lib/events';
 import { getEventTableAssignments, getEventTables } from '@/lib/tables';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { GuestGroup, Event } from '@/lib/supabase/types';
@@ -30,48 +33,64 @@ export default function MobileScanCheckInPage() {
   const [selectedEventId, setSelectedEventId] = useState<string>(session?.user?.eventId || '');
 
   useEffect(() => {
-    let events = getWorkspaceEvents(currentWorkspaceId);
-    const operatorEventId = session?.user?.eventId;
+    let isMounted = true;
 
-    if (isOperator && operatorEventId) {
-      const opEvt = getEventById(operatorEventId);
-      if (opEvt) {
-        events = [opEvt];
+    async function loadEventsAsync() {
+      const operatorEventId = session?.user?.eventId;
+      let events: Event[] = [];
+
+      if (isOperator && operatorEventId) {
+        const opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
+        if (opEvt) {
+          events = [opEvt];
+        }
+      }
+
+      if (events.length === 0) {
+        events = await getWorkspaceEventsAsync(currentWorkspaceId);
+      }
+
+      if (!isMounted) return;
+      setWorkspaceEvents(events);
+
+      // Check URL params for event or token
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const urlEvt = params.get('event');
+        const urlToken = params.get('token');
+
+        if (urlEvt) {
+          setSelectedEventId(urlEvt);
+        } else if (isOperator && operatorEventId) {
+          setSelectedEventId(operatorEventId);
+        } else if (events.length > 0) {
+          setSelectedEventId(events[0].id);
+        }
+
+        if (urlToken) {
+          setScannedInput(urlToken);
+        }
       }
     }
 
-    setWorkspaceEvents(events);
-    
-    // Check URL params for event or token
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const urlEvt = params.get('event');
-      const urlToken = params.get('token');
+    loadEventsAsync();
 
-      if (urlEvt) {
-        setSelectedEventId(urlEvt);
-      } else if (isOperator && operatorEventId) {
-        setSelectedEventId(operatorEventId);
-      } else if (events.length > 0) {
-        setSelectedEventId(events[0].id);
-      }
-
-      if (urlToken) {
-        setScannedInput(urlToken);
-      }
-    }
+    return () => {
+      isMounted = false;
+    };
   }, [currentWorkspaceId, isOperator, session?.user?.eventId]);
 
-  const activeEvent = getEventById(selectedEventId, currentWorkspaceId);
+  const activeEvent = getEventById(selectedEventId, currentWorkspaceId) || workspaceEvents.find(e => e.id === selectedEventId);
 
   // Dynamic Event Data
   const [groups, setGroups] = useState<GuestGroup[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [tables, setTables] = useState<any[]>([]);
 
-  const reloadEventData = () => {
+  const reloadEventData = async () => {
     if (!selectedEventId) return;
-    setGroups(getEventGuestGroups(selectedEventId));
+    const guestList = await getEventGuestGroupsAsync(selectedEventId);
+    setGroups(guestList);
     setAssignments(getEventTableAssignments(selectedEventId));
     setTables(getEventTables(selectedEventId));
   };
