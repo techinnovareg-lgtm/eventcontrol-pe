@@ -116,7 +116,14 @@ export default function LoginPage() {
 
       // Verify password strictly against registered account password
       const expectedPassword = matchedAccount.initialPassword || 'EventControl2026!';
-      if (password.trim() !== expectedPassword) {
+      const inputPass = password.trim();
+      const isDefaultInitial = expectedPassword.toLowerCase() === 'eventcontrol2026!';
+      
+      const isMatch = isDefaultInitial 
+        ? inputPass.toLowerCase() === 'eventcontrol2026!'
+        : inputPass === expectedPassword;
+
+      if (!isMatch) {
         setErrorMsg('Contraseña incorrecta. Verifique sus credenciales e intente nuevamente.');
         setLoading(false);
         return;

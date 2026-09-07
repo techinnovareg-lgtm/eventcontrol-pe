@@ -51,12 +51,24 @@ export default function AccountProfilePage() {
 
   const handleChangePassword = (e: React.FormEvent) => {
     e.preventDefault();
+    const currentPass = currentPassword.trim();
+    const expectedPass = contractInfo.initialPassword || 'EventControl2026!';
+    const isDefaultInitial = expectedPass.toLowerCase() === 'eventcontrol2026!';
+    const isCurrentValid = isDefaultInitial
+      ? currentPass.toLowerCase() === 'eventcontrol2026!'
+      : currentPass === expectedPass;
+
+    if (!isCurrentValid) {
+      setPasswordMsg({ type: 'error', text: 'La contraseña actual ingresada es incorrecta.' });
+      return;
+    }
+
     if (!newPassword || newPassword.length < 6) {
-      setPasswordMsg({ type: 'error', text: 'La contraseña debe tener al menos 6 caracteres.' });
+      setPasswordMsg({ type: 'error', text: 'La contraseña nueva debe tener al menos 6 caracteres.' });
       return;
     }
     if (newPassword !== confirmPassword) {
-      setPasswordMsg({ type: 'error', text: 'Las contraseñas no coinciden.' });
+      setPasswordMsg({ type: 'error', text: 'Las nuevas contraseñas no coinciden.' });
       return;
     }
 

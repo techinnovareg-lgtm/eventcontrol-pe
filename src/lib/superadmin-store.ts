@@ -364,11 +364,12 @@ export function triggerPasswordReset(accountId: string): { success: boolean; mes
   const acc = store.find(a => a.id === accountId);
   if (!acc) return { success: false, message: 'Cuenta no encontrada.' };
 
+  acc.initialPassword = 'EventControl2026!';
   acc.mustChangePassword = true;
   saveAccountsToStorage(store);
   return {
     success: true,
-    message: `Se ha enviado un enlace de restablecimiento al correo ${acc.contactEmail}. El cliente definirá su clave privada en su próximo ingreso.`,
+    message: `¡Contraseña restablecida exitosamente a "Eventcontrol2026!" para ${acc.contactEmail}.`,
   };
 }
 
@@ -404,21 +405,23 @@ export function setActiveSession(session: AuthSession | null): void {
 }
 
 /**
- * Change Current User Password
+ * Change Current User Password Privately
  */
 export function changeUserPassword(userId: string, newPassword: string): { success: boolean; message: string } {
   const store = getAdminAccountsStore();
-  const acc = store.find(a => a.id === userId);
+  const sessionEmail = currentSession?.user?.email?.toLowerCase();
+  const acc = store.find(a => a.id === userId || (sessionEmail && a.contactEmail.toLowerCase() === sessionEmail));
   if (acc) {
     acc.mustChangePassword = false;
+    acc.initialPassword = newPassword.trim();
     acc.passwordHashMasked = '••••••••••••';
     saveAccountsToStorage(store);
   }
-  if (currentSession && currentSession.user.id === userId) {
+  if (currentSession) {
     currentSession.user.mustChangePassword = false;
   }
   return {
     success: true,
-    message: '¡Tu contraseña ha sido actualizada con éxito!',
+    message: '¡Tu contraseña privada ha sido actualizada con éxito!',
   };
 }
