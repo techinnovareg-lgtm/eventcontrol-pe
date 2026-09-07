@@ -69,14 +69,12 @@ export async function GET(req: Request) {
     const found = globalServerMembersStore.find(m => {
       const emailClean = (m.email || '').trim().toLowerCase();
       const nameClean = (m.name || '').trim().toLowerCase();
-      const userPartClean = emailClean.includes('@') ? emailClean.split('@')[0] : emailClean;
 
-      const isMatch = emailClean === cleanedInput || nameClean === cleanedInput || userPartClean === cleanedInput;
+      const isMatch = emailClean === cleanedInput || nameClean === cleanedInput;
       if (!isMatch || m.status !== 'ACTIVO') return false;
 
       const expectedPass = (m.initialPassword || 'puerta2026').trim();
-      if (expectedPass.toLowerCase() === 'puerta2026' && trimmedPass.toLowerCase() === 'puerta2026') return true;
-      return expectedPass === trimmedPass;
+      return expectedPass === trimmedPass || expectedPass.toLowerCase() === trimmedPass.toLowerCase();
     });
 
     if (found) {

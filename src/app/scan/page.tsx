@@ -27,7 +27,7 @@ export default function MobileScanCheckInPage() {
 
   // Workspace Events
   const [workspaceEvents, setWorkspaceEvents] = useState<Event[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState<string>('evt-102');
+  const [selectedEventId, setSelectedEventId] = useState<string>(session?.user?.eventId || '');
 
   useEffect(() => {
     const events = getWorkspaceEvents(currentWorkspaceId);

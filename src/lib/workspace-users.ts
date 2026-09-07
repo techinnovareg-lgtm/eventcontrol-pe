@@ -232,17 +232,14 @@ export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: 
   return store.find(m => {
     const emailClean = (m.email || '').trim().toLowerCase();
     const nameClean = (m.name || '').trim().toLowerCase();
-    const userPartClean = emailClean.includes('@') ? emailClean.split('@')[0] : emailClean;
 
-    const isMatch = emailClean === cleanedInput || nameClean === cleanedInput || userPartClean === cleanedInput;
+    // Strict exact match on full email or full name only (avoids loose prefix collisions)
+    const isMatch = emailClean === cleanedInput || nameClean === cleanedInput;
     if (!isMatch) return false;
     if (m.status !== 'ACTIVO') return false;
 
     const expectedPass = (m.initialPassword || 'puerta2026').trim();
-    if (expectedPass.toLowerCase() === 'puerta2026' && trimmedPassword.toLowerCase() === 'puerta2026') {
-      return true;
-    }
-    return expectedPass === trimmedPassword;
+    return expectedPass === trimmedPassword || expectedPass.toLowerCase() === trimmedPassword.toLowerCase();
   });
 }
 
