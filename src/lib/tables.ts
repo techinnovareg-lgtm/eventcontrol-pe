@@ -30,8 +30,11 @@ export interface VenueElement {
   created_at: string;
 }
 
-// In-memory store for tables
-const tablesStore: Record<string, Table[]> = {
+const TABLES_STORAGE_KEY = 'eventcontrol_tables';
+const ASSIGNMENTS_STORAGE_KEY = 'eventcontrol_table_assignments';
+const VENUE_ELEMENTS_STORAGE_KEY = 'eventcontrol_venue_elements';
+
+const INITIAL_TABLES: Record<string, Table[]> = {
   'evt-102': [
     { id: 'tbl-1', workspace_id: 'ws-a-1111', event_id: 'evt-102', name: 'Mesa 1 (Familia Novia)', capacity: 10, pos_x: 140, pos_y: 110, created_at: new Date().toISOString() },
     { id: 'tbl-2', workspace_id: 'ws-a-1111', event_id: 'evt-102', name: 'Mesa 2 (Amigos Universidad)', capacity: 10, pos_x: 140, pos_y: 310, created_at: new Date().toISOString() },
@@ -41,8 +44,7 @@ const tablesStore: Record<string, Table[]> = {
   ],
 };
 
-// In-memory store for assignments
-const assignmentsStore: Record<string, TableAssignment[]> = {
+const INITIAL_ASSIGNMENTS: Record<string, TableAssignment[]> = {
   'evt-102': [
     { id: 'asgn-1', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-1', group_id: 'grp-001', assigned_passes: 1, created_at: new Date().toISOString() },
     { id: 'asgn-2', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-1', group_id: 'grp-002', assigned_passes: 6, created_at: new Date().toISOString() },
@@ -55,8 +57,7 @@ const assignmentsStore: Record<string, TableAssignment[]> = {
   ],
 };
 
-// In-memory store for venue architectural elements
-const venueElementsStore: Record<string, VenueElement[]> = {
+const INITIAL_VENUE_ELEMENTS: Record<string, VenueElement[]> = {
   'evt-102': [
     {
       id: 've-1',
@@ -106,6 +107,100 @@ const venueElementsStore: Record<string, VenueElement[]> = {
   ],
 };
 
+let tablesMemoryStore: Record<string, Table[]> | null = null;
+let assignmentsMemoryStore: Record<string, TableAssignment[]> | null = null;
+let venueElementsMemoryStore: Record<string, VenueElement[]> | null = null;
+
+function loadTablesFromStorage(): Record<string, Table[]> {
+  if (tablesMemoryStore) return tablesMemoryStore;
+  if (typeof window === 'undefined') return INITIAL_TABLES;
+  try {
+    const raw = localStorage.getItem(TABLES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        tablesMemoryStore = parsed;
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[TablesStore] Failed to load tables from storage', err);
+  }
+  saveTablesToStorage(INITIAL_TABLES);
+  return INITIAL_TABLES;
+}
+
+function saveTablesToStorage(data: Record<string, Table[]>) {
+  tablesMemoryStore = data;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(data));
+    } catch (err) {
+      console.warn('[TablesStore] Failed to save tables to storage', err);
+    }
+  }
+}
+
+function loadAssignmentsFromStorage(): Record<string, TableAssignment[]> {
+  if (assignmentsMemoryStore) return assignmentsMemoryStore;
+  if (typeof window === 'undefined') return INITIAL_ASSIGNMENTS;
+  try {
+    const raw = localStorage.getItem(ASSIGNMENTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        assignmentsMemoryStore = parsed;
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[TablesStore] Failed to load assignments from storage', err);
+  }
+  saveAssignmentsToStorage(INITIAL_ASSIGNMENTS);
+  return INITIAL_ASSIGNMENTS;
+}
+
+function saveAssignmentsToStorage(data: Record<string, TableAssignment[]>) {
+  assignmentsMemoryStore = data;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(data));
+    } catch (err) {
+      console.warn('[TablesStore] Failed to save assignments to storage', err);
+    }
+  }
+}
+
+function loadVenueElementsFromStorage(): Record<string, VenueElement[]> {
+  if (venueElementsMemoryStore) return venueElementsMemoryStore;
+  if (typeof window === 'undefined') return INITIAL_VENUE_ELEMENTS;
+  try {
+    const raw = localStorage.getItem(VENUE_ELEMENTS_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        venueElementsMemoryStore = parsed;
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[TablesStore] Failed to load venue elements from storage', err);
+  }
+  saveVenueElementsToStorage(INITIAL_VENUE_ELEMENTS);
+  return INITIAL_VENUE_ELEMENTS;
+}
+
+function saveVenueElementsToStorage(data: Record<string, VenueElement[]>) {
+  venueElementsMemoryStore = data;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(VENUE_ELEMENTS_STORAGE_KEY, JSON.stringify(data));
+    } catch (err) {
+      console.warn('[TablesStore] Failed to save venue elements to storage', err);
+    }
+  }
+}
+
 export function computeElementDimensions(
   size: ElementSize = 'medium', 
   shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect', 
@@ -136,12 +231,14 @@ export function computeElementDimensions(
 }
 
 export function getEventTables(eventId: string): Table[] {
-  return tablesStore[eventId] || [];
+  const store = loadTablesFromStorage();
+  return store[eventId] || [];
 }
 
 export function createTable(eventId: string, workspaceId: string, name: string, capacity: number, posX = 440, posY = 220): Table {
-  if (!tablesStore[eventId]) {
-    tablesStore[eventId] = [];
+  const store = loadTablesFromStorage();
+  if (!store[eventId]) {
+    store[eventId] = [];
   }
   const newTbl: Table = {
     id: `tbl-${Date.now()}`,
@@ -153,35 +250,44 @@ export function createTable(eventId: string, workspaceId: string, name: string, 
     pos_y: posY,
     created_at: new Date().toISOString(),
   };
-  tablesStore[eventId].push(newTbl);
+  store[eventId].push(newTbl);
+  saveTablesToStorage(store);
   return newTbl;
 }
 
 export function deleteTable(eventId: string, tableId: string): void {
-  if (tablesStore[eventId]) {
-    tablesStore[eventId] = tablesStore[eventId].filter(t => t.id !== tableId);
+  const store = loadTablesFromStorage();
+  if (store[eventId]) {
+    store[eventId] = store[eventId].filter(t => t.id !== tableId);
+    saveTablesToStorage(store);
   }
-  if (assignmentsStore[eventId]) {
-    assignmentsStore[eventId] = assignmentsStore[eventId].filter(a => a.table_id !== tableId);
+  const asgnStore = loadAssignmentsFromStorage();
+  if (asgnStore[eventId]) {
+    asgnStore[eventId] = asgnStore[eventId].filter(a => a.table_id !== tableId);
+    saveAssignmentsToStorage(asgnStore);
   }
 }
 
 export function updateTablePosition(eventId: string, tableId: string, posX: number, posY: number): void {
-  if (tablesStore[eventId]) {
-    const tbl = tablesStore[eventId].find(t => t.id === tableId);
+  const store = loadTablesFromStorage();
+  if (store[eventId]) {
+    const tbl = store[eventId].find(t => t.id === tableId);
     if (tbl) {
       tbl.pos_x = posX;
       tbl.pos_y = posY;
+      saveTablesToStorage(store);
     }
   }
 }
 
 export function updateTable(eventId: string, tableId: string, name: string, capacity: number): Table | null {
-  if (tablesStore[eventId]) {
-    const tbl = tablesStore[eventId].find(t => t.id === tableId);
+  const store = loadTablesFromStorage();
+  if (store[eventId]) {
+    const tbl = store[eventId].find(t => t.id === tableId);
     if (tbl) {
       tbl.name = name;
       tbl.capacity = capacity;
+      saveTablesToStorage(store);
       return tbl;
     }
   }
@@ -189,15 +295,17 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
 }
 
 export function getEventTableAssignments(eventId: string): TableAssignment[] {
-  return assignmentsStore[eventId] || [];
+  const store = loadAssignmentsFromStorage();
+  return store[eventId] || [];
 }
 
 export function assignGroupToTable(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): TableAssignment {
-  if (!assignmentsStore[eventId]) {
-    assignmentsStore[eventId] = [];
+  const store = loadAssignmentsFromStorage();
+  if (!store[eventId]) {
+    store[eventId] = [];
   }
   // Remove existing assignment if any
-  assignmentsStore[eventId] = assignmentsStore[eventId].filter(a => a.group_id !== groupId);
+  store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
 
   const newAsgn: TableAssignment = {
     id: `asgn-${Date.now()}`,
@@ -208,18 +316,21 @@ export function assignGroupToTable(eventId: string, workspaceId: string, tableId
     assigned_passes: passes,
     created_at: new Date().toISOString(),
   };
-  assignmentsStore[eventId].push(newAsgn);
+  store[eventId].push(newAsgn);
+  saveAssignmentsToStorage(store);
   return newAsgn;
 }
 
 export function unassignGroupFromTable(eventId: string, groupId: string): void {
-  if (assignmentsStore[eventId]) {
-    assignmentsStore[eventId] = assignmentsStore[eventId].filter(a => a.group_id !== groupId);
+  const store = loadAssignmentsFromStorage();
+  if (store[eventId]) {
+    store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
+    saveAssignmentsToStorage(store);
   }
 }
 
 export function calculateTableOccupancy(eventId: string, tableId: string, capacity: number) {
-  const assignments = (assignmentsStore[eventId] || []).filter(a => a.table_id === tableId);
+  const assignments = getEventTableAssignments(eventId).filter(a => a.table_id === tableId);
   const totalAssigned = assignments.reduce((sum, a) => sum + a.assigned_passes, 0);
   const isOvercapacity = totalAssigned > capacity;
   const overflowCount = isOvercapacity ? totalAssigned - capacity : 0;
@@ -237,7 +348,8 @@ export function calculateTableOccupancy(eventId: string, tableId: string, capaci
 
 /* VENUE ELEMENTS FUNCTIONS WITH SIZE SUPPORT */
 export function getEventVenueElements(eventId: string): VenueElement[] {
-  return venueElementsStore[eventId] || [];
+  const store = loadVenueElementsFromStorage();
+  return store[eventId] || [];
 }
 
 export function createVenueElement(
@@ -251,8 +363,9 @@ export function createVenueElement(
   posX = 420, 
   posY = 400
 ): VenueElement {
-  if (!venueElementsStore[eventId]) {
-    venueElementsStore[eventId] = [];
+  const store = loadVenueElementsFromStorage();
+  if (!store[eventId]) {
+    store[eventId] = [];
   }
 
   const { width, height } = computeElementDimensions(size, shape, orientation);
@@ -273,16 +386,19 @@ export function createVenueElement(
     created_at: new Date().toISOString(),
   };
 
-  venueElementsStore[eventId].push(newElem);
+  store[eventId].push(newElem);
+  saveVenueElementsToStorage(store);
   return newElem;
 }
 
 export function updateVenueElementPosition(eventId: string, elementId: string, posX: number, posY: number): void {
-  if (venueElementsStore[eventId]) {
-    const elem = venueElementsStore[eventId].find(e => e.id === elementId);
+  const store = loadVenueElementsFromStorage();
+  if (store[eventId]) {
+    const elem = store[eventId].find(e => e.id === elementId);
     if (elem) {
       elem.pos_x = posX;
       elem.pos_y = posY;
+      saveVenueElementsToStorage(store);
     }
   }
 }
@@ -292,8 +408,9 @@ export function updateVenueElement(
   elementId: string, 
   data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>
 ): VenueElement | null {
-  if (venueElementsStore[eventId]) {
-    const elem = venueElementsStore[eventId].find(e => e.id === elementId);
+  const store = loadVenueElementsFromStorage();
+  if (store[eventId]) {
+    const elem = store[eventId].find(e => e.id === elementId);
     if (elem) {
       const nextSize = data.size || elem.size || 'medium';
       const nextShape = data.shape || elem.shape;
@@ -306,6 +423,7 @@ export function updateVenueElement(
         width: dims.width,
         height: dims.height,
       });
+      saveVenueElementsToStorage(store);
       return elem;
     }
   }
@@ -313,7 +431,9 @@ export function updateVenueElement(
 }
 
 export function deleteVenueElement(eventId: string, elementId: string): void {
-  if (venueElementsStore[eventId]) {
-    venueElementsStore[eventId] = venueElementsStore[eventId].filter(e => e.id !== elementId);
+  const store = loadVenueElementsFromStorage();
+  if (store[eventId]) {
+    store[eventId] = store[eventId].filter(e => e.id !== elementId);
+    saveVenueElementsToStorage(store);
   }
 }
