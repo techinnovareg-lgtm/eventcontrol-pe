@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   Camera, QrCode, ShieldCheck, CheckCircle2, XCircle, AlertTriangle, 
-  Users, MapPin, RefreshCw, ArrowLeft, Zap, Lock, Wifi, WifiOff, Download, CloudUpload
+  Users, MapPin, RefreshCw, ArrowLeft, Zap, Lock, Wifi, WifiOff, Download, CloudUpload, Home, LogOut
 } from 'lucide-react';
 import { resolveQRToken, getOrCreateGroupQRToken } from '@/lib/qr-engine';
 import { executeAtomicCheckIn, simulateConcurrentScans, CheckInExecutionResult } from '@/lib/checkin';
@@ -15,8 +15,11 @@ import {
 } from '@/lib/offline-db';
 import { getEventGuestGroups } from '@/lib/events';
 import { getEventTableAssignments, getEventTables } from '@/lib/tables';
+import { getActiveSession } from '@/lib/superadmin-store';
 
 export default function MobileScanCheckInPage() {
+  const session = getActiveSession();
+  const isOperator = session?.user?.role === 'OPERATOR';
   const eventId = 'evt-102';
   const currentWorkspaceId = 'ws-a-1111';
 
@@ -110,28 +113,63 @@ export default function MobileScanCheckInPage() {
     <div className="min-h-screen bg-[#1A1A1A] text-white p-4 max-w-md mx-auto flex flex-col justify-between selection:bg-[#C5A059] selection:text-white">
       {/* Top Header Mobile */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#C5A059]/40">
-              <Image src="/logo-eventcontrol.jpg" alt="Logo" fill className="object-cover" />
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3 gap-2">
+          {isOperator ? (
+            <div className="flex items-center gap-2">
+              <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#C5A059]/40 shrink-0">
+                <Image src="/logo-eventcontrol.jpg" alt="Logo" fill className="object-cover" />
+              </div>
+              <div>
+                <span className="text-xs font-serif font-bold text-white tracking-wide block">
+                  EventControl <span className="text-[#C5A059]">Escáner</span>
+                </span>
+                <span className="text-[9px] text-emerald-400 font-bold block">OPERADOR PUERTA</span>
+              </div>
             </div>
-            <span className="text-xs text-slate-300 font-bold hover:text-white flex items-center gap-1">
-              <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-            </span>
-          </Link>
+          ) : (
+            <Link href="/dashboard" className="flex items-center gap-2">
+              <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#C5A059]/40">
+                <Image src="/logo-eventcontrol.jpg" alt="Logo" fill className="object-cover" />
+              </div>
+              <span className="text-xs text-slate-300 font-bold hover:text-white flex items-center gap-1">
+                <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
+              </span>
+            </Link>
+          )}
 
-          {/* Network Mode Toggle */}
-          <button
-            onClick={() => setIsOnline(!isOnline)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
-              isOnline 
-                ? 'bg-emerald-950 text-emerald-400 border-emerald-800' 
-                : 'bg-amber-950 text-amber-400 border-amber-800'
-            }`}
-          >
-            {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-            {isOnline ? 'ONLINE' : 'OFFLINE (Caché)'}
-          </button>
+          <div className="flex items-center gap-2">
+            {isOperator && (
+              <>
+                <Link 
+                  href="/" 
+                  className="text-[11px] text-slate-300 font-bold hover:text-white px-2.5 py-1 bg-slate-800 rounded-lg border border-slate-700 transition flex items-center gap-1"
+                  title="Página Principal Web"
+                >
+                  <Home className="w-3 h-3 text-[#C5A059]" /> Inicio
+                </Link>
+                <Link 
+                  href="/login" 
+                  className="text-[11px] text-red-400 font-bold hover:text-red-300 px-2.5 py-1 bg-red-950/60 rounded-lg border border-red-800/60 transition flex items-center gap-1"
+                  title="Cerrar Sesión"
+                >
+                  <LogOut className="w-3 h-3" /> Salir
+                </Link>
+              </>
+            )}
+
+            {/* Network Mode Toggle */}
+            <button
+              onClick={() => setIsOnline(!isOnline)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition border ${
+                isOnline 
+                  ? 'bg-emerald-950 text-emerald-400 border-emerald-800' 
+                  : 'bg-amber-950 text-amber-400 border-amber-800'
+              }`}
+            >
+              {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
+              {isOnline ? 'ONLINE' : 'OFFLINE'}
+            </button>
+          </div>
         </div>
 
         {/* Sync Status Banner */}

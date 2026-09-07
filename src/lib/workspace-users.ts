@@ -61,9 +61,9 @@ function loadMembersFromStorage(): WorkspaceMemberUser[] {
   if (typeof window === 'undefined') return INITIAL_DEMO_MEMBERS;
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -185,10 +185,9 @@ export function updateWorkspaceMember(
 
 export function deleteWorkspaceMember(memberId: string): boolean {
   const store = getStore();
-  const idx = store.findIndex(m => m.id === memberId);
-  if (idx !== -1) {
-    store.splice(idx, 1);
-    saveMembersToStorage(store);
+  const updatedStore = store.filter(m => m.id !== memberId);
+  if (updatedStore.length !== store.length) {
+    saveMembersToStorage(updatedStore);
     return true;
   }
   return false;

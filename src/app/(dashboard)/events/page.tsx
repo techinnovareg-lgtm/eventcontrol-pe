@@ -21,6 +21,10 @@ export default function EventsCrudPage() {
 
   useEffect(() => {
     const session = getActiveSession();
+    if (session?.user?.role === 'OPERATOR') {
+      window.location.href = '/scan';
+      return;
+    }
     const contractAccount = getAccountForSession();
     const wsId = session?.user?.workspaceId || contractAccount?.workspaceId || 'ws-a-1111';
     const name = session?.user?.name || contractAccount?.adminName || contractAccount?.companyName || 'Cliente VIP';

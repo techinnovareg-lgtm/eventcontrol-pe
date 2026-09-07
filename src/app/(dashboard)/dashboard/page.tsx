@@ -27,6 +27,10 @@ export default function RealtimeDashboardPage() {
 
   useEffect(() => {
     const session = getActiveSession();
+    if (session?.user?.role === 'OPERATOR') {
+      window.location.href = '/scan';
+      return;
+    }
     const contract = getAccountForSession();
     const wsId = session?.user?.workspaceId || contract?.workspaceId || 'ws-a-1111';
     setCurrentWorkspaceId(wsId);
