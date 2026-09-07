@@ -27,6 +27,7 @@ const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [
     roleLabel: 'PROPIETARIO',
     permissionsScope: 'Acceso total, facturación, usuarios y eventos',
     status: 'ACTIVO',
+    initialPassword: 'EventControl2026!',
     created_at: new Date().toISOString(),
   },
   {
@@ -39,6 +40,7 @@ const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [
     roleLabel: 'COORDINADOR',
     permissionsScope: 'Edición de eventos, invitados, mesas y cortes',
     status: 'ACTIVO',
+    initialPassword: 'coordinador2026',
     created_at: new Date().toISOString(),
   },
   {
@@ -51,6 +53,7 @@ const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [
     roleLabel: 'SEGURIDAD (Puerta)',
     permissionsScope: 'Escaneo de QR y registro de check-in únicamente',
     status: 'ACTIVO',
+    initialPassword: 'puerta2026',
     created_at: new Date().toISOString(),
   },
 ];
@@ -196,10 +199,11 @@ export function deleteWorkspaceMember(memberId: string): boolean {
 export function authenticateWorkspaceMember(email: string, passwordInput: string): WorkspaceMemberUser | undefined {
   const store = getStore();
   const cleanedEmail = email.trim().toLowerCase();
+  const trimmedPassword = passwordInput.trim();
   
   return store.find(m => 
     m.email.toLowerCase() === cleanedEmail && 
     m.status === 'ACTIVO' &&
-    (!m.initialPassword || m.initialPassword === passwordInput || passwordInput.length >= 6)
+    (m.initialPassword ? m.initialPassword === trimmedPassword : trimmedPassword === 'puerta2026')
   );
 }

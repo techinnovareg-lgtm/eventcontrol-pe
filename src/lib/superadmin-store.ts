@@ -43,6 +43,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contractEndDate: '2026-09-08T23:59:59.000Z', // 6 days remaining for expiration alert
     status: 'ACTIVA',
     mustChangePassword: false,
+    initialPassword: 'EventControl2026!',
     passwordHashMasked: '••••••••••••',
     created_at: '2026-08-01T00:00:00.000Z',
   },
@@ -58,6 +59,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contractEndDate: '2027-07-15T23:59:59.000Z',
     status: 'ACTIVA',
     mustChangePassword: false,
+    initialPassword: 'EventControl2026!',
     passwordHashMasked: '••••••••••••',
     created_at: '2026-07-15T00:00:00.000Z',
   },
@@ -73,6 +75,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contractEndDate: '2027-08-20T23:59:59.000Z',
     status: 'ACTIVA',
     mustChangePassword: true,
+    initialPassword: 'EventControl2026!',
     passwordHashMasked: '••••••••••••',
     created_at: '2026-08-20T00:00:00.000Z',
   },

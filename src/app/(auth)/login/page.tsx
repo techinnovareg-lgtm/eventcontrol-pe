@@ -114,6 +114,14 @@ export default function LoginPage() {
         return;
       }
 
+      // Verify password strictly against registered account password
+      const expectedPassword = matchedAccount.initialPassword || 'EventControl2026!';
+      if (password.trim() !== expectedPassword) {
+        setErrorMsg('Contraseña incorrecta. Verifique sus credenciales e intente nuevamente.');
+        setLoading(false);
+        return;
+      }
+
       // Successfully authenticate registered client account
       setActiveSession({
         user: {
