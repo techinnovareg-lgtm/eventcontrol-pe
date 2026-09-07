@@ -24,6 +24,7 @@ export interface AuthSession {
     name: string;
     role: 'SUPER_USER' | 'ADMIN' | 'OPERATOR';
     workspaceId?: string;
+    eventId?: string;
     mustChangePassword?: boolean;
   };
 }

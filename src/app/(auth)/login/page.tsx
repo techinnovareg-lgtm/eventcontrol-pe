@@ -161,11 +161,13 @@ export default function LoginPage() {
           name: matchedSubUser.name,
           role: matchedSubUser.role === 'OPERATOR' ? 'OPERATOR' : 'ADMIN',
           workspaceId: matchedSubUser.workspaceId,
+          eventId: matchedSubUser.eventId,
         },
       });
 
       if (matchedSubUser.role === 'OPERATOR') {
-        router.push('/scan');
+        const scanRoute = matchedSubUser.eventId ? `/scan?event=${matchedSubUser.eventId}` : '/scan';
+        router.push(scanRoute);
       } else {
         router.push('/dashboard');
       }

@@ -120,8 +120,8 @@ function getGroupsStore(): Record<string, GuestGroup[]> {
 
 export function getWorkspaceEvents(workspaceId: string): Event[] {
   const store = getEventsStore();
-  const filtered = store.filter(e => e.workspace_id === workspaceId);
-  return filtered.length > 0 ? filtered : store;
+  if (!workspaceId) return store;
+  return store.filter(e => e.workspace_id === workspaceId);
 }
 
 export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
@@ -132,7 +132,7 @@ export function getEventById(eventId: string, workspaceId?: string): Event | und
     found = store.find(e => e.workspace_id === workspaceId);
     if (found) return found;
   }
-  return store[0];
+  return undefined;
 }
 
 export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Event {

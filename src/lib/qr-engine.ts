@@ -1,4 +1,5 @@
 import { QRToken } from '@/lib/supabase/types';
+import { getEventGuestGroups } from '@/lib/events';
 
 // Mock repository for QR Tokens
 let qrTokenStore: Record<string, QRToken> = {};
@@ -146,7 +147,11 @@ export function findTokenAndGroupForScannedInput(
     if (!matchedToken.is_active) {
       return { valid: false, reason: 'REJECTED_REVOKED', token: matchedToken };
     }
-    const matchedGroup = groups.find(g => g.id === matchedToken!.group_id);
+    let matchedGroup = groups.find(g => g.id === matchedToken!.group_id);
+    if (!matchedGroup && matchedToken.event_id) {
+      const eventGroups = getEventGuestGroups(matchedToken.event_id);
+      matchedGroup = eventGroups.find(g => g.id === matchedToken!.group_id);
+    }
     return { valid: true, token: matchedToken, group: matchedGroup };
   }
 

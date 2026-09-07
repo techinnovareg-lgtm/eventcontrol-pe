@@ -139,6 +139,9 @@ export default function MobileScanCheckInPage() {
     const res = findTokenAndGroupForScannedInput(rawCode, selectedEventId, currentWorkspaceId, groups);
 
     if (res.valid && res.token && res.group) {
+      if (res.token.event_id && res.token.event_id !== selectedEventId) {
+        setSelectedEventId(res.token.event_id);
+      }
       setSelectedTokenHash(res.token.token_hash);
       setMatchedGroup(res.group);
       setScanErrorMsg(null);
