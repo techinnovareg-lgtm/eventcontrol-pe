@@ -117,45 +117,34 @@ export function findTokenAndGroupForScannedInput(
   eventId: string,
   workspaceId: string,
   groups: any[]
-): { valid: boolean; token?: QRToken; group?: any; reason?: string } {
+): { valid: boolean; token?: QRToken; group?: any; reason?: string; otherEventId?: string } {
   if (!rawInput || !rawInput.trim()) {
     return { valid: false, reason: 'REJECTED_INVALID' };
   }
 
   const cleanInput = extractTokenFromInput(rawInput);
 
-  // 1. Ensure all groups in this event have registered QR tokens in qrTokenStore
+  // 1. Ensure all groups in this active event have registered QR tokens in qrTokenStore
   groups.forEach(g => {
     if (g && g.id) {
       getOrCreateGroupQRToken(g.id, eventId, workspaceId);
     }
   });
 
-  // 2. Search qrTokenStore by token_hash, group_id, or token id
-  let matchedToken = Object.values(qrTokenStore).find(
+  // 2. Search qrTokenStore strictly for current active event first
+  const activeMatchedToken = Object.values(qrTokenStore).find(
     t => t.event_id === eventId && (t.token_hash === cleanInput || t.group_id === cleanInput || t.id === cleanInput)
   );
 
-  // Fallback: search across all events if event_id is unspecified or newly loaded
-  if (!matchedToken) {
-    matchedToken = Object.values(qrTokenStore).find(
-      t => t.token_hash === cleanInput || t.group_id === cleanInput || t.id === cleanInput
-    );
+  if (activeMatchedToken) {
+    if (!activeMatchedToken.is_active) {
+      return { valid: false, reason: 'REJECTED_REVOKED', token: activeMatchedToken };
+    }
+    const matchedGroup = groups.find(g => g.id === activeMatchedToken.group_id);
+    return { valid: true, token: activeMatchedToken, group: matchedGroup };
   }
 
-  if (matchedToken) {
-    if (!matchedToken.is_active) {
-      return { valid: false, reason: 'REJECTED_REVOKED', token: matchedToken };
-    }
-    let matchedGroup = groups.find(g => g.id === matchedToken!.group_id);
-    if (!matchedGroup && matchedToken.event_id) {
-      const eventGroups = getEventGuestGroups(matchedToken.event_id);
-      matchedGroup = eventGroups.find(g => g.id === matchedToken!.group_id);
-    }
-    return { valid: true, token: matchedToken, group: matchedGroup };
-  }
-
-  // 3. Fallback: match by group ID or group name directly
+  // 3. Match by group ID or group name directly in current active event
   const searchLower = cleanInput.toLowerCase();
   const matchedGroup = groups.find(
     g => g.id === cleanInput || 
@@ -166,6 +155,20 @@ export function findTokenAndGroupForScannedInput(
   if (matchedGroup) {
     const newToken = getOrCreateGroupQRToken(matchedGroup.id, eventId, workspaceId);
     return { valid: true, token: newToken, group: matchedGroup };
+  }
+
+  // 4. Check if token belongs to ANOTHER event (Security Check: Reject cross-event entry)
+  const otherMatchedToken = Object.values(qrTokenStore).find(
+    t => t.token_hash === cleanInput || t.group_id === cleanInput || t.id === cleanInput
+  );
+
+  if (otherMatchedToken && otherMatchedToken.event_id !== eventId) {
+    return { 
+      valid: false, 
+      reason: 'REJECTED_DIFFERENT_EVENT', 
+      token: otherMatchedToken,
+      otherEventId: otherMatchedToken.event_id 
+    };
   }
 
   return { valid: false, reason: 'REJECTED_INVALID' };

@@ -31,7 +31,14 @@ export default function MobileScanCheckInPage() {
 
   useEffect(() => {
     const events = getWorkspaceEvents(currentWorkspaceId);
-    setWorkspaceEvents(events);
+    
+    // Operator Role restriction: limit event list strictly to assigned event if specified
+    const operatorEventId = session?.user?.eventId;
+    let filteredEvents = events;
+    if (isOperator && operatorEventId && events.some(e => e.id === operatorEventId)) {
+      filteredEvents = events.filter(e => e.id === operatorEventId);
+    }
+    setWorkspaceEvents(filteredEvents);
     
     // Check URL params for event or token
     if (typeof window !== 'undefined') {
@@ -39,17 +46,19 @@ export default function MobileScanCheckInPage() {
       const urlEvt = params.get('event');
       const urlToken = params.get('token');
 
-      if (urlEvt && events.some(e => e.id === urlEvt)) {
+      if (urlEvt && filteredEvents.some(e => e.id === urlEvt)) {
         setSelectedEventId(urlEvt);
-      } else if (events.length > 0) {
-        setSelectedEventId(events[0].id);
+      } else if (isOperator && operatorEventId && filteredEvents.some(e => e.id === operatorEventId)) {
+        setSelectedEventId(operatorEventId);
+      } else if (filteredEvents.length > 0) {
+        setSelectedEventId(filteredEvents[0].id);
       }
 
       if (urlToken) {
         setScannedInput(urlToken);
       }
     }
-  }, [currentWorkspaceId]);
+  }, [currentWorkspaceId, isOperator, session?.user?.eventId]);
 
   const activeEvent = getEventById(selectedEventId, currentWorkspaceId);
 
@@ -139,9 +148,6 @@ export default function MobileScanCheckInPage() {
     const res = findTokenAndGroupForScannedInput(rawCode, selectedEventId, currentWorkspaceId, groups);
 
     if (res.valid && res.token && res.group) {
-      if (res.token.event_id && res.token.event_id !== selectedEventId) {
-        setSelectedEventId(res.token.event_id);
-      }
       setSelectedTokenHash(res.token.token_hash);
       setMatchedGroup(res.group);
       setScanErrorMsg(null);
@@ -153,7 +159,11 @@ export default function MobileScanCheckInPage() {
     } else {
       setSelectedTokenHash('');
       setMatchedGroup(null);
-      if (res.reason === 'REJECTED_REVOKED') {
+      if (res.reason === 'REJECTED_DIFFERENT_EVENT') {
+        const otherEvt = res.otherEventId ? getEventById(res.otherEventId, currentWorkspaceId) : null;
+        const otherEvtName = otherEvt ? `"${otherEvt.name}"` : 'otro evento';
+        setScanErrorMsg(`✕ CÓDIGO PERTENECE A OTRO EVENTO: Este pase es para ${otherEvtName}. No tiene acceso a este evento.`);
+      } else if (res.reason === 'REJECTED_REVOKED') {
         setScanErrorMsg('✕ CÓDIGO QR REVOCADO: Este pase fue invalidado por el administrador.');
       } else {
         setScanErrorMsg('✕ CÓDIGO QR INVÁLIDO: No existe en la lista de invitados de este evento.');
