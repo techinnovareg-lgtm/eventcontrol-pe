@@ -3,6 +3,7 @@ export type WorkspaceUserRole = 'OWNER' | 'ADMIN' | 'COORDINADOR' | 'OPERATOR';
 export interface WorkspaceMemberUser {
   id: string;
   workspaceId: string;
+  eventId?: string;
   name: string;
   email: string;
   role: WorkspaceUserRole;
@@ -19,6 +20,7 @@ const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [
   {
     id: 'wm-01',
     workspaceId: 'ws-a-1111',
+    eventId: 'evt-102',
     name: 'Ana María Gamarra',
     email: 'ana@amgweddings.pe',
     role: 'OWNER',
@@ -30,6 +32,7 @@ const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [
   {
     id: 'wm-02',
     workspaceId: 'ws-a-1111',
+    eventId: 'evt-102',
     name: 'Carlos Pérez',
     email: 'carlos@amgweddings.pe',
     role: 'COORDINADOR',
@@ -41,6 +44,7 @@ const INITIAL_DEMO_MEMBERS: WorkspaceMemberUser[] = [
   {
     id: 'wm-03',
     workspaceId: 'ws-a-1111',
+    eventId: 'evt-102',
     name: 'Puerta Principal 1',
     email: 'puerta1@amgweddings.pe',
     role: 'OPERATOR',
@@ -93,8 +97,17 @@ export function getWorkspaceMembers(workspaceId: string): WorkspaceMemberUser[] 
   return store.filter(m => m.workspaceId === workspaceId);
 }
 
+export function getEventMembers(eventId: string, workspaceId?: string): WorkspaceMemberUser[] {
+  const store = getStore();
+  if (workspaceId) {
+    return store.filter(m => m.eventId === eventId || (m.workspaceId === workspaceId && !m.eventId));
+  }
+  return store.filter(m => m.eventId === eventId);
+}
+
 export function createWorkspaceMember(data: {
   workspaceId: string;
+  eventId?: string;
   name: string;
   email: string;
   password?: string;
@@ -120,6 +133,7 @@ export function createWorkspaceMember(data: {
   const newMember: WorkspaceMemberUser = {
     id: `wm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     workspaceId: data.workspaceId,
+    eventId: data.eventId,
     name: data.name.trim(),
     email: cleanedEmail,
     role: data.role,

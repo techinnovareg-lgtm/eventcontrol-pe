@@ -4,12 +4,12 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   BarChart3, MapPin, QrCode, MessageSquare, FileSpreadsheet, 
-  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar, User
+  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar, User, Users
 } from 'lucide-react';
 import { calculateRemainingDays, getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
 interface EventNavHeaderProps {
-  currentTab: 'dashboard' | 'import' | 'tables' | 'qr' | 'whatsapp' | 'cuts' | 'reports' | 'scan';
+  currentTab: 'dashboard' | 'import' | 'tables' | 'qr' | 'whatsapp' | 'cuts' | 'reports' | 'team' | 'scan';
   eventId?: string;
   eventName?: string;
 }
@@ -39,6 +39,7 @@ export default function EventNavHeader({
     { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: `/events/${eventId}/whatsapp` },
     { id: 'cuts', label: 'Cortes Catering', icon: Scissors, href: `/events/${eventId}/cuts` },
     { id: 'reports', label: 'Reportes', icon: Clock, href: `/events/${eventId}/reports` },
+    { id: 'team', label: 'Equipo del Evento', icon: Users, href: `/events/${eventId}/team` },
     { id: 'scan', label: 'Escáner PWA', icon: QrCode, href: `/scan` },
   ];
 
