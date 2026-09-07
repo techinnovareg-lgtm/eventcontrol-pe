@@ -5,12 +5,16 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
   Users, UserPlus, ShieldCheck, Lock, ArrowLeft, CheckCircle2, 
-  Sparkles, X, MessageSquare, Check, Mail, Phone, Calendar, MapPin
+  Sparkles, X, MessageSquare, Check, Mail, Phone, Calendar, MapPin,
+  Pencil, Trash2
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
 import { getEventById } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
-import { getEventMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
+import { 
+  getEventMembers, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
+  WorkspaceMemberUser, WorkspaceUserRole 
+} from '@/lib/workspace-users';
 
 export default function EventTeamPage() {
   const params = useParams();
@@ -28,7 +32,7 @@ export default function EventTeamPage() {
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
   }, [eventId, currentWorkspaceId]);
 
-  // Modal State
+  // Create Modal State
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
@@ -36,6 +40,15 @@ export default function EventTeamPage() {
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<WorkspaceUserRole>('OPERATOR');
   const [createdMemberSuccess, setCreatedMemberSuccess] = useState<{ member: WorkspaceMemberUser; rawPass: string } | null>(null);
+
+  // Edit Modal State
+  const [editingMember, setEditingMember] = useState<WorkspaceMemberUser | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  const [editRole, setEditRole] = useState<WorkspaceUserRole>('OPERATOR');
+  const [editStatus, setEditStatus] = useState<'ACTIVO' | 'INACTIVO'>('ACTIVO');
+  const [editMemberSuccess, setEditMemberSuccess] = useState<string | null>(null);
 
   const handleCreateSubUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,6 +66,43 @@ export default function EventTeamPage() {
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
     setCreatedMemberSuccess({ member: created, rawPass: pass });
+  };
+
+  const openEditModal = (member: WorkspaceMemberUser) => {
+    setEditingMember(member);
+    setEditName(member.name);
+    setEditEmail(member.email);
+    setEditPassword(member.initialPassword || 'puerta2026');
+    setEditRole(member.role);
+    setEditStatus(member.status);
+    setEditMemberSuccess(null);
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember || !editName.trim() || !editEmail.trim()) return;
+
+    updateWorkspaceMember(editingMember.id, {
+      name: editName,
+      email: editEmail,
+      initialPassword: editPassword,
+      role: editRole,
+      status: editStatus,
+    });
+
+    setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
+    setEditMemberSuccess('¡Colaborador actualizado exitosamente!');
+    setTimeout(() => {
+      setEditingMember(null);
+      setEditMemberSuccess(null);
+    }, 1500);
+  };
+
+  const handleDeleteMember = (memberId: string, memberName: string) => {
+    if (confirm(`¿Estás seguro de eliminar a ${memberName} del equipo de este evento?`)) {
+      deleteWorkspaceMember(memberId);
+      setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
+    }
   };
 
   const resetInviteModal = () => {
@@ -150,6 +200,7 @@ export default function EventTeamPage() {
                     <th className="py-3.5 px-4">Rol Asignado</th>
                     <th className="py-3.5 px-4">Alcance de Permisos</th>
                     <th className="py-3.5 px-4">Estado</th>
+                    <th className="py-3.5 px-4 text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -172,9 +223,32 @@ export default function EventTeamPage() {
                       </td>
                       <td className="py-3.5 px-4 text-slate-600 font-medium">{m.permissionsScope}</td>
                       <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px] border border-emerald-300">
+                        <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] border ${
+                          m.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'
+                        }`}>
                           {m.status}
                         </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openEditModal(m)}
+                            className="px-2.5 py-1 text-xs font-bold text-[#B8860B] hover:text-slate-900 bg-amber-50 hover:bg-amber-100 border border-[#C5A059]/40 rounded-lg transition flex items-center gap-1 shadow-2xs"
+                            title="Editar datos del colaborador"
+                          >
+                            <Pencil className="w-3 h-3" /> Editar
+                          </button>
+
+                          {m.role !== 'OWNER' && (
+                            <button
+                              onClick={() => handleDeleteMember(m.id, m.name)}
+                              className="p-1 text-slate-400 hover:text-red-600 rounded-lg transition"
+                              title="Eliminar colaborador del evento"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -323,6 +397,124 @@ export default function EventTeamPage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA EDITAR COLABORADOR / OPERADOR DE EVENTO */}
+      {editingMember && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border-2 border-[#C5A059] shadow-2xl space-y-6 relative">
+            <button
+              onClick={() => setEditingMember(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-amber-50 text-[#B8860B] rounded-2xl border border-[#C5A059]/40 flex items-center justify-center mx-auto shadow-sm">
+                <Pencil className="w-6 h-6" />
+              </div>
+              <h2 className="text-xl font-serif font-bold text-[#1A1A1A]">Editar Colaborador</h2>
+              <p className="text-xs text-slate-500">
+                Actualiza los accesos o datos del colaborador de <strong className="text-slate-800">{event?.name || 'este evento'}</strong>.
+              </p>
+            </div>
+
+            {editMemberSuccess && (
+              <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-xl text-center">
+                {editMemberSuccess}
+              </div>
+            )}
+
+            <form onSubmit={handleSaveEdit} className="space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Nombre Completo
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Correo Electrónico de Ingreso
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Contraseña de Ingreso
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editPassword}
+                    onChange={(e) => setEditPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                    Estado de la Cuenta
+                  </label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value as 'ACTIVO' | 'INACTIVO')}
+                    className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                  >
+                    <option value="ACTIVO">ACTIVO (Permitir Ingreso)</option>
+                    <option value="INACTIVO">INACTIVO (Bloquear Ingreso)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Rol Asignado
+                </label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value as WorkspaceUserRole)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                >
+                  <option value="OPERATOR">OPERADOR / SEGURIDAD (Escáner de Puerta únicamente)</option>
+                  <option value="COORDINADOR">COORDINADOR (Edición de Listas y Mesas del Evento)</option>
+                  <option value="ADMIN">ADMINISTRADOR (Acceso Completo al Evento)</option>
+                </select>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingMember(null)}
+                  className="w-1/2 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 py-3 gold-button font-bold text-xs rounded-xl shadow-md"
+                >
+                  Guardar Cambios
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

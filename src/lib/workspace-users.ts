@@ -149,6 +149,51 @@ export function createWorkspaceMember(data: {
   return newMember;
 }
 
+export function updateWorkspaceMember(
+  memberId: string,
+  data: Partial<Pick<WorkspaceMemberUser, 'name' | 'email' | 'role' | 'status' | 'initialPassword'>>
+): WorkspaceMemberUser | undefined {
+  const store = getStore();
+  const member = store.find(m => m.id === memberId);
+  if (!member) return undefined;
+
+  if (data.name) member.name = data.name.trim();
+  if (data.email) member.email = data.email.trim().toLowerCase();
+  if (data.initialPassword) member.initialPassword = data.initialPassword.trim();
+  if (data.status) member.status = data.status;
+
+  if (data.role) {
+    member.role = data.role;
+    if (data.role === 'OWNER') {
+      member.roleLabel = 'PROPIETARIO';
+      member.permissionsScope = 'Acceso total, facturación, usuarios y eventos';
+    } else if (data.role === 'ADMIN') {
+      member.roleLabel = 'ADMINISTRADOR';
+      member.permissionsScope = 'Administración completa de eventos y equipo';
+    } else if (data.role === 'OPERATOR') {
+      member.roleLabel = 'SEGURIDAD (Puerta)';
+      member.permissionsScope = 'Escaneo de QR y registro de check-in únicamente';
+    } else {
+      member.roleLabel = 'COORDINADOR';
+      member.permissionsScope = 'Edición de eventos, invitados y listas';
+    }
+  }
+
+  saveMembersToStorage(store);
+  return member;
+}
+
+export function deleteWorkspaceMember(memberId: string): boolean {
+  const store = getStore();
+  const idx = store.findIndex(m => m.id === memberId);
+  if (idx !== -1) {
+    store.splice(idx, 1);
+    saveMembersToStorage(store);
+    return true;
+  }
+  return false;
+}
+
 export function authenticateWorkspaceMember(email: string, passwordInput: string): WorkspaceMemberUser | undefined {
   const store = getStore();
   const cleanedEmail = email.trim().toLowerCase();
