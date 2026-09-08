@@ -1,6 +1,6 @@
 import { CheckIn, CheckInResultStatus, GuestGroup } from '@/lib/supabase/types';
 import { resolveQRToken } from '@/lib/qr-engine';
-import { getEventGuestGroups, updateSingleGuestGroupCheckIn } from '@/lib/events';
+import { getEventGuestGroups, updateSingleGuestGroupCheckIn, updateSingleGuestGroupCheckInAsync } from '@/lib/events';
 import { getEventTableAssignments, getEventTables } from '@/lib/tables';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
@@ -160,6 +160,32 @@ export function executeAtomicCheckIn(
       ? '✓ INGRESO COMPLETO REGISTRADO. El grupo alcanzó el máximo de pases.' 
       : `✓ INGRESO PARCIAL REGISTRADO (${newCheckedIn}/${group.max_passes}).`,
   };
+}
+
+export async function executeAtomicCheckInAsync(
+  tokenHash: string,
+  passesRequested: number,
+  operatorId = 'user-security-01',
+  eventId = 'evt-102',
+  isOfflineSync = false
+): Promise<CheckInExecutionResult> {
+  const result = executeAtomicCheckIn(tokenHash, passesRequested, operatorId, eventId, isOfflineSync);
+  if (result.success) {
+    const tokenResult = resolveQRToken(tokenHash);
+    if (tokenResult.valid && tokenResult.token) {
+      const groups = getEventGuestGroups(tokenResult.token.event_id);
+      const group = groups.find(g => g.id === tokenResult.token?.group_id);
+      if (group) {
+        await updateSingleGuestGroupCheckInAsync(
+          tokenResult.token.event_id,
+          group.id,
+          group.checked_in_count,
+          group.status
+        );
+      }
+    }
+  }
+  return result;
 }
 
 /**

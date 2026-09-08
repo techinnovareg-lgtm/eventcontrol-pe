@@ -9,7 +9,7 @@ import {
   Search, Check, Sparkles, ChevronDown
 } from 'lucide-react';
 import { resolveQRToken, getOrCreateGroupQRToken, findTokenAndGroupForScannedInput, extractTokenFromInput } from '@/lib/qr-engine';
-import { executeAtomicCheckIn, simulateConcurrentScans, CheckInExecutionResult } from '@/lib/checkin';
+import { executeAtomicCheckIn, executeAtomicCheckInAsync, simulateConcurrentScans, CheckInExecutionResult } from '@/lib/checkin';
 import { 
   downloadEventOfflineManifest, executeOfflineCheckIn, 
   syncOfflineQueueToServer, getPendingOfflineQueueCount 
@@ -129,19 +129,19 @@ export default function MobileScanCheckInPage() {
   useEffect(() => {
     reloadEventData();
 
-    // Auto-retry polling every 4s if groups list is empty to catch online sync from PC
+    // Auto-sync polling every 5s to catch online sync from other doors or PC
     const timer = setInterval(() => {
-      if (selectedEventId && groups.length === 0) {
+      if (selectedEventId) {
         getEventGuestGroupsAsync(selectedEventId).then(list => {
           if (list && list.length > 0) {
             setGroups(list);
           }
         });
       }
-    }, 4000);
+    }, 5000);
 
     return () => clearInterval(timer);
-  }, [selectedEventId, groups.length]);
+  }, [selectedEventId]);
 
   // Network & Offline State
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -289,14 +289,14 @@ export default function MobileScanCheckInPage() {
     let res: CheckInExecutionResult;
 
     if (isOnline) {
-      res = executeAtomicCheckIn(selectedTokenHash, passesRequested, 'operador-seguridad-01', selectedEventId);
+      res = await executeAtomicCheckInAsync(selectedTokenHash, passesRequested, 'operador-seguridad-01', selectedEventId);
     } else {
       res = await executeOfflineCheckIn(selectedTokenHash, passesRequested, 'operador-seguridad-01', selectedEventId);
       await checkPendingQueue();
     }
 
     setResultModal(res);
-    reloadEventData();
+    await reloadEventData();
 
     // Update matched group in memory
     const updatedGroups = getEventGuestGroups(selectedEventId);

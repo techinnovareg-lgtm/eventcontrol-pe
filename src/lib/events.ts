@@ -240,16 +240,62 @@ export function getEventGuestGroups(eventId: string): GuestGroup[] {
 }
 
 export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGroup[]> {
+  const localStore = getGroupsStore();
+  const localGroups = localStore[eventId] || [];
+
   // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.groups) && data.groups.length > 0) {
-        const store = getGroupsStore();
-        store[eventId] = data.groups;
-        saveGroupsToStorage(store);
-        return data.groups;
+        const serverGroups: GuestGroup[] = data.groups;
+        let requiresServerReSync = false;
+
+        // Smart Reconciliation: Merge server data with local memory store without regressing check-ins
+        const mergedGroups = serverGroups.map(serverG => {
+          const localG = localGroups.find(lg => lg.id === serverG.id);
+          if (!localG) return serverG;
+
+          const localCount = localG.checked_in_count || 0;
+          const serverCount = serverG.checked_in_count || 0;
+
+          if (localCount > serverCount) {
+            requiresServerReSync = true;
+          }
+
+          const maxCount = Math.max(localCount, serverCount);
+          const status = maxCount >= serverG.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
+
+          return {
+            ...serverG,
+            checked_in_count: maxCount,
+            status: status as 'PENDIENTE' | 'PARCIAL' | 'COMPLETO',
+          };
+        });
+
+        // Also include any local groups missing from server
+        localGroups.forEach(localG => {
+          if (!mergedGroups.some(mg => mg.id === localG.id)) {
+            mergedGroups.push(localG);
+            requiresServerReSync = true;
+          }
+        });
+
+        localStore[eventId] = mergedGroups;
+        saveGroupsToStorage(localStore);
+
+        // If local had higher check-in count, re-sync to server asynchronously
+        if (requiresServerReSync && typeof window !== 'undefined') {
+          const workspaceId = mergedGroups[0]?.workspace_id || '';
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: mergedGroups }),
+          }).catch(err => console.warn('[Re-sync higher local count warning]', err));
+        }
+
+        return mergedGroups;
       }
     }
   } catch (err) {
@@ -311,6 +357,36 @@ export function updateSingleGuestGroupCheckIn(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: eventGroups }),
       }).catch(err => console.warn('[Sync Groups CheckIn dispatch warning]', err));
+    }
+  }
+}
+
+export async function updateSingleGuestGroupCheckInAsync(
+  eventId: string,
+  groupId: string,
+  newCheckedInCount: number,
+  newStatus: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO'
+): Promise<void> {
+  const store = getGroupsStore();
+  const eventGroups = store[eventId] || [];
+  const group = eventGroups.find(g => g.id === groupId);
+
+  if (group) {
+    group.checked_in_count = newCheckedInCount;
+    group.status = newStatus;
+    saveGroupsToStorage(store);
+
+    if (typeof window !== 'undefined') {
+      const workspaceId = group.workspace_id || '';
+      try {
+        await fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: eventGroups }),
+        });
+      } catch (err) {
+        console.warn('[Sync Groups CheckIn Async dispatch warning]', err);
+      }
     }
   }
 }

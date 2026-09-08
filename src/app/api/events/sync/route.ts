@@ -131,10 +131,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, event });
     }
 
-    if (action === 'SYNC_GROUPS' && eventId && groups) {
-      globalServerGroupsStore[eventId] = groups;
+    if (action === 'SYNC_GROUPS' && eventId && Array.isArray(groups)) {
+      const existingGroups = globalServerGroupsStore[eventId] || [];
+      const mergedGroups = groups.map((g: GuestGroup) => {
+        const exG = existingGroups.find(e => e.id === g.id);
+        if (!exG) return g;
+        const maxCount = Math.max(g.checked_in_count || 0, exG.checked_in_count || 0);
+        const status: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO' = maxCount >= g.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
+        return { ...g, checked_in_count: maxCount, status };
+      });
+
+      globalServerGroupsStore[eventId] = mergedGroups;
       saveDbToFile();
-      return NextResponse.json({ success: true, count: groups.length });
+      return NextResponse.json({ success: true, count: mergedGroups.length });
     }
 
     if (action === 'SYNC_TABLES' && eventId) {
