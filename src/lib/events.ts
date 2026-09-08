@@ -70,9 +70,36 @@ function saveGroupsToStorage(groups: Record<string, GuestGroup[]>) {
   }
 }
 
+function autoSyncLocalStoresToServer() {
+  if (typeof window === 'undefined') return;
+  try {
+    const localEvents = eventsMemoryStore || loadEventsFromStorage();
+    localEvents.forEach(evt => {
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+      }).catch(() => {});
+    });
+
+    const localGroups = guestGroupsMemoryStore || loadGroupsFromStorage();
+    Object.entries(localGroups).forEach(([evtId, grps]) => {
+      if (grps && grps.length > 0) {
+        const workspaceId = grps[0]?.workspace_id || '';
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_GROUPS', eventId: evtId, workspaceId, groups: grps }),
+        }).catch(() => {});
+      }
+    });
+  } catch (err) {}
+}
+
 function getEventsStore(): Event[] {
   if (!eventsMemoryStore) {
     eventsMemoryStore = loadEventsFromStorage();
+    setTimeout(() => autoSyncLocalStoresToServer(), 100);
   }
   return eventsMemoryStore;
 }
@@ -80,6 +107,7 @@ function getEventsStore(): Event[] {
 function getGroupsStore(): Record<string, GuestGroup[]> {
   if (!guestGroupsMemoryStore) {
     guestGroupsMemoryStore = loadGroupsFromStorage();
+    setTimeout(() => autoSyncLocalStoresToServer(), 100);
   }
   return guestGroupsMemoryStore;
 }

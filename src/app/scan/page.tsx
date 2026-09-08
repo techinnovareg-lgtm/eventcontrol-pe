@@ -46,18 +46,35 @@ export default function MobileScanCheckInPage() {
       let events: Event[] = [];
 
       if (isOperator && operatorEventId) {
-        const opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
-        if (opEvt) {
-          events = [opEvt];
+        let opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
+        if (!opEvt) {
+          opEvt = {
+            id: operatorEventId,
+            workspace_id: currentWorkspaceId,
+            name: 'Evento Asignado a Puerta',
+            event_type: 'GENERAL',
+            event_date: new Date().toISOString().split('T')[0],
+            status: 'ACTIVO',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        }
+        events = [opEvt];
+        if (isMounted) {
+          setWorkspaceEvents(events);
+          setSelectedEventId(operatorEventId);
+        }
+      } else {
+        events = await getWorkspaceEventsAsync(currentWorkspaceId);
+        if (isMounted) {
+          setWorkspaceEvents(events);
+          if (events.length > 0 && !selectedEventId) {
+            setSelectedEventId(events[0].id);
+          }
         }
       }
 
-      if (events.length === 0) {
-        events = await getWorkspaceEventsAsync(currentWorkspaceId);
-      }
-
       if (!isMounted) return;
-      setWorkspaceEvents(events);
 
       // Check URL params for event or token
       if (typeof window !== 'undefined') {
@@ -65,12 +82,8 @@ export default function MobileScanCheckInPage() {
         const urlEvt = params.get('event');
         const urlToken = params.get('token');
 
-        if (urlEvt) {
+        if (urlEvt && !isOperator) {
           setSelectedEventId(urlEvt);
-        } else if (isOperator && operatorEventId) {
-          setSelectedEventId(operatorEventId);
-        } else if (events.length > 0) {
-          setSelectedEventId(events[0].id);
         }
 
         if (urlToken) {
