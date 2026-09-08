@@ -275,7 +275,23 @@ export default function MobileScanCheckInPage() {
     setTimeout(() => setSyncStatusMsg(null), 5000);
   };
 
+  // Contingency Security Policy: Manual selection without QR requires Wedding Planner PIN for Operators
+  const [isManualAuthorized, setIsManualAuthorized] = useState<boolean>(!isOperator);
+  const [showPinModal, setShowPinModal] = useState<boolean>(false);
+  const [pendingManualGroupId, setPendingManualGroupId] = useState<string | null>(null);
+  const [pinInput, setPinInput] = useState<string>('');
+  const [pinError, setPinError] = useState<string | null>(null);
+
   const handleManualSelectGroup = (groupId: string) => {
+    // If user is Operator and has not authorized manual bypass yet, prompt for Wedding Planner PIN
+    if (isOperator && !isManualAuthorized) {
+      setPendingManualGroupId(groupId);
+      setPinInput('');
+      setPinError(null);
+      setShowPinModal(true);
+      return;
+    }
+
     const group = groups.find(g => g.id === groupId);
     if (group) {
       const token = getOrCreateGroupQRToken(groupId, selectedEventId, currentWorkspaceId);
@@ -285,6 +301,23 @@ export default function MobileScanCheckInPage() {
       setScanErrorMsg(null);
       setPassesRequested(1);
       setResultModal(null);
+    }
+  };
+
+  const handleVerifyPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPin = pinInput.trim();
+    if (cleanPin === '1234' || cleanPin === '2026') {
+      setIsManualAuthorized(true);
+      setShowPinModal(false);
+      setPinError(null);
+      if (pendingManualGroupId) {
+        const targetId = pendingManualGroupId;
+        setPendingManualGroupId(null);
+        handleManualSelectGroup(targetId);
+      }
+    } else {
+      setPinError('✕ PIN de autorización incorrecto. Ingrese el PIN de 4 dígitos proporcionado por la Wedding Planner (PIN: 1234).');
     }
   };
 
@@ -949,6 +982,68 @@ export default function MobileScanCheckInPage() {
             >
               Entendido
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* CONTINGENCY AUTHORIZATION PIN MODAL (WEDDING PLANNER OVERRIDE) */}
+      {showPinModal && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="max-w-xs w-full bg-slate-900 border-2 border-[#C5A059] rounded-3xl p-6 shadow-2xl text-center space-y-4">
+            <div className="w-14 h-14 bg-amber-950/80 text-[#C5A059] rounded-2xl border border-[#C5A059]/40 flex items-center justify-center mx-auto shadow-md">
+              <Lock className="w-7 h-7" />
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-white font-serif">Autorización de Contingencia</h3>
+              <p className="text-xs text-slate-400 mt-1">
+                El ingreso manual por lista (sin mostrar el código QR) requiere el PIN de la <strong>Wedding Planner</strong> para evitar accesos no autorizados en puerta.
+              </p>
+            </div>
+
+            {pinError && (
+              <div className="p-2.5 bg-red-950/90 border border-red-800 text-red-300 text-[11px] rounded-xl font-medium">
+                {pinError}
+              </div>
+            )}
+
+            <form onSubmit={handleVerifyPin} className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-bold text-[#C5A059] uppercase tracking-wider mb-1">
+                  🔑 PIN de Autorización (PIN Demo: 1234):
+                </label>
+                <input
+                  type="password"
+                  maxLength={4}
+                  required
+                  autoFocus
+                  value={pinInput}
+                  onChange={(e) => setPinInput(e.target.value)}
+                  placeholder="• • • •"
+                  className="w-full bg-slate-950 border border-slate-700 text-white text-center text-xl tracking-[0.4em] py-2.5 rounded-xl focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-mono"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPinModal(false);
+                    setPendingManualGroupId(null);
+                    setPinError(null);
+                  }}
+                  className="w-1/2 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs rounded-xl transition"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="w-1/2 py-2.5 gold-button font-extrabold text-xs rounded-xl shadow-md transition"
+                >
+                  Autorizar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

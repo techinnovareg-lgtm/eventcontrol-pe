@@ -245,35 +245,54 @@ export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: 
 }
 
 /**
- * Async Authentication with Cross-Device Central Server Fallback
+ * Async Authentication with Central Server Authority First (Cross-Device Credential Sync)
  */
 export async function authenticateWorkspaceMemberAsync(emailOrUser: string, passwordInput: string): Promise<WorkspaceMemberUser | undefined> {
-  // 1. Try local browser localStorage first
-  const localMatch = authenticateWorkspaceMember(emailOrUser, passwordInput);
-  if (localMatch) return localMatch;
+  const cleanedInput = emailOrUser.trim().toLowerCase();
+  const trimmedPassword = passwordInput.trim();
 
-  // 2. Query central server API to fetch collaborator created on another device
+  // 1. Primary: Fetch latest authoritative member record from central server DB
   try {
-    const url = `/api/auth/sync-members?email=${encodeURIComponent(emailOrUser.trim())}&password=${encodeURIComponent(passwordInput.trim())}`;
+    const url = `/api/auth/sync-members?email=${encodeURIComponent(cleanedInput)}`;
     const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
       if (data.success && data.member) {
-        // Save fetched member to local browser storage for offline access
+        const serverMember: WorkspaceMemberUser = data.member;
+
+        // Update local memory store and localStorage with latest server member data
         const store = getStore();
-        const exists = store.some(m => m.id === data.member.id);
-        if (!exists) {
-          const updated = [data.member, ...store];
-          saveMembersToStorage(updated);
+        const idx = store.findIndex(m => m.id === serverMember.id || m.email.toLowerCase() === serverMember.email.toLowerCase());
+        if (idx !== -1) {
+          store[idx] = serverMember;
+        } else {
+          store.unshift(serverMember);
         }
-        return data.member;
+        saveMembersToStorage(store);
+
+        // Check active status
+        if (serverMember.status !== 'ACTIVO') return undefined;
+
+        // Check credentials expiration
+        if (serverMember.credentialsExpiresAt) {
+          const expiry = new Date(serverMember.credentialsExpiresAt).getTime();
+          if (Date.now() > expiry) return undefined;
+        }
+
+        // Verify password strictly against the latest initialPassword from central server
+        const expectedPass = (serverMember.initialPassword || 'puerta2026').trim();
+        const isMatch = expectedPass === trimmedPassword || expectedPass.toLowerCase() === trimmedPassword.toLowerCase();
+        if (isMatch) return serverMember;
+
+        return undefined; // Reject if password does not match latest server password
       }
     }
   } catch (err) {
-    console.warn('[SyncMembers API Query Error]', err);
+    console.warn('[SyncMembers API Online Query Warning - Falling back to offline local cache]', err);
   }
 
-  return undefined;
+  // 2. Secondary: Offline Contingency Fallback using local browser cache
+  return authenticateWorkspaceMember(emailOrUser, passwordInput);
 }
 
 export function findMemberByEmail(email: string): WorkspaceMemberUser | undefined {

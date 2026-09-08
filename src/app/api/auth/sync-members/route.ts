@@ -73,6 +73,21 @@ export async function GET(req: Request) {
     if (found) {
       return NextResponse.json({ success: true, member: found });
     } else {
+      return NextResponse.json({ success: false, message: 'Miembro o clave no coincide' }, { status: 401 });
+    }
+  }
+
+  if (emailOrUser) {
+    const cleanedInput = emailOrUser.trim().toLowerCase();
+    const found = globalServerMembersStore.find(m => {
+      const emailClean = (m.email || '').trim().toLowerCase();
+      const nameClean = (m.name || '').trim().toLowerCase();
+      return emailClean === cleanedInput || nameClean === cleanedInput;
+    });
+
+    if (found) {
+      return NextResponse.json({ success: true, member: found });
+    } else {
       return NextResponse.json({ success: false, message: 'Miembro no encontrado' }, { status: 404 });
     }
   }
