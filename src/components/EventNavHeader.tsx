@@ -16,9 +16,11 @@ interface EventNavHeaderProps {
 
 export default function EventNavHeader({
   currentTab,
-  eventId = 'evt-active',
+  eventId = 'evt-102',
   eventName = 'Evento Activo',
 }: EventNavHeaderProps) {
+
+  const safeEventId = (eventId && eventId.trim() !== '' && eventId !== 'undefined' && eventId !== 'null') ? eventId : 'evt-102';
 
   // Dynamic contract account & active session check
   const contractAccount = getAccountForSession();
@@ -32,14 +34,14 @@ export default function EventNavHeader({
   const userInitial = userName ? userName.charAt(0).toUpperCase() : 'A';
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: eventId && eventId !== 'evt-active' ? `/dashboard?eventId=${eventId}` : '/dashboard' },
-    { id: 'import', label: 'Importar Excel', icon: FileSpreadsheet, href: `/events/${eventId}/import` },
-    { id: 'tables', label: 'Plano de Mesas', icon: MapPin, href: `/events/${eventId}/tables` },
-    { id: 'qr', label: 'Pases & QR', icon: QrCode, href: `/events/${eventId}/qr` },
-    { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: `/events/${eventId}/whatsapp` },
-    { id: 'cuts', label: 'Cortes Catering', icon: Scissors, href: `/events/${eventId}/cuts` },
-    { id: 'reports', label: 'Reportes', icon: Clock, href: `/events/${eventId}/reports` },
-    { id: 'team', label: 'Equipo del Evento', icon: Users, href: `/events/${eventId}/team` },
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: `/dashboard?eventId=${safeEventId}` },
+    { id: 'import', label: 'Importar Excel', icon: FileSpreadsheet, href: `/events/${safeEventId}/import` },
+    { id: 'tables', label: 'Plano de Mesas', icon: MapPin, href: `/events/${safeEventId}/tables` },
+    { id: 'qr', label: 'Pases & QR', icon: QrCode, href: `/events/${safeEventId}/qr` },
+    { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: `/events/${safeEventId}/whatsapp` },
+    { id: 'cuts', label: 'Cortes Catering', icon: Scissors, href: `/events/${safeEventId}/cuts` },
+    { id: 'reports', label: 'Reportes', icon: Clock, href: `/events/${safeEventId}/reports` },
+    { id: 'team', label: 'Equipo del Evento', icon: Users, href: `/events/${safeEventId}/team` },
     { id: 'scan', label: 'Escáner PWA', icon: QrCode, href: `/scan` },
   ];
 
