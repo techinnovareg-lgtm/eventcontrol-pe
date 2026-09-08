@@ -117,6 +117,18 @@ export default function MobileScanCheckInPage() {
   const reloadEventData = async () => {
     if (!selectedEventId) return;
     setIsRefreshingList(true);
+    const updatedEvt = await getEventByIdAsync(selectedEventId, currentWorkspaceId);
+    if (updatedEvt) {
+      setWorkspaceEvents(prev => {
+        const idx = prev.findIndex(e => e.id === updatedEvt.id);
+        if (idx !== -1) {
+          const clone = [...prev];
+          clone[idx] = updatedEvt;
+          return clone;
+        }
+        return [updatedEvt, ...prev];
+      });
+    }
     const guestList = await getEventGuestGroupsAsync(selectedEventId);
     const tablesList = await getEventTablesAsync(selectedEventId);
     const assignmentsList = await getEventTableAssignmentsAsync(selectedEventId);
@@ -132,6 +144,19 @@ export default function MobileScanCheckInPage() {
     // Auto-sync polling every 5s to catch online sync from other doors or PC
     const timer = setInterval(() => {
       if (selectedEventId) {
+        getEventByIdAsync(selectedEventId, currentWorkspaceId).then(evt => {
+          if (evt) {
+            setWorkspaceEvents(prev => {
+              const idx = prev.findIndex(e => e.id === evt.id);
+              if (idx !== -1) {
+                const clone = [...prev];
+                clone[idx] = evt;
+                return clone;
+              }
+              return [evt, ...prev];
+            });
+          }
+        });
         getEventGuestGroupsAsync(selectedEventId).then(list => {
           if (list && list.length > 0) {
             setGroups(list);
@@ -147,7 +172,7 @@ export default function MobileScanCheckInPage() {
     }, 5000);
 
     return () => clearInterval(timer);
-  }, [selectedEventId]);
+  }, [selectedEventId, currentWorkspaceId]);
 
   // Network & Offline State
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -282,17 +307,7 @@ export default function MobileScanCheckInPage() {
   const [pinInput, setPinInput] = useState<string>('');
   const [pinError, setPinError] = useState<string | null>(null);
 
-  const handleManualSelectGroup = (groupId: string) => {
-    // If free manual checkin is enabled by Wedding Planner or user is not Operator, bypass PIN check
-    const isFreeAllowed = !!activeEvent?.allow_free_manual_checkin;
-    if (isOperator && !isManualAuthorized && !isFreeAllowed) {
-      setPendingManualGroupId(groupId);
-      setPinInput('');
-      setPinError(null);
-      setShowPinModal(true);
-      return;
-    }
-
+  const selectGroupDirectly = (groupId: string) => {
     const group = groups.find(g => g.id === groupId);
     if (group) {
       const token = getOrCreateGroupQRToken(groupId, selectedEventId, currentWorkspaceId);
@@ -305,22 +320,36 @@ export default function MobileScanCheckInPage() {
     }
   };
 
+  const handleManualSelectGroup = (groupId: string) => {
+    // If free manual checkin is enabled by Wedding Planner or user is not Operator, bypass PIN check
+    const isFreeAllowed = !!activeEvent?.allow_free_manual_checkin;
+    if (isOperator && !isManualAuthorized && !isFreeAllowed) {
+      setPendingManualGroupId(groupId);
+      setPinInput('');
+      setPinError(null);
+      setShowPinModal(true);
+      return;
+    }
+
+    selectGroupDirectly(groupId);
+  };
+
   const handleVerifyPin = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPin = pinInput.trim();
     const expectedPin = (activeEvent?.contingency_pin || '1234').trim();
 
-    if (cleanPin === expectedPin || cleanPin === '1234' || cleanPin === '2026') {
+    if (cleanPin === expectedPin) {
       setIsManualAuthorized(true);
       setShowPinModal(false);
       setPinError(null);
       if (pendingManualGroupId) {
         const targetId = pendingManualGroupId;
         setPendingManualGroupId(null);
-        handleManualSelectGroup(targetId);
+        selectGroupDirectly(targetId);
       }
     } else {
-      setPinError(`✕ PIN de autorización incorrecto. Ingrese el PIN configurado por la Wedding Planner.`);
+      setPinError(`✕ PIN de autorización incorrecto. Ingrese el PIN de 4 dígitos configurado por la Wedding Planner.`);
     }
   };
 
@@ -1013,7 +1042,7 @@ export default function MobileScanCheckInPage() {
             <form onSubmit={handleVerifyPin} className="space-y-3">
               <div>
                 <label className="block text-[10px] font-bold text-[#C5A059] uppercase tracking-wider mb-1">
-                  🔑 PIN de Autorización (PIN Demo: 1234):
+                  🔑 PIN de Autorización de la Wedding Planner:
                 </label>
                 <input
                   type="password"
