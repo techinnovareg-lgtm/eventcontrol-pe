@@ -90,8 +90,8 @@ export async function GET(req: Request) {
       }
     }
 
-    let assignments = globalServerAssignmentsStore[eventId] || [];
-    if (assignments.length === 0) {
+    let assignments = globalServerAssignmentsStore[eventId];
+    if (assignments === undefined) {
       const allAsgnLists = Object.values(globalServerAssignmentsStore);
       for (const list of allAsgnLists) {
         if (Array.isArray(list) && list.length > 0) {
@@ -101,18 +101,18 @@ export async function GET(req: Request) {
           }
         }
       }
-    }
-    if (assignments.length === 0) {
-      assignments = [
-        { id: 'asgn-1', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-1', group_id: 'grp-001', assigned_passes: 1, created_at: new Date().toISOString() },
-        { id: 'asgn-2', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-1', group_id: 'grp-002', assigned_passes: 6, created_at: new Date().toISOString() },
-        { id: 'asgn-3', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-2', group_id: 'grp-003', assigned_passes: 4, created_at: new Date().toISOString() },
-        { id: 'asgn-4', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-2', group_id: 'grp-004', assigned_passes: 2, created_at: new Date().toISOString() },
-        { id: 'asgn-5', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-3', group_id: 'grp-005', assigned_passes: 1, created_at: new Date().toISOString() },
-        { id: 'asgn-6', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-3', group_id: 'grp-006', assigned_passes: 4, created_at: new Date().toISOString() },
-        { id: 'asgn-7', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-4', group_id: 'grp-007', assigned_passes: 2, created_at: new Date().toISOString() },
-        { id: 'asgn-8', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-4', group_id: 'grp-008', assigned_passes: 3, created_at: new Date().toISOString() },
-      ];
+      if (!assignments) {
+        assignments = [
+          { id: 'asgn-1', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-1', group_id: 'grp-001', assigned_passes: 1, created_at: new Date().toISOString() },
+          { id: 'asgn-2', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-1', group_id: 'grp-002', assigned_passes: 6, created_at: new Date().toISOString() },
+          { id: 'asgn-3', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-2', group_id: 'grp-003', assigned_passes: 4, created_at: new Date().toISOString() },
+          { id: 'asgn-4', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-2', group_id: 'grp-004', assigned_passes: 2, created_at: new Date().toISOString() },
+          { id: 'asgn-5', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-3', group_id: 'grp-005', assigned_passes: 1, created_at: new Date().toISOString() },
+          { id: 'asgn-6', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-3', group_id: 'grp-006', assigned_passes: 4, created_at: new Date().toISOString() },
+          { id: 'asgn-7', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-4', group_id: 'grp-007', assigned_passes: 2, created_at: new Date().toISOString() },
+          { id: 'asgn-8', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-4', group_id: 'grp-008', assigned_passes: 3, created_at: new Date().toISOString() },
+        ];
+      }
       globalServerAssignmentsStore[eventId] = assignments;
     }
 

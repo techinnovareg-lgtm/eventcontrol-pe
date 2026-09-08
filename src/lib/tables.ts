@@ -121,13 +121,11 @@ export function autoSyncTablesToServer(eventId?: string) {
     targetEventIds.forEach(evtId => {
       const tables = allTables[evtId] || [];
       const assignments = allAssignments[evtId] || [];
-      if (tables.length > 0 || assignments.length > 0) {
-        fetch('/api/events/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
-        }).catch(() => {});
-      }
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
+      }).catch(() => {});
     });
   } catch (err) {}
 }
@@ -345,11 +343,10 @@ export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
 
 export function getEventTableAssignments(eventId: string): TableAssignment[] {
   const store = loadAssignmentsFromStorage();
-  if (store[eventId] && store[eventId].length > 0) return store[eventId];
-  // Fallback: Check if any event key in store has assignments
+  if (store[eventId] !== undefined) return store[eventId];
   const allLists = Object.values(store);
   for (const list of allLists) {
-    if (Array.isArray(list) && list.length > 0) return list;
+    if (Array.isArray(list)) return list;
   }
   return INITIAL_ASSIGNMENTS[eventId] || INITIAL_ASSIGNMENTS['evt-102'] || [];
 }
@@ -359,7 +356,7 @@ export async function getEventTableAssignmentsAsync(eventId: string): Promise<Ta
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.assignments) && data.assignments.length > 0) {
+      if (data.success && Array.isArray(data.assignments)) {
         const store = loadAssignmentsFromStorage();
         store[eventId] = data.assignments;
         saveAssignmentsToStorage(store);
@@ -389,6 +386,7 @@ export function assignGroupToTable(eventId: string, workspaceId: string, tableId
   };
   store[eventId].push(newAsgn);
   saveAssignmentsToStorage(store);
+  autoSyncTablesToServer(eventId);
   return newAsgn;
 }
 
@@ -397,6 +395,7 @@ export function unassignGroupFromTable(eventId: string, groupId: string): void {
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
     saveAssignmentsToStorage(store);
+    autoSyncTablesToServer(eventId);
   }
 }
 

@@ -448,7 +448,7 @@ export default function TablesManagementPage() {
         ctx.stroke();
 
         // Guest Assignments List
-        const tblAsgn = assignments.filter(a => a.table_id === tbl.id);
+        const tblAsgn = validAssignments.filter(a => a.table_id === tbl.id);
         let lineY = posY + 54;
         if (tblAsgn.length === 0) {
           ctx.fillStyle = '#94A3B8';
@@ -623,8 +623,9 @@ export default function TablesManagementPage() {
     };
   }, []);
 
-  // Filter unassigned groups
-  const assignedGroupIds = new Set(assignments.map(a => a.group_id));
+  // Filter valid assignments that match existing groups
+  const validAssignments = assignments.filter(a => groups.some(g => g.id === a.group_id));
+  const assignedGroupIds = new Set(validAssignments.map(a => a.group_id));
   const unassignedGroups = groups.filter(g => !assignedGroupIds.has(g.id));
 
   // EXACT MATHEMATICAL SEATING METRICS FOR INVITADOS (PERSONAS) + PASES (GRUPOS)
@@ -641,7 +642,7 @@ export default function TablesManagementPage() {
   const assignedGuestsPercentage = totalAuthorizedGuests > 0 ? Math.min(100, Math.round((totalAssignedGuests / totalAuthorizedGuests) * 100)) : 0;
 
   const selectedTableObj = tables.find(t => t.id === selectedTableId);
-  const selectedTableAssignments = assignments.filter(a => a.table_id === selectedTableId);
+  const selectedTableAssignments = validAssignments.filter(a => a.table_id === selectedTableId);
 
   // Helper icon renderer for Venue Elements
   const renderVenueElementIcon = (type: VenueElementType) => {
@@ -888,12 +889,12 @@ export default function TablesManagementPage() {
                     {!isCollapsed && (
                       <>
                         <div className="py-2 space-y-1 min-h-[45px]">
-                          {assignments.filter(a => a.table_id === tbl.id).length === 0 ? (
+                          {validAssignments.filter(a => a.table_id === tbl.id).length === 0 ? (
                             <span className="text-[11px] text-slate-400 italic block text-center pt-2">
                               Arrastra pases aquí
                             </span>
                           ) : (
-                            assignments.filter(a => a.table_id === tbl.id).map(asgn => {
+                            validAssignments.filter(a => a.table_id === tbl.id).map(asgn => {
                               const grp = groups.find(g => g.id === asgn.group_id);
                               return (
                                 <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
