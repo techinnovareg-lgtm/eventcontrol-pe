@@ -18,7 +18,8 @@ import {
   getEventTables, createTable, deleteTable, updateTable, getEventTableAssignments, 
   assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
   getEventVenueElements, createVenueElement, updateVenueElement, updateVenueElementPosition, 
-  deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions 
+  deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions,
+  autoSyncTablesToServer 
 } from '@/lib/tables';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
@@ -37,6 +38,10 @@ export default function TablesManagementPage() {
     const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
     setCurrentWorkspaceId(wsId);
   }, []);
+
+  useEffect(() => {
+    autoSyncTablesToServer(eventId);
+  }, [eventId]);
 
   const event = getEventById(eventId, currentWorkspaceId);
   const groups = getEventGuestGroups(eventId);
@@ -131,6 +136,7 @@ export default function TablesManagementPage() {
       };
     });
     setTablePositions(updatedPos);
+    autoSyncTablesToServer(eventId);
   };
 
   const handleCreateTable = (e: React.FormEvent) => {
@@ -202,6 +208,7 @@ export default function TablesManagementPage() {
     if (confirm('¿Eliminar esta mesa y liberar sus asignaciones?')) {
       deleteTable(eventId, tableId);
       if (selectedTableId === tableId) setSelectedTableId(null);
+      setEditingTableObj(null);
       refreshData();
     }
   };
@@ -209,6 +216,7 @@ export default function TablesManagementPage() {
   const handleDeleteVenueElement = (elemId: string) => {
     if (confirm('¿Eliminar este elemento del salón?')) {
       deleteVenueElement(eventId, elemId);
+      setEditingVenueElementObj(null);
       refreshData();
     }
   };

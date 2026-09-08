@@ -111,26 +111,7 @@ let tablesMemoryStore: Record<string, Table[]> | null = null;
 let assignmentsMemoryStore: Record<string, TableAssignment[]> | null = null;
 let venueElementsMemoryStore: Record<string, VenueElement[]> | null = null;
 
-function loadTablesFromStorage(): Record<string, Table[]> {
-  if (tablesMemoryStore) return tablesMemoryStore;
-  if (typeof window === 'undefined') return INITIAL_TABLES;
-  try {
-    const raw = localStorage.getItem(TABLES_STORAGE_KEY);
-    if (raw !== null) {
-      const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === 'object') {
-        tablesMemoryStore = parsed;
-        return parsed;
-      }
-    }
-  } catch (err) {
-    console.warn('[TablesStore] Failed to load tables from storage', err);
-  }
-  saveTablesToStorage(INITIAL_TABLES);
-  return INITIAL_TABLES;
-}
-
-function autoSyncTablesToServer(eventId?: string) {
+export function autoSyncTablesToServer(eventId?: string) {
   if (typeof window === 'undefined') return;
   try {
     const allTables = loadTablesFromStorage();
@@ -149,6 +130,26 @@ function autoSyncTablesToServer(eventId?: string) {
       }
     });
   } catch (err) {}
+}
+
+function loadTablesFromStorage(): Record<string, Table[]> {
+  if (tablesMemoryStore) return tablesMemoryStore;
+  if (typeof window === 'undefined') return INITIAL_TABLES;
+  try {
+    const raw = localStorage.getItem(TABLES_STORAGE_KEY);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        tablesMemoryStore = parsed;
+        setTimeout(() => autoSyncTablesToServer(), 100);
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('[TablesStore] Failed to load tables from storage', err);
+  }
+  saveTablesToStorage(INITIAL_TABLES);
+  return INITIAL_TABLES;
 }
 
 function saveTablesToStorage(data: Record<string, Table[]>) {
@@ -172,6 +173,7 @@ function loadAssignmentsFromStorage(): Record<string, TableAssignment[]> {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
         assignmentsMemoryStore = parsed;
+        setTimeout(() => autoSyncTablesToServer(), 100);
         return parsed;
       }
     }

@@ -65,8 +65,31 @@ export async function GET(req: Request) {
       }
     }
 
-    const tables = globalServerTablesStore[eventId] || [];
-    const assignments = globalServerAssignmentsStore[eventId] || [];
+    let tables = globalServerTablesStore[eventId] || [];
+    if (tables.length === 0) {
+      const allTableLists = Object.values(globalServerTablesStore);
+      for (const list of allTableLists) {
+        if (Array.isArray(list) && list.length > 0) {
+          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
+            tables = list;
+            break;
+          }
+        }
+      }
+    }
+
+    let assignments = globalServerAssignmentsStore[eventId] || [];
+    if (assignments.length === 0) {
+      const allAsgnLists = Object.values(globalServerAssignmentsStore);
+      for (const list of allAsgnLists) {
+        if (Array.isArray(list) && list.length > 0) {
+          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
+            assignments = list;
+            break;
+          }
+        }
+      }
+    }
 
     return NextResponse.json({
       success: true,
