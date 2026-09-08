@@ -48,9 +48,24 @@ function saveMembersToStorage(members: WorkspaceMemberUser[]) {
   }
 }
 
+function autoSyncMembersToServer() {
+  if (typeof window === 'undefined') return;
+  try {
+    const members = membersMemoryStore || loadMembersFromStorage();
+    if (members && members.length > 0) {
+      fetch('/api/auth/sync-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC', members }),
+      }).catch(() => {});
+    }
+  } catch (err) {}
+}
+
 function getStore(): WorkspaceMemberUser[] {
   if (!membersMemoryStore) {
     membersMemoryStore = loadMembersFromStorage();
+    setTimeout(() => autoSyncMembersToServer(), 100);
   }
   return membersMemoryStore;
 }

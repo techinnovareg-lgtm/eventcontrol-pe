@@ -105,18 +105,34 @@ export default function MobileScanCheckInPage() {
   const [groups, setGroups] = useState<GuestGroup[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
   const [tables, setTables] = useState<any[]>([]);
+  const [isRefreshingList, setIsRefreshingList] = useState<boolean>(false);
 
   const reloadEventData = async () => {
     if (!selectedEventId) return;
+    setIsRefreshingList(true);
     const guestList = await getEventGuestGroupsAsync(selectedEventId);
     setGroups(guestList);
     setAssignments(getEventTableAssignments(selectedEventId));
     setTables(getEventTables(selectedEventId));
+    setIsRefreshingList(false);
   };
 
   useEffect(() => {
     reloadEventData();
-  }, [selectedEventId]);
+
+    // Auto-retry polling every 4s if groups list is empty to catch online sync from PC
+    const timer = setInterval(() => {
+      if (selectedEventId && groups.length === 0) {
+        getEventGuestGroupsAsync(selectedEventId).then(list => {
+          if (list && list.length > 0) {
+            setGroups(list);
+          }
+        });
+      }
+    }, 4000);
+
+    return () => clearInterval(timer);
+  }, [selectedEventId, groups.length]);
 
   // Network & Offline State
   const [isOnline, setIsOnline] = useState<boolean>(true);
@@ -389,13 +405,22 @@ export default function MobileScanCheckInPage() {
           </div>
         )}
 
-        {/* Offline Controls Bar */}
-        <div className="flex gap-2 text-xs">
+        {/* Offline & Guest Refresh Controls Bar */}
+        <div className="flex flex-wrap gap-2 text-xs">
+          <button
+            onClick={reloadEventData}
+            disabled={isRefreshingList}
+            className="flex-1 py-2 px-3 bg-indigo-950 hover:bg-indigo-900 text-indigo-200 border border-indigo-800 rounded-xl transition flex items-center justify-center gap-1.5 font-bold"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 text-indigo-400 ${isRefreshingList ? 'animate-spin' : ''}`} />
+            {isRefreshingList ? 'Cargando Invitados...' : `Actualizar Lista (${groups.length} pases)`}
+          </button>
+
           <button
             onClick={handleDownloadManifest}
-            className="flex-1 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition flex items-center justify-center gap-1 font-semibold"
+            className="py-2 px-3 bg-slate-900 hover:bg-slate-800 text-slate-300 rounded-xl border border-slate-800 transition flex items-center justify-center gap-1 font-semibold"
           >
-            <Download className="w-3.5 h-3.5 text-[#C5A059]" /> {manifestDownloaded ? 'Caché Actualizado' : 'Descargar Manifiesto Offline'}
+            <Download className="w-3.5 h-3.5 text-[#C5A059]" /> {manifestDownloaded ? 'Manifiesto Listo' : 'Manifiesto Offline'}
           </button>
 
           {pendingSyncCount > 0 && (

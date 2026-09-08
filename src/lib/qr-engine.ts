@@ -16,6 +16,24 @@ export function generateSecureTokenString(): string {
   return `tk_${randomUuid.replace(/-/g, '')}`;
 }
 
+export function generateDeterministicTokenString(groupId: string): string {
+  if (!groupId) return generateSecureTokenString();
+  let hash1 = 0;
+  for (let i = 0; i < groupId.length; i++) {
+    const char = groupId.charCodeAt(i);
+    hash1 = ((hash1 << 5) - hash1) + char;
+    hash1 |= 0;
+  }
+  let hash2 = 5381;
+  for (let i = 0; i < groupId.length; i++) {
+    hash2 = ((hash2 << 5) + hash2) + groupId.charCodeAt(i);
+    hash2 |= 0;
+  }
+  const part1 = Math.abs(hash1).toString(36);
+  const part2 = Math.abs(hash2).toString(36);
+  return `tk_${part1}${part2}`;
+}
+
 /**
  * Returns or creates the active QR Token for a GuestGroup
  */
@@ -25,11 +43,11 @@ export function getOrCreateGroupQRToken(groupId: string, eventId: string, worksp
   }
 
   const newToken: QRToken = {
-    id: `qr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: `qr-${groupId}`,
     group_id: groupId,
     event_id: eventId,
     workspace_id: workspaceId,
-    token_hash: generateSecureTokenString(),
+    token_hash: generateDeterministicTokenString(groupId),
     is_active: true,
     created_at: new Date().toISOString(),
   };
@@ -48,7 +66,7 @@ export function revokeAndRegenerateQRToken(groupId: string, eventId: string, wor
   }
 
   const newToken: QRToken = {
-    id: `qr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+    id: `qr-${groupId}-${Date.now()}`,
     group_id: groupId,
     event_id: eventId,
     workspace_id: workspaceId,
@@ -144,12 +162,14 @@ export function findTokenAndGroupForScannedInput(
     return { valid: true, token: activeMatchedToken, group: matchedGroup };
   }
 
-  // 3. Match by group ID or group name directly in current active event
+  // 3. Match by group ID, group name, phone, external ID, or deterministic token in current active event
   const searchLower = cleanInput.toLowerCase();
   const matchedGroup = groups.find(
     g => g.id === cleanInput || 
+         generateDeterministicTokenString(g.id) === cleanInput ||
          g.group_name.toLowerCase() === searchLower || 
-         (g.responsible_phone && g.responsible_phone.toLowerCase() === searchLower)
+         (g.responsible_phone && g.responsible_phone.toLowerCase() === searchLower) ||
+         (g.external_id && g.external_id.toLowerCase() === searchLower)
   );
 
   if (matchedGroup) {
