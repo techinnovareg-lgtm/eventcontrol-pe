@@ -130,11 +130,33 @@ function loadTablesFromStorage(): Record<string, Table[]> {
   return INITIAL_TABLES;
 }
 
+function autoSyncTablesToServer(eventId?: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const allTables = loadTablesFromStorage();
+    const allAssignments = loadAssignmentsFromStorage();
+    const targetEventIds = eventId ? [eventId] : Array.from(new Set([...Object.keys(allTables), ...Object.keys(allAssignments)]));
+
+    targetEventIds.forEach(evtId => {
+      const tables = allTables[evtId] || [];
+      const assignments = allAssignments[evtId] || [];
+      if (tables.length > 0 || assignments.length > 0) {
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
+        }).catch(() => {});
+      }
+    });
+  } catch (err) {}
+}
+
 function saveTablesToStorage(data: Record<string, Table[]>) {
   tablesMemoryStore = data;
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(data));
+      setTimeout(() => autoSyncTablesToServer(), 100);
     } catch (err) {
       console.warn('[TablesStore] Failed to save tables to storage', err);
     }
@@ -165,6 +187,7 @@ function saveAssignmentsToStorage(data: Record<string, TableAssignment[]>) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(data));
+      setTimeout(() => autoSyncTablesToServer(), 100);
     } catch (err) {
       console.warn('[TablesStore] Failed to save assignments to storage', err);
     }
@@ -230,10 +253,7 @@ export function computeElementDimensions(
   return { width: w, height: h };
 }
 
-export function getEventTables(eventId: string): Table[] {
-  const store = loadTablesFromStorage();
-  return store[eventId] || [];
-}
+
 
 export function createTable(eventId: string, workspaceId: string, name: string, capacity: number, posX = 440, posY = 220): Table {
   const store = loadTablesFromStorage();
@@ -294,9 +314,46 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
   return null;
 }
 
+export function getEventTables(eventId: string): Table[] {
+  const store = loadTablesFromStorage();
+  return store[eventId] || [];
+}
+
+export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
+  try {
+    const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.tables) && data.tables.length > 0) {
+        const store = loadTablesFromStorage();
+        store[eventId] = data.tables;
+        saveTablesToStorage(store);
+        return data.tables;
+      }
+    }
+  } catch (err) {}
+  return getEventTables(eventId);
+}
+
 export function getEventTableAssignments(eventId: string): TableAssignment[] {
   const store = loadAssignmentsFromStorage();
   return store[eventId] || [];
+}
+
+export async function getEventTableAssignmentsAsync(eventId: string): Promise<TableAssignment[]> {
+  try {
+    const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.assignments) && data.assignments.length > 0) {
+        const store = loadAssignmentsFromStorage();
+        store[eventId] = data.assignments;
+        saveAssignmentsToStorage(store);
+        return data.assignments;
+      }
+    }
+  } catch (err) {}
+  return getEventTableAssignments(eventId);
 }
 
 export function assignGroupToTable(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): TableAssignment {

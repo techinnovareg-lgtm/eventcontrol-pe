@@ -18,7 +18,10 @@ import {
   getEventGuestGroups, getWorkspaceEvents, getEventById,
   getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync 
 } from '@/lib/events';
-import { getEventTableAssignments, getEventTables } from '@/lib/tables';
+import { 
+  getEventTableAssignments, getEventTables,
+  getEventTableAssignmentsAsync, getEventTablesAsync 
+} from '@/lib/tables';
 import { getActiveSession, setActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { GuestGroup, Event } from '@/lib/supabase/types';
 
@@ -111,9 +114,11 @@ export default function MobileScanCheckInPage() {
     if (!selectedEventId) return;
     setIsRefreshingList(true);
     const guestList = await getEventGuestGroupsAsync(selectedEventId);
+    const tablesList = await getEventTablesAsync(selectedEventId);
+    const assignmentsList = await getEventTableAssignmentsAsync(selectedEventId);
     setGroups(guestList);
-    setAssignments(getEventTableAssignments(selectedEventId));
-    setTables(getEventTables(selectedEventId));
+    setTables(tablesList);
+    setAssignments(assignmentsList);
     setIsRefreshingList(false);
   };
 
@@ -550,61 +555,92 @@ export default function MobileScanCheckInPage() {
               </div>
             </div>
 
-            {/* Quantity Touch Selectors */}
-            {matchedGroup.status !== 'COMPLETO' ? (
-              <div className="space-y-2">
-                <label className="block text-xs font-bold text-slate-300 text-center uppercase tracking-wider">
-                  ¿Cuántas personas ingresan ahora?
-                </label>
+            {/* Quantity Touch & Stepper Selectors */}
+            {matchedGroup.status !== 'COMPLETO' ? (() => {
+              const availablePasses = Math.max(1, matchedGroup.max_passes - (matchedGroup.checked_in_count || 0));
+              const quickOptions = [1, 2, 3, 4, 5, 10, 15, 20].filter(n => n <= availablePasses);
 
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5].map((num) => {
-                    const available = matchedGroup.max_passes - (matchedGroup.checked_in_count || 0);
-                    const disabled = num > available;
-                    return (
+              return (
+                <div className="space-y-3 pt-1">
+                  <label className="block text-xs font-bold text-slate-300 text-center uppercase tracking-wider">
+                    ¿Cuántas personas ingresan ahora? (Disponibles: {availablePasses})
+                  </label>
+
+                  {/* Stepper Counter Controls (- / +) */}
+                  <div className="flex items-center justify-center gap-3 bg-slate-950 p-2.5 rounded-2xl border border-slate-800">
+                    <button
+                      type="button"
+                      disabled={passesRequested <= 1}
+                      onClick={() => setPassesRequested(Math.max(1, passesRequested - 1))}
+                      className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xl font-bold border border-slate-700 flex items-center justify-center transition"
+                    >
+                      -
+                    </button>
+
+                    <div className="text-center px-4">
+                      <span className="text-2xl font-extrabold text-[#C5A059] block font-mono">
+                        {passesRequested}
+                      </span>
+                      <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                        {passesRequested === 1 ? 'Persona / Pase' : 'Personas / Pases'}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={passesRequested >= availablePasses}
+                      onClick={() => setPassesRequested(Math.min(availablePasses, passesRequested + 1))}
+                      className="w-12 h-12 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:cursor-not-allowed text-white text-xl font-bold border border-slate-700 flex items-center justify-center transition"
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  {/* Dynamic Quick Preset Buttons */}
+                  <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                    {quickOptions.map((num) => (
                       <button
                         key={num}
                         type="button"
-                        disabled={disabled}
                         onClick={() => setPassesRequested(num)}
-                        className={`py-3 text-base font-extrabold rounded-xl transition border ${
-                          disabled
-                            ? 'bg-slate-900 border-slate-800 text-slate-600 opacity-40 cursor-not-allowed'
-                            : passesRequested === num
-                            ? 'bg-[#C5A059] border-[#C5A059] text-slate-950 shadow-lg scale-105'
+                        className={`px-3 py-1.5 text-xs font-bold rounded-xl transition border ${
+                          passesRequested === num
+                            ? 'bg-[#C5A059] border-[#C5A059] text-slate-950 shadow-md scale-105'
                             : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
                         }`}
                       >
                         {num}
                       </button>
-                    );
-                  })}
-                </div>
+                    ))}
 
-                <button
-                  onClick={handleConfirmCheckIn}
-                  className="w-full py-4 gold-button font-extrabold text-base rounded-2xl transition shadow-xl flex items-center justify-center gap-2 mt-4"
-                >
-                  <CheckCircle2 className="w-6 h-6" /> CONFIRMAR INGRESO ({passesRequested} PASES)
-                </button>
-              </div>
-            ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPassesRequested(availablePasses)}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-xl transition border ${
+                        passesRequested === availablePasses
+                          ? 'bg-emerald-600 border-emerald-500 text-white shadow-md'
+                          : 'bg-emerald-950/80 border-emerald-800 text-emerald-300 hover:bg-emerald-900'
+                      }`}
+                    >
+                      TODOS ({availablePasses})
+                    </button>
+                  </div>
+
+                  <button
+                    onClick={handleConfirmCheckIn}
+                    className="w-full py-4 gold-button font-extrabold text-base rounded-2xl transition shadow-xl flex items-center justify-center gap-2 mt-4"
+                  >
+                    <CheckCircle2 className="w-6 h-6" /> CONFIRMAR INGRESO ({passesRequested} {passesRequested === 1 ? 'PASE' : 'PASES'})
+                  </button>
+                </div>
+              );
+            })() : (
               <div className="p-4 bg-red-950/60 border border-red-800 rounded-xl text-center space-y-1">
                 <XCircle className="w-8 h-8 text-red-500 mx-auto" />
                 <h4 className="text-sm font-bold text-red-300 font-serif">GRUPO COMPLETO</h4>
                 <p className="text-xs text-red-400">Todos los pases autorizados para esta lista han ingresado previamente.</p>
               </div>
             )}
-
-            {/* Test Concurrency Button */}
-            <div className="pt-2">
-              <button
-                onClick={handleSimulateConcurrency}
-                className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-xl border border-slate-700 transition flex items-center justify-center gap-1.5"
-              >
-                <Zap className="w-3.5 h-3.5 text-amber-400" /> Simular 2 Operadores Simultáneos (Caso 5)
-              </button>
-            </div>
           </div>
         ) : (
           /* BACKUP / FALLBACK MANUAL SELECTOR */
