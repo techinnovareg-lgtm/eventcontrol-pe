@@ -9,7 +9,7 @@ import {
   Pencil, Trash2
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById, updateEvent } from '@/lib/events';
+import { getEventById, updateEvent, updateEventAsync } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { 
   getEventMembers, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
@@ -41,13 +41,13 @@ export default function EventTeamPage() {
     }
   }, [eventId, currentWorkspaceId, event]);
 
-  const handleSaveContingencyPin = (e: React.FormEvent) => {
+  const handleSaveContingencyPin = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPin = contingencyPin.trim() || '1234';
-    updateEvent(eventId, {
+    await updateEventAsync(eventId, {
       contingency_pin: cleanPin,
       allow_free_manual_checkin: allowFreeManual,
-    });
+    }, currentWorkspaceId);
     setPinSavedSuccess('✓ ¡PIN de Contingencia guardado y sincronizado automáticamente con todas las puertas!');
     setTimeout(() => setPinSavedSuccess(null), 4000);
   };
@@ -195,7 +195,7 @@ export default function EventTeamPage() {
             </div>
 
             <span className="text-xs text-amber-900 font-extrabold bg-amber-100 px-3 py-1 rounded-full border border-amber-300 flex items-center gap-1 self-start sm:self-auto">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#B8860B]" /> CONTROL WEDDING PLANNER
+              <ShieldCheck className="w-3.5 h-3.5 text-[#B8860B]" /> CONTROL DEL ORGANIZADOR DEL EVENTO
             </span>
           </div>
 

@@ -24,6 +24,7 @@ import {
 } from '@/lib/tables';
 import { getActiveSession, setActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { GuestGroup, Event } from '@/lib/supabase/types';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 
 export default function MobileScanCheckInPage() {
   const session = getActiveSession();
@@ -141,6 +142,11 @@ export default function MobileScanCheckInPage() {
   useEffect(() => {
     reloadEventData();
 
+    // Subscribe to instant BroadcastChannel notifications for 0ms cross-tab sync
+    const unsubscribe = checkInRealtimeChannel.subscribe((data) => {
+      reloadEventData();
+    });
+
     // Auto-sync polling every 5s to catch online sync from other doors or PC
     const timer = setInterval(() => {
       if (selectedEventId) {
@@ -171,7 +177,10 @@ export default function MobileScanCheckInPage() {
       }
     }, 5000);
 
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
   }, [selectedEventId, currentWorkspaceId]);
 
   // Network & Offline State
@@ -334,10 +343,13 @@ export default function MobileScanCheckInPage() {
     selectGroupDirectly(groupId);
   };
 
-  const handleVerifyPin = (e: React.FormEvent) => {
+  const handleVerifyPin = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPin = pinInput.trim();
-    const expectedPin = (activeEvent?.contingency_pin || '1234').trim();
+
+    // Query fresh event from central online server DB in real-time
+    const freshEvt = await getEventByIdAsync(selectedEventId, currentWorkspaceId);
+    const expectedPin = (freshEvt?.contingency_pin || activeEvent?.contingency_pin || '1234').trim();
 
     if (cleanPin === expectedPin) {
       setIsManualAuthorized(true);
@@ -349,7 +361,7 @@ export default function MobileScanCheckInPage() {
         selectGroupDirectly(targetId);
       }
     } else {
-      setPinError(`✕ PIN de autorización incorrecto. Ingrese el PIN de 4 dígitos configurado por la Wedding Planner.`);
+      setPinError(`✕ PIN de autorización incorrecto. Ingrese el PIN de 4 dígitos configurado por el o la organizadora del evento.`);
     }
   };
 
@@ -1029,7 +1041,7 @@ export default function MobileScanCheckInPage() {
             <div>
               <h3 className="text-base font-bold text-white font-serif">Autorización de Contingencia</h3>
               <p className="text-xs text-slate-400 mt-1">
-                El ingreso manual por lista (sin mostrar el código QR) requiere el PIN de la <strong>Wedding Planner</strong> para evitar accesos no autorizados en puerta.
+                El ingreso manual por lista (sin mostrar el código QR) requiere el PIN de el o la organizadora del evento para evitar accesos no autorizados en puerta.
               </p>
             </div>
 
@@ -1042,7 +1054,7 @@ export default function MobileScanCheckInPage() {
             <form onSubmit={handleVerifyPin} className="space-y-3">
               <div>
                 <label className="block text-[10px] font-bold text-[#C5A059] uppercase tracking-wider mb-1">
-                  🔑 PIN de Autorización de la Wedding Planner:
+                  🔑 PIN de Autorización de el o la organizadora del evento:
                 </label>
                 <input
                   type="password"

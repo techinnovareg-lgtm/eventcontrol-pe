@@ -1,4 +1,5 @@
 import { Event, EventStatus, GuestGroup } from '@/lib/supabase/types';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 
 const EVENTS_STORAGE_KEY = 'eventcontrol_events';
 const GROUPS_STORAGE_KEY = 'eventcontrol_guest_groups';
@@ -207,22 +208,64 @@ export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'
   return newEvt;
 }
 
-export function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'created_at'>>): Event | undefined {
+export function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'created_at'>>): Event {
   const store = getEventsStore();
-  const evt = store.find(e => e.id === eventId);
-  if (evt) {
+  let evt = store.find(e => e.id === eventId);
+  if (!evt) {
+    evt = {
+      id: eventId,
+      workspace_id: 'ws-a-1111',
+      name: 'Evento Principal',
+      event_type: 'BODA_SOCIAL',
+      event_date: new Date().toISOString().split('T')[0],
+      status: 'ACTIVO',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      ...data,
+    };
+    store.unshift(evt);
+  } else {
     Object.assign(evt, data, { updated_at: new Date().toISOString() });
-    saveEventsToStorage(store);
+  }
 
-    if (typeof window !== 'undefined') {
-      fetch('/api/events/sync', {
+  saveEventsToStorage(store);
+  checkInRealtimeChannel.notify({ type: 'EVENT_UPDATED', eventId, event: evt });
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+    }).catch(err => console.warn('[Sync Event API dispatch warning]', err));
+  }
+
+  return evt;
+}
+
+export async function updateEventAsync(
+  eventId: string,
+  data: Partial<Omit<Event, 'id' | 'created_at'>>,
+  workspaceId?: string
+): Promise<Event> {
+  const updatedEvt = updateEvent(eventId, data);
+  if (workspaceId && updatedEvt.workspace_id !== workspaceId) {
+    updatedEvt.workspace_id = workspaceId;
+    saveEventsToStorage(getEventsStore());
+  }
+
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/events/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
-      }).catch(err => console.warn('[Sync Event API dispatch warning]', err));
+        body: JSON.stringify({ action: 'SYNC_EVENT', event: updatedEvt }),
+      });
+    } catch (err) {
+      console.warn('[updateEventAsync dispatch warning]', err);
     }
   }
-  return evt;
+
+  return updatedEvt;
 }
 
 export function deleteEvent(eventId: string): void {
