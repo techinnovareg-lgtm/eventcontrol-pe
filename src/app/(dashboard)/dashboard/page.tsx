@@ -11,7 +11,8 @@ import {
 import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
-import { getWorkspaceEvents } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync } from '@/lib/events';
+import { getEventTablesAsync, getEventTableAssignmentsAsync } from '@/lib/tables';
 import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 import { Calendar } from 'lucide-react';
 
@@ -25,52 +26,67 @@ export default function RealtimeDashboardPage() {
   const [recentCheckIns, setRecentCheckIns] = useState<any[]>([]);
   const [realtimePulse, setRealtimePulse] = useState(false);
 
+  const refreshDashboardData = async (targetEventId: string, targetWsId: string) => {
+    if (!targetEventId) return;
+    await getEventByIdAsync(targetEventId, targetWsId);
+    await getEventGuestGroupsAsync(targetEventId);
+    await getEventTablesAsync(targetEventId);
+    await getEventTableAssignmentsAsync(targetEventId);
+
+    setMetrics(calculateDashboardMetrics(targetEventId, targetWsId));
+    setTablesStats(getTablesOccupancyStats(targetEventId));
+    setRecentCheckIns(getRecentCheckInsFeed(targetEventId));
+  };
+
   useEffect(() => {
-    const session = getActiveSession();
-    if (session?.user?.role === 'OPERATOR') {
-      window.location.href = '/scan';
-      return;
-    }
-    const contract = getAccountForSession();
-    const wsId = session?.user?.workspaceId || contract?.workspaceId || 'ws-a-1111';
-    setCurrentWorkspaceId(wsId);
-
-    const userEvents = getWorkspaceEvents(wsId);
-    if (userEvents.length === 0) {
-      setHasNoEvents(true);
-    } else {
-      setHasNoEvents(false);
-
-      // Check if URL has ?eventId=
-      let selectedId = '';
-      if (typeof window !== 'undefined') {
-        const urlParams = new URLSearchParams(window.location.search);
-        selectedId = urlParams.get('eventId') || '';
+    async function initDashboard() {
+      const session = getActiveSession();
+      if (session?.user?.role === 'OPERATOR') {
+        window.location.href = '/scan';
+        return;
       }
+      const contract = getAccountForSession();
+      const wsId = session?.user?.workspaceId || contract?.workspaceId || 'ws-a-1111';
+      setCurrentWorkspaceId(wsId);
 
-      const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
-      const activeEvtId = activeEvt.id;
+      const userEvents = await getWorkspaceEventsAsync(wsId);
+      if (userEvents.length === 0) {
+        setHasNoEvents(true);
+      } else {
+        setHasNoEvents(false);
 
-      setEventId(activeEvtId);
-      setMetrics(calculateDashboardMetrics(activeEvtId, wsId));
-      setTablesStats(getTablesOccupancyStats(activeEvtId));
-      setRecentCheckIns(getRecentCheckInsFeed(activeEvtId));
+        let selectedId = '';
+        if (typeof window !== 'undefined') {
+          const urlParams = new URLSearchParams(window.location.search);
+          selectedId = urlParams.get('eventId') || '';
+        }
+
+        const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
+        const activeEvtId = activeEvt.id;
+
+        setEventId(activeEvtId);
+        await refreshDashboardData(activeEvtId, wsId);
+      }
     }
+
+    initDashboard();
   }, []);
 
   useEffect(() => {
-    if (hasNoEvents) return;
+    if (hasNoEvents || !eventId) return;
 
-    const unsubscribeFn = checkInRealtimeChannel.subscribe((payload) => {
-      setMetrics(calculateDashboardMetrics(eventId, currentWorkspaceId));
-      setTablesStats(getTablesOccupancyStats(eventId));
-      setRecentCheckIns(getRecentCheckInsFeed(eventId));
-      
+    const unsubscribeFn = checkInRealtimeChannel.subscribe(() => {
+      refreshDashboardData(eventId, currentWorkspaceId);
       setRealtimePulse(true);
       setTimeout(() => setRealtimePulse(false), 2000);
     });
 
+    const timer = setInterval(() => {
+      refreshDashboardData(eventId, currentWorkspaceId);
+    }, 3000);
+
     return () => {
+      clearInterval(timer);
       if (typeof unsubscribeFn === 'function') {
         unsubscribeFn();
       }

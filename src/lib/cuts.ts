@@ -1,46 +1,85 @@
 import { Cut } from '@/lib/supabase/types';
 import { calculateDashboardMetrics, getTablesOccupancyStats } from '@/lib/dashboard-stats';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 
-// Mock in-memory repository for Cuts
-let cutsStore: Record<string, Cut[]> = {
-  'evt-102': [
-    {
-      id: 'cut-1',
-      event_id: 'evt-102',
-      workspace_id: 'ws-a-1111',
-      cut_name: 'Brindis de Bienvenida',
-      cut_timestamp: new Date('2026-09-20T17:30:00').toISOString(),
-      total_authorized: 50,
-      total_present: 32,
-      total_pending: 18,
-      table_snapshots: [
-        { tableName: 'Mesa 1 (Familia)', present: 5, capacity: 10 },
-        { tableName: 'Mesa 2 (Amigos)', present: 4, capacity: 8 },
-        { tableName: 'Mesa 3 (Honor)', present: 3, capacity: 6 },
-      ],
-      created_at: new Date('2026-09-20T17:30:00').toISOString(),
-    },
-    {
-      id: 'cut-2',
-      event_id: 'evt-102',
-      workspace_id: 'ws-a-1111',
-      cut_name: 'Servicio de Comida (Catering)',
-      cut_timestamp: new Date('2026-09-20T19:00:00').toISOString(),
-      total_authorized: 50,
-      total_present: 42,
-      total_pending: 8,
-      table_snapshots: [
-        { tableName: 'Mesa 1 (Familia)', present: 7, capacity: 10 },
-        { tableName: 'Mesa 2 (Amigos)', present: 6, capacity: 8 },
-        { tableName: 'Mesa 3 (Honor)', present: 5, capacity: 6 },
-      ],
-      created_at: new Date('2026-09-20T19:00:00').toISOString(),
+const CUTS_STORAGE_KEY = 'eventcontrol_cuts';
+
+let cutsMemoryStore: Record<string, Cut[]> | null = null;
+
+function loadCutsFromStorage(): Record<string, Cut[]> {
+  if (cutsMemoryStore) return cutsMemoryStore;
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(CUTS_STORAGE_KEY);
+    if (raw !== null) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') {
+        cutsMemoryStore = parsed;
+        setTimeout(() => autoSyncCutsToServer(), 100);
+        return parsed;
+      }
     }
-  ]
-};
+  } catch (err) {
+    console.warn('[CutsStore] Failed to load cuts from storage', err);
+  }
+  return {};
+}
+
+function saveCutsToStorage(data: Record<string, Cut[]>) {
+  cutsMemoryStore = data;
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(CUTS_STORAGE_KEY, JSON.stringify(data));
+    } catch (err) {
+      console.warn('[CutsStore] Failed to save cuts to storage', err);
+    }
+  }
+}
+
+function autoSyncCutsToServer(eventId?: string) {
+  if (typeof window === 'undefined') return;
+  try {
+    const store = loadCutsFromStorage();
+    const targetEventIds = eventId ? [eventId] : Object.keys(store);
+
+    targetEventIds.forEach(evtId => {
+      const cuts = store[evtId] || [];
+      if (cuts.length > 0) {
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_CUTS', eventId: evtId, cuts }),
+        }).catch(() => {});
+      }
+    });
+  } catch (err) {}
+}
 
 export function getEventCuts(eventId: string): Cut[] {
-  return cutsStore[eventId] || [];
+  const store = loadCutsFromStorage();
+  if (store[eventId] && store[eventId].length > 0) return store[eventId];
+
+  const allLists = Object.values(store);
+  for (const list of allLists) {
+    if (Array.isArray(list) && list.length > 0) return list;
+  }
+  return [];
+}
+
+export async function getEventCutsAsync(eventId: string): Promise<Cut[]> {
+  try {
+    const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.cuts) && data.cuts.length > 0) {
+        const store = loadCutsFromStorage();
+        store[eventId] = data.cuts;
+        saveCutsToStorage(store);
+        return data.cuts;
+      }
+    }
+  } catch (err) {}
+  return getEventCuts(eventId);
 }
 
 /**
@@ -67,9 +106,39 @@ export function createEventCut(eventId: string, workspaceId: string, cutName: st
     created_at: new Date().toISOString(),
   };
 
-  if (!cutsStore[eventId]) cutsStore[eventId] = [];
-  cutsStore[eventId].unshift(newCut);
+  const store = loadCutsFromStorage();
+  if (!store[eventId]) store[eventId] = [];
+  store[eventId].unshift(newCut);
+  saveCutsToStorage(store);
+
+  checkInRealtimeChannel.notify({ type: 'CUT_CREATED', eventId, cut: newCut });
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SYNC_CUTS', eventId, cuts: store[eventId] }),
+    }).catch(err => console.warn('[Sync Cuts API dispatch warning]', err));
+  }
+
   return newCut;
+}
+
+export function deleteEventCut(eventId: string, cutId: string): void {
+  const store = loadCutsFromStorage();
+  if (store[eventId]) {
+    store[eventId] = store[eventId].filter(c => c.id !== cutId);
+    saveCutsToStorage(store);
+    checkInRealtimeChannel.notify({ type: 'CUT_DELETED', eventId, cutId });
+
+    if (typeof window !== 'undefined') {
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_CUTS', eventId, cuts: store[eventId] }),
+      }).catch(() => {});
+    }
+  }
 }
 
 export interface CateringAnalysisResult {
@@ -92,7 +161,6 @@ export interface CateringAnalysisResult {
  */
 export function calculateCateringDiff(eventId: string): CateringAnalysisResult | null {
   const cuts = getEventCuts(eventId);
-  // Find official food cut or latest cut
   const foodCut = cuts.find(c => c.cut_name.toLowerCase().includes('comida') || c.cut_name.toLowerCase().includes('catering')) || cuts[0];
 
   if (!foodCut) return null;
@@ -101,7 +169,6 @@ export function calculateCateringDiff(eventId: string): CateringAnalysisResult |
   const currentTablesStats = getTablesOccupancyStats(eventId);
 
   const lateArrivalsCount = Math.max(0, currentMetrics.totalEntered - foodCut.total_present);
-
   const snapTables = (foodCut.table_snapshots as any[]) || [];
 
   const tableBreakdown = currentTablesStats.map((ct) => {

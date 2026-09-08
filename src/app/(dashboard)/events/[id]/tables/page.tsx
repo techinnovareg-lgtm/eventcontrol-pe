@@ -13,14 +13,15 @@ import {
   Flower2, Columns, Waves, Trees, DoorOpen, Layers, Maximize, UserPlus, Printer, Download, FileText,
   FoldVertical, UnfoldVertical
 } from 'lucide-react';
-import { getEventById, getEventGuestGroups } from '@/lib/events';
+import { getEventById, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { 
-  getEventTables, createTable, deleteTable, updateTable, getEventTableAssignments, 
-  assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
+  getEventTables, getEventTablesAsync, createTable, deleteTable, updateTable, getEventTableAssignments, 
+  getEventTableAssignmentsAsync, assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
   getEventVenueElements, createVenueElement, updateVenueElement, updateVenueElementPosition, 
   deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions,
   autoSyncTablesToServer 
 } from '@/lib/tables';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
 
@@ -44,7 +45,7 @@ export default function TablesManagementPage() {
   }, [eventId]);
 
   const event = getEventById(eventId, currentWorkspaceId);
-  const groups = getEventGuestGroups(eventId);
+  const [groups, setGroups] = useState<GuestGroup[]>(() => getEventGuestGroups(eventId));
 
   const [tables, setTables] = useState<Table[]>(() => getEventTables(eventId));
   const [assignments, setAssignments] = useState<TableAssignment[]>(() => getEventTableAssignments(eventId));
@@ -121,23 +122,46 @@ export default function TablesManagementPage() {
   const [elementOrientation, setElementOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
   const [elementShape, setElementShape] = useState<'rect' | 'round_rect' | 'circle' | 'oval'>('circle');
 
-  const refreshData = () => {
-    const updatedTables = getEventTables(eventId);
+  const refreshDataAsync = async () => {
+    const updatedTables = await getEventTablesAsync(eventId);
+    const updatedAssignments = await getEventTableAssignmentsAsync(eventId);
+    const updatedGroups = await getEventGuestGroupsAsync(eventId);
     setTables([...updatedTables]);
-    setAssignments([...getEventTableAssignments(eventId)]);
+    setAssignments([...updatedAssignments]);
+    setGroups([...updatedGroups]);
     setVenueElements([...getEventVenueElements(eventId)]);
 
-    const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = {};
-    updatedTables.forEach((t, i) => {
-      updatedPos[t.id] = tablePositions[t.id] || {
-        x: t.pos_x || (140 + (i % 4) * 280),
-        y: t.pos_y || (140 + Math.floor(i / 4) * 200),
-        shape: 'ROUND',
-      };
+    setTablePositions(prev => {
+      const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+      updatedTables.forEach((t, i) => {
+        if (!updatedPos[t.id]) {
+          updatedPos[t.id] = {
+            x: t.pos_x || (140 + (i % 4) * 280),
+            y: t.pos_y || (140 + Math.floor(i / 4) * 200),
+            shape: 'ROUND',
+          };
+        }
+      });
+      return updatedPos;
     });
-    setTablePositions(updatedPos);
     autoSyncTablesToServer(eventId);
   };
+
+  const refreshData = () => {
+    refreshDataAsync();
+  };
+
+  useEffect(() => {
+    refreshDataAsync();
+    const interval = setInterval(refreshDataAsync, 3000);
+    const unsub = checkInRealtimeChannel.subscribe(() => {
+      refreshDataAsync();
+    });
+    return () => {
+      clearInterval(interval);
+      unsub();
+    };
+  }, [eventId]);
 
   const handleCreateTable = (e: React.FormEvent) => {
     e.preventDefault();

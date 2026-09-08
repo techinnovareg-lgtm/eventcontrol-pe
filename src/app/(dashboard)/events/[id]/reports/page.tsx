@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
@@ -8,9 +8,11 @@ import {
   CheckCircle2, Utensils, Users, Grid, ShieldCheck, Clock
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById, getEventGuestGroups } from '@/lib/events';
+import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { calculateDashboardMetrics, getTablesOccupancyStats } from '@/lib/dashboard-stats';
-import { calculateCateringDiff } from '@/lib/cuts';
+import { calculateCateringDiff, getEventCutsAsync } from '@/lib/cuts';
+import { getEventTablesAsync } from '@/lib/tables';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 import { exportEventToExcel } from '@/lib/export-engine';
 
 export default function EventReportsPage() {
@@ -18,11 +20,37 @@ export default function EventReportsPage() {
   const eventId = String(params.id || 'evt-102');
   const currentWorkspaceId = 'ws-a-1111';
 
-  const event = getEventById(eventId, currentWorkspaceId);
-  const metrics = calculateDashboardMetrics(eventId);
-  const groups = getEventGuestGroups(eventId);
-  const tablesStats = getTablesOccupancyStats(eventId);
-  const cateringDiff = calculateCateringDiff(eventId);
+  const [event, setEvent] = useState(() => getEventById(eventId, currentWorkspaceId));
+  const [metrics, setMetrics] = useState(() => calculateDashboardMetrics(eventId));
+  const [groups, setGroups] = useState(() => getEventGuestGroups(eventId));
+  const [tablesStats, setTablesStats] = useState(() => getTablesOccupancyStats(eventId));
+  const [cateringDiff, setCateringDiff] = useState(() => calculateCateringDiff(eventId));
+
+  const refreshData = async () => {
+    await Promise.all([
+      getEventByIdAsync(eventId, currentWorkspaceId),
+      getEventGuestGroupsAsync(eventId),
+      getEventTablesAsync(eventId),
+      getEventCutsAsync(eventId),
+    ]);
+    setEvent(getEventById(eventId, currentWorkspaceId));
+    setMetrics(calculateDashboardMetrics(eventId));
+    setGroups(getEventGuestGroups(eventId));
+    setTablesStats(getTablesOccupancyStats(eventId));
+    setCateringDiff(calculateCateringDiff(eventId));
+  };
+
+  useEffect(() => {
+    refreshData();
+    const interval = setInterval(refreshData, 3000);
+    const unsub = checkInRealtimeChannel.subscribe(() => {
+      refreshData();
+    });
+    return () => {
+      clearInterval(interval);
+      unsub();
+    };
+  }, [eventId]);
 
   const handleExportExcel = () => {
     exportEventToExcel(eventId, currentWorkspaceId);

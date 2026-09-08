@@ -385,13 +385,25 @@ export function updateSingleGuestGroupCheckIn(
   newStatus: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO'
 ): void {
   const store = getGroupsStore();
-  const eventGroups = store[eventId] || [];
+  let eventGroups = store[eventId];
+  if (!eventGroups || eventGroups.length === 0) {
+    const allLists = Object.values(store);
+    for (const list of allLists) {
+      if (Array.isArray(list) && list.some(g => g.id === groupId)) {
+        eventGroups = list;
+        break;
+      }
+    }
+  }
+
+  if (!eventGroups) eventGroups = [];
   const group = eventGroups.find(g => g.id === groupId);
 
   if (group) {
     group.checked_in_count = newCheckedInCount;
     group.status = newStatus;
     saveGroupsToStorage(store);
+    checkInRealtimeChannel.notify({ type: 'CHECKIN_UPDATED', eventId, groupId, newCheckedInCount, newStatus });
 
     if (typeof window !== 'undefined') {
       const workspaceId = group.workspace_id || '';

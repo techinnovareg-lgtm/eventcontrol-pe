@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { Event, GuestGroup, Table, TableAssignment } from '@/lib/supabase/types';
+import { Event, GuestGroup, Table, TableAssignment, Cut, CheckIn } from '@/lib/supabase/types';
+import { VenueElement } from '@/lib/tables';
 import fs from 'fs';
 import path from 'path';
 
@@ -8,6 +9,9 @@ let globalServerEventsStore: Event[] = [];
 let globalServerGroupsStore: Record<string, GuestGroup[]> = {};
 let globalServerTablesStore: Record<string, Table[]> = {};
 let globalServerAssignmentsStore: Record<string, TableAssignment[]> = {};
+let globalServerCutsStore: Record<string, Cut[]> = {};
+let globalServerCheckInsStore: Record<string, CheckIn[]> = {};
+let globalServerVenueElementsStore: Record<string, VenueElement[]> = {};
 
 const DB_FILE = path.join(process.cwd(), '.next', 'server_events_db.json');
 
@@ -21,6 +25,9 @@ function loadDbFromFile() {
         if (parsed.groups) globalServerGroupsStore = parsed.groups;
         if (parsed.tables) globalServerTablesStore = parsed.tables;
         if (parsed.assignments) globalServerAssignmentsStore = parsed.assignments;
+        if (parsed.cuts) globalServerCutsStore = parsed.cuts;
+        if (parsed.checkIns) globalServerCheckInsStore = parsed.checkIns;
+        if (parsed.venueElements) globalServerVenueElementsStore = parsed.venueElements;
       }
     }
   } catch (e) {}
@@ -35,6 +42,9 @@ function saveDbToFile() {
       groups: globalServerGroupsStore,
       tables: globalServerTablesStore,
       assignments: globalServerAssignmentsStore,
+      cuts: globalServerCutsStore,
+      checkIns: globalServerCheckInsStore,
+      venueElements: globalServerVenueElementsStore,
     }), 'utf-8');
   } catch (e) {}
 }
@@ -49,10 +59,12 @@ export async function GET(req: Request) {
   const eventId = searchParams.get('eventId');
 
   if (eventId) {
-    const event = globalServerEventsStore.find(e => e.id === eventId);
-    let groups = globalServerGroupsStore[eventId] || [];
+    let event = globalServerEventsStore.find(e => e.id === eventId);
+    if (!event && workspaceId) {
+      event = globalServerEventsStore.find(e => e.workspace_id === workspaceId);
+    }
 
-    // Fallback: If no groups under exact eventId, check if groups exist under any key or workspace
+    let groups = globalServerGroupsStore[eventId] || [];
     if (groups.length === 0) {
       const allGroupLists = Object.values(globalServerGroupsStore);
       for (const list of allGroupLists) {
@@ -91,12 +103,43 @@ export async function GET(req: Request) {
       }
     }
 
+    let cuts = globalServerCutsStore[eventId] || [];
+    if (cuts.length === 0) {
+      const allCutLists = Object.values(globalServerCutsStore);
+      for (const list of allCutLists) {
+        if (Array.isArray(list) && list.length > 0) {
+          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
+            cuts = list;
+            break;
+          }
+        }
+      }
+    }
+
+    let checkIns = globalServerCheckInsStore[eventId] || [];
+    if (checkIns.length === 0) {
+      const allCheckInLists = Object.values(globalServerCheckInsStore);
+      for (const list of allCheckInLists) {
+        if (Array.isArray(list) && list.length > 0) {
+          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
+            checkIns = list;
+            break;
+          }
+        }
+      }
+    }
+
+    let venueElements = globalServerVenueElementsStore[eventId] || [];
+
     return NextResponse.json({
       success: true,
       event: event || null,
       groups,
       tables,
       assignments,
+      cuts,
+      checkIns,
+      venueElements,
     });
   }
 
@@ -118,7 +161,7 @@ export async function POST(req: Request) {
   try {
     loadDbFromFile();
     const body = await req.json();
-    const { action, event, eventId, workspaceId, groups, tables, assignments } = body;
+    const { action, event, eventId, workspaceId, groups, tables, assignments, cuts, checkIn, venueElements } = body;
 
     if (action === 'SYNC_EVENT' && event) {
       const idx = globalServerEventsStore.findIndex(e => e.id === event.id);
@@ -131,17 +174,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, event });
     }
 
-    if (action === 'SYNC_GROUPS' && eventId && Array.isArray(groups)) {
-      const existingGroups = globalServerGroupsStore[eventId] || [];
+    if (action === 'SYNC_GROUPS' && Array.isArray(groups)) {
+      const targetEvtId = eventId || (groups[0]?.event_id) || 'evt-102';
+      
+      const existingGroups = globalServerGroupsStore[targetEvtId] || [];
       const mergedGroups = groups.map((g: GuestGroup) => {
         const exG = existingGroups.find(e => e.id === g.id);
-        if (!exG) return g;
-        const maxCount = Math.max(g.checked_in_count || 0, exG.checked_in_count || 0);
+        const maxCount = Math.max(g.checked_in_count || 0, exG ? (exG.checked_in_count || 0) : 0);
         const status: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO' = maxCount >= g.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
         return { ...g, checked_in_count: maxCount, status };
       });
 
-      globalServerGroupsStore[eventId] = mergedGroups;
+      existingGroups.forEach((exG: GuestGroup) => {
+        if (!mergedGroups.some(mg => mg.id === exG.id)) {
+          mergedGroups.push(exG);
+        }
+      });
+
+      globalServerGroupsStore[targetEvtId] = mergedGroups;
+
+      // Update all key entries in globalServerGroupsStore
+      Object.keys(globalServerGroupsStore).forEach(k => {
+        globalServerGroupsStore[k] = globalServerGroupsStore[k].map(g => {
+          const match = mergedGroups.find(m => m.id === g.id);
+          return match || g;
+        });
+      });
+
       saveDbToFile();
       return NextResponse.json({ success: true, count: mergedGroups.length });
     }
@@ -149,6 +208,28 @@ export async function POST(req: Request) {
     if (action === 'SYNC_TABLES' && eventId) {
       if (tables) globalServerTablesStore[eventId] = tables;
       if (assignments) globalServerAssignmentsStore[eventId] = assignments;
+      saveDbToFile();
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'SYNC_CUTS' && eventId && Array.isArray(cuts)) {
+      globalServerCutsStore[eventId] = cuts;
+      saveDbToFile();
+      return NextResponse.json({ success: true, count: cuts.length });
+    }
+
+    if (action === 'SYNC_CHECKINS' && eventId && checkIn) {
+      if (!globalServerCheckInsStore[eventId]) globalServerCheckInsStore[eventId] = [];
+      const exists = globalServerCheckInsStore[eventId].some(c => c.id === checkIn.id);
+      if (!exists) {
+        globalServerCheckInsStore[eventId].unshift(checkIn);
+      }
+      saveDbToFile();
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'SYNC_VENUE_ELEMENTS' && eventId && Array.isArray(venueElements)) {
+      globalServerVenueElementsStore[eventId] = venueElements;
       saveDbToFile();
       return NextResponse.json({ success: true });
     }

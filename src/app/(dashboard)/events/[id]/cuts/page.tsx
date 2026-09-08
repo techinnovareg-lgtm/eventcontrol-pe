@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useParams } from 'next/navigation';
@@ -9,8 +9,9 @@ import {
   Lock, Users, Grid, History, ArrowRight
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById } from '@/lib/events';
-import { getEventCuts, createEventCut, calculateCateringDiff } from '@/lib/cuts';
+import { getEventById, getEventGuestGroupsAsync, getEventByIdAsync } from '@/lib/events';
+import { getEventCuts, getEventCutsAsync, createEventCut, calculateCateringDiff } from '@/lib/cuts';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 import { Cut } from '@/lib/supabase/types';
 
 export default function EventCutsPage() {
@@ -20,24 +21,44 @@ export default function EventCutsPage() {
 
   const event = getEventById(eventId, currentWorkspaceId);
 
-  const [cuts, setCuts] = useState<Cut[]>(getEventCuts(eventId));
-  const [cateringDiff, setCateringDiff] = useState(calculateCateringDiff(eventId));
+  const [cuts, setCuts] = useState<Cut[]>(() => getEventCuts(eventId));
+  const [cateringDiff, setCateringDiff] = useState(() => calculateCateringDiff(eventId));
   const [cutName, setCutName] = useState('Servicio de Comida (Catering)');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  const refreshCuts = () => {
-    setCuts([...getEventCuts(eventId)]);
+  const refreshCuts = async () => {
+    await getEventByIdAsync(eventId, currentWorkspaceId);
+    await getEventGuestGroupsAsync(eventId);
+    const freshCuts = await getEventCutsAsync(eventId);
+    setCuts([...freshCuts]);
     setCateringDiff(calculateCateringDiff(eventId));
   };
 
-  const handleCreateCut = (e: React.FormEvent) => {
+  useEffect(() => {
+    refreshCuts();
+
+    const unsubscribe = checkInRealtimeChannel.subscribe(() => {
+      refreshCuts();
+    });
+
+    const timer = setInterval(() => {
+      refreshCuts();
+    }, 3000);
+
+    return () => {
+      clearInterval(timer);
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [eventId]);
+
+  const handleCreateCut = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!cutName) return;
 
     createEventCut(eventId, currentWorkspaceId, cutName);
     setCutName('');
     setShowCreateModal(false);
-    refreshCuts();
+    await refreshCuts();
   };
 
   return (
