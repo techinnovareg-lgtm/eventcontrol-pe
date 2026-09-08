@@ -288,3 +288,29 @@ export function deleteEventGuestGroups(eventId: string): void {
   delete store[eventId];
   saveGroupsToStorage(store);
 }
+
+export function updateSingleGuestGroupCheckIn(
+  eventId: string,
+  groupId: string,
+  newCheckedInCount: number,
+  newStatus: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO'
+): void {
+  const store = getGroupsStore();
+  const eventGroups = store[eventId] || [];
+  const group = eventGroups.find(g => g.id === groupId);
+
+  if (group) {
+    group.checked_in_count = newCheckedInCount;
+    group.status = newStatus;
+    saveGroupsToStorage(store);
+
+    if (typeof window !== 'undefined') {
+      const workspaceId = group.workspace_id || '';
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: eventGroups }),
+      }).catch(err => console.warn('[Sync Groups CheckIn dispatch warning]', err));
+    }
+  }
+}

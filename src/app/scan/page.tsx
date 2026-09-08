@@ -110,6 +110,10 @@ export default function MobileScanCheckInPage() {
   const [tables, setTables] = useState<any[]>([]);
   const [isRefreshingList, setIsRefreshingList] = useState<boolean>(false);
 
+  // Live Pass Attendance Grid State
+  const [gridFilterTab, setGridFilterTab] = useState<'ALL' | 'PARTIAL' | 'COMPLETE' | 'PENDING'>('ALL');
+  const [gridSearchTerm, setGridSearchTerm] = useState<string>('');
+
   const reloadEventData = async () => {
     if (!selectedEventId) return;
     setIsRefreshingList(true);
@@ -668,6 +672,195 @@ export default function MobileScanCheckInPage() {
             </select>
           </div>
         )}
+
+        {/* RESUMEN EN VIVO DE AVANCE DE INGRESO Y GRILLA DE PASES */}
+        {(() => {
+          const totalPasses = groups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
+          const enteredPasses = groups.reduce((sum, g) => sum + (g.checked_in_count || 0), 0);
+          const pendingPasses = Math.max(0, totalPasses - enteredPasses);
+          const enteredPercentage = totalPasses > 0 ? Math.round((enteredPasses / totalPasses) * 100) : 0;
+
+          const completeGroups = groups.filter(g => g.status === 'COMPLETO' || (g.checked_in_count || 0) >= g.max_passes);
+          const partialGroups = groups.filter(g => g.status === 'PARCIAL' || ((g.checked_in_count || 0) > 0 && (g.checked_in_count || 0) < g.max_passes));
+          const pendingGroups = groups.filter(g => (g.checked_in_count || 0) === 0 && g.status !== 'COMPLETO');
+
+          const filteredDisplayGroups = groups.filter(g => {
+            const checkedIn = g.checked_in_count || 0;
+            const isComp = checkedIn >= g.max_passes || g.status === 'COMPLETO';
+            const isPart = checkedIn > 0 && checkedIn < g.max_passes;
+            const isPend = checkedIn === 0 && !isComp;
+
+            if (gridFilterTab === 'PARTIAL' && !isPart) return false;
+            if (gridFilterTab === 'COMPLETE' && !isComp) return false;
+            if (gridFilterTab === 'PENDING' && !isPend) return false;
+
+            if (gridSearchTerm.trim()) {
+              const q = gridSearchTerm.trim().toLowerCase();
+              const nameMatch = g.group_name.toLowerCase().includes(q);
+              const phoneMatch = g.responsible_phone && g.responsible_phone.toLowerCase().includes(q);
+              return nameMatch || phoneMatch;
+            }
+
+            return true;
+          });
+
+          return (
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-4 shadow-2xl">
+              {/* Header Stats Bar */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <div>
+                  <span className="text-[11px] font-bold text-[#C5A059] uppercase tracking-wider block flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-[#C5A059]" /> Resumen de Avance de Ingresos en Puerta
+                  </span>
+                  <h3 className="text-base font-bold text-white font-serif mt-0.5">
+                    Avance: {enteredPasses} / {totalPasses} Personas Ingresadas ({enteredPercentage}%)
+                  </h3>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5 text-xs font-bold">
+                  <span className="px-2.5 py-1 bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 rounded-full">
+                    ✓ {enteredPasses} Ingresaron
+                  </span>
+                  <span className="px-2.5 py-1 bg-amber-950/80 text-amber-400 border border-amber-800/80 rounded-full">
+                    ⏳ {pendingPasses} Pendientes
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-1">
+                <div className="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                  <div 
+                    className="bg-gradient-to-r from-emerald-500 via-[#C5A059] to-amber-500 h-full transition-all duration-500"
+                    style={{ width: `${enteredPercentage}%` }}
+                  ></div>
+                </div>
+                <div className="flex justify-between text-[10px] text-slate-400 font-mono">
+                  <span>0 personas</span>
+                  <span>{enteredPercentage}% Ingresado</span>
+                  <span>Total: {totalPasses} personas</span>
+                </div>
+              </div>
+
+              {/* Filter Tabs & Live Search Bar */}
+              <div className="space-y-3 pt-1">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-1 text-[11px] font-bold">
+                    <button
+                      onClick={() => setGridFilterTab('ALL')}
+                      className={`px-2.5 py-1 rounded-xl border transition ${
+                        gridFilterTab === 'ALL'
+                          ? 'bg-[#C5A059] text-slate-950 border-[#C5A059]'
+                          : 'bg-slate-950 text-slate-300 border-slate-800 hover:bg-slate-800'
+                      }`}
+                    >
+                      Todos ({groups.length})
+                    </button>
+                    <button
+                      onClick={() => setGridFilterTab('PARTIAL')}
+                      className={`px-2.5 py-1 rounded-xl border transition ${
+                        gridFilterTab === 'PARTIAL'
+                          ? 'bg-amber-500 text-slate-950 border-amber-500'
+                          : 'bg-amber-950/40 text-amber-300 border-amber-900/60 hover:bg-amber-950'
+                      }`}
+                    >
+                      🟡 Parciales ({partialGroups.length})
+                    </button>
+                    <button
+                      onClick={() => setGridFilterTab('COMPLETE')}
+                      className={`px-2.5 py-1 rounded-xl border transition ${
+                        gridFilterTab === 'COMPLETE'
+                          ? 'bg-red-600 text-white border-red-600'
+                          : 'bg-red-950/40 text-red-300 border-red-900/60 hover:bg-red-950'
+                      }`}
+                    >
+                      🔴 Agotados ({completeGroups.length})
+                    </button>
+                    <button
+                      onClick={() => setGridFilterTab('PENDING')}
+                      className={`px-2.5 py-1 rounded-xl border transition ${
+                        gridFilterTab === 'PENDING'
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-emerald-950/40 text-emerald-300 border-emerald-900/60 hover:bg-emerald-950'
+                      }`}
+                    >
+                      🟢 Pendientes ({pendingGroups.length})
+                    </button>
+                  </div>
+
+                  {/* Search Box */}
+                  <div className="relative flex-1">
+                    <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={gridSearchTerm}
+                      onChange={(e) => setGridSearchTerm(e.target.value)}
+                      placeholder="Buscar invitado por nombre..."
+                      className="w-full pl-8 pr-3 py-1 bg-slate-950 border border-slate-800 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-[#C5A059]"
+                    />
+                  </div>
+                </div>
+
+                {/* Guest Groups Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+                  {filteredDisplayGroups.length === 0 ? (
+                    <div className="col-span-full p-6 text-center text-xs text-slate-500 bg-slate-950/60 rounded-xl border border-slate-800">
+                      No se encontraron pases con el filtro o término de búsqueda.
+                    </div>
+                  ) : (
+                    filteredDisplayGroups.map((g) => {
+                      const checkedIn = g.checked_in_count || 0;
+                      const isComp = checkedIn >= g.max_passes || g.status === 'COMPLETO';
+                      const isPart = checkedIn > 0 && checkedIn < g.max_passes;
+                      const tblAsgn = assignments.find(a => a.group_id === g.id);
+                      const tbl = tblAsgn ? tables.find(t => t.id === tblAsgn.table_id) : null;
+                      const tableNameStr = tbl ? tbl.name : 'Sin Mesa';
+
+                      return (
+                        <div 
+                          key={g.id}
+                          onClick={() => handleManualSelectGroup(g.id)}
+                          className={`p-2.5 rounded-xl border transition cursor-pointer flex items-center justify-between gap-2 hover:scale-[1.01] ${
+                            isComp 
+                              ? 'bg-red-950/20 border-red-900/50 hover:border-red-700' 
+                              : isPart 
+                              ? 'bg-amber-950/20 border-amber-900/50 hover:border-amber-700' 
+                              : 'bg-slate-950 border-slate-800 hover:border-slate-700'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5">
+                              <strong className="text-xs font-bold text-white truncate block">{g.group_name}</strong>
+                              <span className="text-[9px] text-purple-300 font-semibold bg-purple-950/80 px-1.5 py-0.2 rounded border border-purple-800/40 shrink-0">
+                                {tableNameStr}
+                              </span>
+                            </div>
+                            {g.responsible_phone && (
+                              <span className="text-[10px] text-slate-400 block truncate">Tel: {g.responsible_phone}</span>
+                            )}
+                          </div>
+
+                          <div className="text-right shrink-0">
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold block mb-0.5 ${
+                              isComp ? 'bg-red-950 text-red-400 border border-red-800' :
+                              isPart ? 'bg-amber-950 text-amber-400 border border-amber-800' :
+                              'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                            }`}>
+                              {isComp ? '🔴 AGOTADO' : isPart ? `🟡 ${checkedIn}/${g.max_passes}` : '🟢 PENDIENTE'}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400">
+                              {checkedIn} de {g.max_passes} pases
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* RESULT MODAL POPUP */}

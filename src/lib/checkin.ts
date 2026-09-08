@@ -1,6 +1,6 @@
 import { CheckIn, CheckInResultStatus, GuestGroup } from '@/lib/supabase/types';
 import { resolveQRToken } from '@/lib/qr-engine';
-import { getEventGuestGroups } from '@/lib/events';
+import { getEventGuestGroups, updateSingleGuestGroupCheckIn } from '@/lib/events';
 import { getEventTableAssignments, getEventTables } from '@/lib/tables';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
@@ -123,6 +123,9 @@ export function executeAtomicCheckIn(
 
   group.checked_in_count = newCheckedIn;
   group.status = newStatus;
+
+  // Persist check-in count & status locally and dispatch to central server API
+  updateSingleGuestGroupCheckIn(token.event_id, group.id, newCheckedIn, newStatus);
 
   // Audit log success check-in
   const checkInRecord: CheckIn = {
