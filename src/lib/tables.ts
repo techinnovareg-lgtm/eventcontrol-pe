@@ -318,7 +318,13 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
 
 export function getEventTables(eventId: string): Table[] {
   const store = loadTablesFromStorage();
-  return store[eventId] || [];
+  if (store[eventId] && store[eventId].length > 0) return store[eventId];
+  // Fallback: Check if any event key in store has tables
+  const allLists = Object.values(store);
+  for (const list of allLists) {
+    if (Array.isArray(list) && list.length > 0) return list;
+  }
+  return [];
 }
 
 export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
@@ -339,7 +345,13 @@ export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
 
 export function getEventTableAssignments(eventId: string): TableAssignment[] {
   const store = loadAssignmentsFromStorage();
-  return store[eventId] || [];
+  if (store[eventId] && store[eventId].length > 0) return store[eventId];
+  // Fallback: Check if any event key in store has assignments
+  const allLists = Object.values(store);
+  for (const list of allLists) {
+    if (Array.isArray(list) && list.length > 0) return list;
+  }
+  return [];
 }
 
 export async function getEventTableAssignmentsAsync(eventId: string): Promise<TableAssignment[]> {

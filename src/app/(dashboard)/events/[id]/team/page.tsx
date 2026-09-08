@@ -39,6 +39,7 @@ export default function EventTeamPage() {
   const [newMemberPassword, setNewMemberPassword] = useState('puerta2026');
   const [newMemberPhone, setNewMemberPhone] = useState('');
   const [newMemberRole, setNewMemberRole] = useState<WorkspaceUserRole>('OPERATOR');
+  const [newMemberExpiresAt, setNewMemberExpiresAt] = useState('');
   const [createdMemberSuccess, setCreatedMemberSuccess] = useState<{ member: WorkspaceMemberUser; rawPass: string } | null>(null);
 
   // Edit Modal State
@@ -48,6 +49,7 @@ export default function EventTeamPage() {
   const [editPassword, setEditPassword] = useState('');
   const [editRole, setEditRole] = useState<WorkspaceUserRole>('OPERATOR');
   const [editStatus, setEditStatus] = useState<'ACTIVO' | 'INACTIVO'>('ACTIVO');
+  const [editExpiresAt, setEditExpiresAt] = useState('');
   const [editMemberSuccess, setEditMemberSuccess] = useState<string | null>(null);
 
   const handleCreateSubUser = (e: React.FormEvent) => {
@@ -62,6 +64,7 @@ export default function EventTeamPage() {
       email: newMemberEmail,
       password: pass,
       role: newMemberRole,
+      credentialsExpiresAt: newMemberExpiresAt ? `${newMemberExpiresAt}T23:59:59.000Z` : undefined,
     });
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
@@ -75,6 +78,7 @@ export default function EventTeamPage() {
     setEditPassword(member.initialPassword || 'puerta2026');
     setEditRole(member.role);
     setEditStatus(member.status);
+    setEditExpiresAt(member.credentialsExpiresAt ? member.credentialsExpiresAt.split('T')[0] : '');
     setEditMemberSuccess(null);
   };
 
@@ -88,6 +92,7 @@ export default function EventTeamPage() {
       initialPassword: editPassword,
       role: editRole,
       status: editStatus,
+      credentialsExpiresAt: editExpiresAt ? `${editExpiresAt}T23:59:59.000Z` : '',
     });
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
@@ -113,6 +118,7 @@ export default function EventTeamPage() {
     setNewMemberPassword('puerta2026');
     setNewMemberPhone('');
     setNewMemberRole('OPERATOR');
+    setNewMemberExpiresAt('');
   };
 
   const getWhatsAppDispatchLink = () => {
@@ -198,7 +204,7 @@ export default function EventTeamPage() {
                     <th className="py-3.5 px-4">#</th>
                     <th className="py-3.5 px-4">Colaborador / Usuario</th>
                     <th className="py-3.5 px-4">Rol Asignado</th>
-                    <th className="py-3.5 px-4">Alcance de Permisos</th>
+                    <th className="py-3.5 px-4">Vencimiento Credenciales</th>
                     <th className="py-3.5 px-4">Estado</th>
                     <th className="py-3.5 px-4 text-right">Acciones</th>
                   </tr>
@@ -212,7 +218,7 @@ export default function EventTeamPage() {
                         <span className="text-xs text-slate-500 font-mono">{m.email}</span>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className={`font-bold ${
+                        <span className={`font-bold block ${
                           m.role === 'OWNER' ? 'text-amber-800 font-black' :
                           m.role === 'ADMIN' ? 'text-purple-700' :
                           m.role === 'COORDINADOR' ? 'text-indigo-700' :
@@ -220,8 +226,26 @@ export default function EventTeamPage() {
                         }`}>
                           {m.roleLabel}
                         </span>
+                        <span className="text-[10px] text-slate-400 font-medium block truncate max-w-[180px]">{m.permissionsScope}</span>
                       </td>
-                      <td className="py-3.5 px-4 text-slate-600 font-medium">{m.permissionsScope}</td>
+                      <td className="py-3.5 px-4">
+                        {(() => {
+                          const expStr = m.credentialsExpiresAt || contractInfo?.contractEndDate;
+                          if (!expStr) return <span className="text-slate-400 font-mono text-[10px]">Sin límite</span>;
+                          const expDate = new Date(expStr);
+                          const isExpired = Date.now() > expDate.getTime();
+                          const formatted = expDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                          return (
+                            <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] border inline-block ${
+                              isExpired 
+                                ? 'bg-red-100 text-red-800 border-red-300' 
+                                : 'bg-blue-50 text-blue-800 border-blue-200'
+                            }`}>
+                              {isExpired ? `🔴 EXPIRADA (${formatted})` : `🟢 VIGENTE (${formatted})`}
+                            </span>
+                          );
+                        })()}
+                      </td>
                       <td className="py-3.5 px-4">
                         <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] border ${
                           m.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' : 'bg-slate-100 text-slate-600 border-slate-300'
@@ -353,6 +377,21 @@ export default function EventTeamPage() {
                       <option value="COORDINADOR">COORDINADOR (Edición de Listas y Mesas del Evento)</option>
                       <option value="ADMIN">ADMINISTRADOR (Acceso Completo al Evento)</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                      📅 Vencimiento de Credenciales
+                    </label>
+                    <input
+                      type="date"
+                      value={newMemberExpiresAt}
+                      onChange={(e) => setNewMemberExpiresAt(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                      💡 <em>Si lo dejas en blanco, vencerá automáticamente cuando venza el plan contratado ({contractInfo?.contractEndDate ? new Date(contractInfo.contractEndDate).toLocaleDateString('es-PE') : 'Plan Principal'}).</em>
+                    </p>
                   </div>
 
                   <button
@@ -497,6 +536,21 @@ export default function EventTeamPage() {
                   <option value="COORDINADOR">COORDINADOR (Edición de Listas y Mesas del Evento)</option>
                   <option value="ADMIN">ADMINISTRADOR (Acceso Completo al Evento)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  📅 Vencimiento de Credenciales
+                </label>
+                <input
+                  type="date"
+                  value={editExpiresAt}
+                  onChange={(e) => setEditExpiresAt(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
+                />
+                <p className="text-[10px] text-slate-500 mt-1 font-medium">
+                  💡 <em>Dejar en blanco para aplicar vencimiento según plan del usuario principal ({contractInfo?.contractEndDate ? new Date(contractInfo.contractEndDate).toLocaleDateString('es-PE') : 'Plan'}).</em>
+                </p>
               </div>
 
               <div className="flex gap-2 pt-2">

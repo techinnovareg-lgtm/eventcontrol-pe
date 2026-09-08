@@ -11,7 +11,7 @@ import {
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts,
   verifySuperAdminPassword 
 } from '@/lib/superadmin-store';
-import { authenticateWorkspaceMemberAsync } from '@/lib/workspace-users';
+import { authenticateWorkspaceMemberAsync, findMemberByEmail } from '@/lib/workspace-users';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -172,6 +172,22 @@ export default function LoginPage() {
         router.push('/dashboard');
       }
       return;
+    }
+
+    // Check if sub-user exists but credentials expired or status is inactive
+    const existingMember = findMemberByEmail(inputEmail);
+    if (existingMember) {
+      if (existingMember.status === 'INACTIVO') {
+        setErrorMsg('Acceso denegado: Su cuenta de colaborador se encuentra inactiva. Contacte a su administrador.');
+        setLoading(false);
+        return;
+      }
+      if (existingMember.credentialsExpiresAt && new Date().getTime() > new Date(existingMember.credentialsExpiresAt).getTime()) {
+        const expFormatted = new Date(existingMember.credentialsExpiresAt).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        setErrorMsg(`✕ CREDENCIALES VENCIDAS: Sus credenciales expiraron el ${expFormatted}. Contacte al usuario principal para renovar su acceso.`);
+        setLoading(false);
+        return;
+      }
     }
 
     // Strict Rejection for unregistered emails or invalid credentials

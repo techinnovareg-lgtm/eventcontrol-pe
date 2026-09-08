@@ -137,6 +137,12 @@ export default function MobileScanCheckInPage() {
             setGroups(list);
           }
         });
+        getEventTablesAsync(selectedEventId).then(tList => {
+          if (tList && tList.length > 0) setTables(tList);
+        });
+        getEventTableAssignmentsAsync(selectedEventId).then(aList => {
+          if (aList && aList.length > 0) setAssignments(aList);
+        });
       }
     }, 5000);
 
@@ -194,9 +200,11 @@ export default function MobileScanCheckInPage() {
   // Resolve Table Name for Matched Group
   let matchedTableName = 'Sin Mesa Asignada';
   if (matchedGroup) {
-    const asgn = assignments.find(a => a.group_id === matchedGroup.id);
+    const currentAsgns = assignments.length > 0 ? assignments : getEventTableAssignments(selectedEventId);
+    const currentTbls = tables.length > 0 ? tables : getEventTables(selectedEventId);
+    const asgn = currentAsgns.find(a => a.group_id === matchedGroup.id);
     if (asgn) {
-      const tbl = tables.find(t => t.id === asgn.table_id);
+      const tbl = currentTbls.find(t => t.id === asgn.table_id);
       if (tbl) matchedTableName = tbl.name;
     }
   }
@@ -812,8 +820,10 @@ export default function MobileScanCheckInPage() {
                       const checkedIn = g.checked_in_count || 0;
                       const isComp = checkedIn >= g.max_passes || g.status === 'COMPLETO';
                       const isPart = checkedIn > 0 && checkedIn < g.max_passes;
-                      const tblAsgn = assignments.find(a => a.group_id === g.id);
-                      const tbl = tblAsgn ? tables.find(t => t.id === tblAsgn.table_id) : null;
+                      const currentAsgns = assignments.length > 0 ? assignments : getEventTableAssignments(selectedEventId);
+                      const currentTbls = tables.length > 0 ? tables : getEventTables(selectedEventId);
+                      const tblAsgn = currentAsgns.find(a => a.group_id === g.id);
+                      const tbl = tblAsgn ? currentTbls.find(t => t.id === tblAsgn.table_id) : null;
                       const tableNameStr = tbl ? tbl.name : 'Sin Mesa';
 
                       return (

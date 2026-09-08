@@ -1,3 +1,5 @@
+import { getAllAdminAccounts } from './superadmin-store';
+
 export type WorkspaceUserRole = 'OWNER' | 'ADMIN' | 'COORDINADOR' | 'OPERATOR';
 
 export interface WorkspaceMemberUser {
@@ -11,6 +13,7 @@ export interface WorkspaceMemberUser {
   permissionsScope: string;
   status: 'ACTIVO' | 'INACTIVO';
   initialPassword?: string;
+  credentialsExpiresAt?: string; // Custom expiration or defaults to main client plan expiration
   created_at: string;
 }
 
@@ -90,6 +93,7 @@ export function createWorkspaceMember(data: {
   email: string;
   password?: string;
   role: WorkspaceUserRole;
+  credentialsExpiresAt?: string;
 }): WorkspaceMemberUser {
   const store = getStore();
   const cleanedEmail = data.email.trim().toLowerCase();
@@ -108,6 +112,18 @@ export function createWorkspaceMember(data: {
     permissionsScope = 'Escaneo de QR y registro de check-in únicamente';
   }
 
+  // Determine expiration date: custom date provided by client OR default to main admin contract end date
+  let expiresAt = data.credentialsExpiresAt ? data.credentialsExpiresAt.trim() : undefined;
+  if (!expiresAt) {
+    const adminAccounts = getAllAdminAccounts();
+    const mainAccount = adminAccounts.find(a => a.workspaceId === data.workspaceId);
+    if (mainAccount && mainAccount.contractEndDate) {
+      expiresAt = mainAccount.contractEndDate;
+    } else {
+      expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+    }
+  }
+
   const newMember: WorkspaceMemberUser = {
     id: `wm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     workspaceId: data.workspaceId,
@@ -119,6 +135,7 @@ export function createWorkspaceMember(data: {
     permissionsScope,
     status: 'ACTIVO',
     initialPassword: data.password || 'puerta2026',
+    credentialsExpiresAt: expiresAt,
     created_at: new Date().toISOString(),
   };
 
@@ -139,7 +156,7 @@ export function createWorkspaceMember(data: {
 
 export function updateWorkspaceMember(
   memberId: string,
-  data: Partial<Pick<WorkspaceMemberUser, 'name' | 'email' | 'role' | 'status' | 'initialPassword'>>
+  data: Partial<Pick<WorkspaceMemberUser, 'name' | 'email' | 'role' | 'status' | 'initialPassword' | 'credentialsExpiresAt'>>
 ): WorkspaceMemberUser | undefined {
   const store = getStore();
   const member = store.find(m => m.id === memberId);
@@ -149,6 +166,9 @@ export function updateWorkspaceMember(
   if (data.email) member.email = data.email.trim().toLowerCase();
   if (data.initialPassword) member.initialPassword = data.initialPassword.trim();
   if (data.status) member.status = data.status;
+  if (data.credentialsExpiresAt !== undefined) {
+    member.credentialsExpiresAt = data.credentialsExpiresAt ? data.credentialsExpiresAt.trim() : undefined;
+  }
 
   if (data.role) {
     member.role = data.role;
@@ -208,10 +228,16 @@ export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: 
     const emailClean = (m.email || '').trim().toLowerCase();
     const nameClean = (m.name || '').trim().toLowerCase();
 
-    // Strict exact match on full email or full name only (avoids loose prefix collisions)
+    // Strict exact match on full email or full name only
     const isMatch = emailClean === cleanedInput || nameClean === cleanedInput;
     if (!isMatch) return false;
     if (m.status !== 'ACTIVO') return false;
+
+    // Enforce credentials expiration
+    if (m.credentialsExpiresAt) {
+      const expiry = new Date(m.credentialsExpiresAt).getTime();
+      if (Date.now() > expiry) return false;
+    }
 
     const expectedPass = (m.initialPassword || 'puerta2026').trim();
     return expectedPass === trimmedPassword || expectedPass.toLowerCase() === trimmedPassword.toLowerCase();
@@ -248,4 +274,10 @@ export async function authenticateWorkspaceMemberAsync(emailOrUser: string, pass
   }
 
   return undefined;
+}
+
+export function findMemberByEmail(email: string): WorkspaceMemberUser | undefined {
+  const store = getStore();
+  const clean = email.trim().toLowerCase();
+  return store.find(m => (m.email || '').trim().toLowerCase() === clean);
 }

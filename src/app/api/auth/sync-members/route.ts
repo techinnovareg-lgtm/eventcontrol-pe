@@ -13,6 +13,7 @@ export interface WorkspaceMemberUser {
   permissionsScope: string;
   status: 'ACTIVO' | 'INACTIVO';
   initialPassword?: string;
+  credentialsExpiresAt?: string;
   created_at: string;
 }
 
@@ -59,6 +60,11 @@ export async function GET(req: Request) {
 
       const isMatch = emailClean === cleanedInput || nameClean === cleanedInput;
       if (!isMatch || m.status !== 'ACTIVO') return false;
+
+      if (m.credentialsExpiresAt) {
+        const expiry = new Date(m.credentialsExpiresAt).getTime();
+        if (Date.now() > expiry) return false;
+      }
 
       const expectedPass = (m.initialPassword || 'puerta2026').trim();
       return expectedPass === trimmedPass || expectedPass.toLowerCase() === trimmedPass.toLowerCase();
