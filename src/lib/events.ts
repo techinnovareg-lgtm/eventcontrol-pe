@@ -91,25 +91,25 @@ export function getWorkspaceEvents(workspaceId: string): Event[] {
 }
 
 export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
-  const local = getWorkspaceEvents(workspaceId);
-  if (local.length > 0) return local;
-
+  // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.events) && data.events.length > 0) {
+      if (data.success && Array.isArray(data.events)) {
         const store = getEventsStore();
         const merged = [...data.events, ...store.filter(e => !data.events.some((de: Event) => de.id === e.id))];
         saveEventsToStorage(merged);
-        return merged.filter((e: Event) => e.workspace_id === workspaceId);
+        const onlineEvents = merged.filter((e: Event) => e.workspace_id === workspaceId);
+        if (onlineEvents.length > 0) return onlineEvents;
       }
     }
   } catch (err) {
-    console.warn('[Sync Events API Query Warning]', err);
+    console.warn('[Sync Events API Online Fetch Warning - Switching to Offline Contingency Cache]', err);
   }
 
-  return local;
+  // 2. Secondary: Offline Contingency Fallback Cache
+  return getWorkspaceEvents(workspaceId);
 }
 
 export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
@@ -124,9 +124,7 @@ export function getEventById(eventId: string, workspaceId?: string): Event | und
 }
 
 export async function getEventByIdAsync(eventId: string, workspaceId?: string): Promise<Event | undefined> {
-  const local = getEventById(eventId, workspaceId);
-  if (local) return local;
-
+  // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
@@ -141,7 +139,7 @@ export async function getEventByIdAsync(eventId: string, workspaceId?: string): 
         }
         saveEventsToStorage(store);
 
-        // Also save fetched groups if present
+        // Save fetched guest groups if present
         if (Array.isArray(data.groups) && data.groups.length > 0) {
           const gStore = getGroupsStore();
           gStore[eventId] = data.groups;
@@ -152,10 +150,11 @@ export async function getEventByIdAsync(eventId: string, workspaceId?: string): 
       }
     }
   } catch (err) {
-    console.warn('[Sync EventById API Query Warning]', err);
+    console.warn('[Sync EventById Online Fetch Warning - Switching to Offline Contingency Cache]', err);
   }
 
-  return undefined;
+  // 2. Secondary: Offline Contingency Fallback Cache
+  return getEventById(eventId, workspaceId);
 }
 
 export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Event {
@@ -213,25 +212,24 @@ export function getEventGuestGroups(eventId: string): GuestGroup[] {
 }
 
 export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGroup[]> {
-  const local = getEventGuestGroups(eventId);
-  if (local.length > 0) return local;
-
+  // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.groups) && data.groups.length > 0) {
+      if (data.success && Array.isArray(data.groups)) {
         const store = getGroupsStore();
         store[eventId] = data.groups;
         saveGroupsToStorage(store);
-        return data.groups;
+        if (data.groups.length > 0) return data.groups;
       }
     }
   } catch (err) {
-    console.warn('[Sync GuestGroups API Query Warning]', err);
+    console.warn('[Sync GuestGroups API Online Fetch Warning - Switching to Offline Contingency Cache]', err);
   }
 
-  return local;
+  // 2. Secondary: Offline Contingency Fallback Cache
+  return getEventGuestGroups(eventId);
 }
 
 export function saveEventGuestGroups(eventId: string, workspaceId: string, groups: Omit<GuestGroup, 'id' | 'created_at' | 'updated_at'>[]): GuestGroup[] {
