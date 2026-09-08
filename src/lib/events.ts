@@ -245,11 +245,11 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.groups)) {
+      if (data.success && Array.isArray(data.groups) && data.groups.length > 0) {
         const store = getGroupsStore();
         store[eventId] = data.groups;
         saveGroupsToStorage(store);
-        if (data.groups.length > 0) return data.groups;
+        return data.groups;
       }
     }
   } catch (err) {

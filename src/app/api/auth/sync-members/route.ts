@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server';
+import fs from 'fs';
+import path from 'path';
 
 export interface WorkspaceMemberUser {
   id: string;
@@ -17,7 +19,32 @@ export interface WorkspaceMemberUser {
 // Global server-side memory store for sub-users and door operators across devices
 let globalServerMembersStore: WorkspaceMemberUser[] = [];
 
+const MEMBERS_DB_FILE = path.join(process.cwd(), '.next', 'server_members_db.json');
+
+function loadMembersFromFile() {
+  try {
+    if (fs.existsSync(MEMBERS_DB_FILE)) {
+      const raw = fs.readFileSync(MEMBERS_DB_FILE, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        globalServerMembersStore = parsed;
+      }
+    }
+  } catch (e) {}
+}
+
+function saveMembersToFile() {
+  try {
+    const dir = path.dirname(MEMBERS_DB_FILE);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(MEMBERS_DB_FILE, JSON.stringify(globalServerMembersStore), 'utf-8');
+  } catch (e) {}
+}
+
+loadMembersFromFile();
+
 export async function GET(req: Request) {
+  loadMembersFromFile();
   const { searchParams } = new URL(req.url);
   const emailOrUser = searchParams.get('email') || searchParams.get('user');
   const password = searchParams.get('password');
@@ -49,6 +76,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    loadMembersFromFile();
     const body = await req.json();
     if (body.action === 'CREATE' || body.action === 'UPSERT') {
       const member: WorkspaceMemberUser = body.member;
@@ -59,11 +87,13 @@ export async function POST(req: Request) {
         } else {
           globalServerMembersStore.unshift(member);
         }
+        saveMembersToFile();
       }
     } else if (body.action === 'DELETE') {
       const memberId = body.memberId;
       if (memberId) {
         globalServerMembersStore = globalServerMembersStore.filter(m => m.id !== memberId);
+        saveMembersToFile();
       }
     } else if (body.action === 'SYNC') {
       const members: WorkspaceMemberUser[] = body.members || [];
@@ -75,6 +105,7 @@ export async function POST(req: Request) {
           globalServerMembersStore.unshift(m);
         }
       });
+      saveMembersToFile();
     }
 
     return NextResponse.json({ success: true, members: globalServerMembersStore });
