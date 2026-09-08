@@ -19,7 +19,7 @@ import {
   getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync 
 } from '@/lib/events';
 import { getEventTableAssignments, getEventTables } from '@/lib/tables';
-import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
+import { getActiveSession, setActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { GuestGroup, Event } from '@/lib/supabase/types';
 
 export default function MobileScanCheckInPage() {
@@ -36,7 +36,13 @@ export default function MobileScanCheckInPage() {
     let isMounted = true;
 
     async function loadEventsAsync() {
-      const operatorEventId = session?.user?.eventId;
+      const activeSession = getActiveSession();
+      if (!activeSession) {
+        if (typeof window !== 'undefined') window.location.href = '/login';
+        return;
+      }
+
+      const operatorEventId = activeSession?.user?.eventId;
       let events: Event[] = [];
 
       if (isOperator && operatorEventId) {
@@ -274,7 +280,7 @@ export default function MobileScanCheckInPage() {
       {/* Top Header Mobile */}
       <div className="space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3 gap-2">
-          {isOperator ? (
+          {(!session || session?.user?.role === 'OPERATOR' || isOperator) ? (
             <div className="flex items-center gap-2">
               <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#C5A059]/40 shrink-0">
                 <Image src="/logo-eventcontrol.jpg" alt="Logo" fill className="object-cover" />
@@ -298,7 +304,7 @@ export default function MobileScanCheckInPage() {
           )}
 
           <div className="flex items-center gap-2">
-            {isOperator && (
+            {(!session || session?.user?.role === 'OPERATOR' || isOperator) && (
               <>
                 <Link 
                   href="/" 
@@ -307,13 +313,16 @@ export default function MobileScanCheckInPage() {
                 >
                   <Home className="w-3 h-3 text-[#C5A059]" /> Inicio
                 </Link>
-                <Link 
-                  href="/login" 
+                <button 
+                  onClick={() => {
+                    setActiveSession(null);
+                    if (typeof window !== 'undefined') window.location.href = '/login';
+                  }} 
                   className="text-[11px] text-red-400 font-bold hover:text-red-300 px-2.5 py-1 bg-red-950/60 rounded-lg border border-red-800/60 transition flex items-center gap-1"
                   title="Cerrar Sesión"
                 >
                   <LogOut className="w-3 h-3" /> Salir
-                </Link>
+                </button>
               </>
             )}
 

@@ -420,18 +420,48 @@ export function rememberDevice(remember: boolean): void {
   }
 }
 
+const SESSION_STORAGE_KEY = 'eventcontrol_active_session';
+
 /**
- * Get Active Auth Session
+ * Get Active Auth Session (with browser storage persistence on refresh)
  */
 export function getActiveSession(): AuthSession | null {
-  return currentSession;
+  if (currentSession) return currentSession;
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.user) {
+          currentSession = parsed;
+          return parsed;
+        }
+      }
+    } catch (err) {
+      console.warn('[ActiveSession] Failed to read from storage', err);
+    }
+  }
+  return null;
 }
 
 /**
- * Set Active Session (Login)
+ * Set Active Session (Login / Logout with storage persistence)
  */
 export function setActiveSession(session: AuthSession | null): void {
   currentSession = session;
+  if (typeof window !== 'undefined') {
+    try {
+      if (session) {
+        localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
+      } else {
+        localStorage.removeItem(SESSION_STORAGE_KEY);
+        sessionStorage.removeItem(SESSION_STORAGE_KEY);
+      }
+    } catch (err) {
+      console.warn('[ActiveSession] Failed to save to storage', err);
+    }
+  }
 }
 
 /**
