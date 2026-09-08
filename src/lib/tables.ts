@@ -351,7 +351,7 @@ export function getEventTableAssignments(eventId: string): TableAssignment[] {
   for (const list of allLists) {
     if (Array.isArray(list) && list.length > 0) return list;
   }
-  return [];
+  return INITIAL_ASSIGNMENTS[eventId] || INITIAL_ASSIGNMENTS['evt-102'] || [];
 }
 
 export async function getEventTableAssignmentsAsync(eventId: string): Promise<TableAssignment[]> {

@@ -24,10 +24,12 @@ export default function ExcelImportWizardPage() {
   const params = useParams();
   const eventId = String(params.id || 'evt-102');
 
+  const [isMounted, setIsMounted] = useState<boolean>(false);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
   const [existingGroups, setExistingGroups] = useState<GuestGroup[]>([]);
 
   useEffect(() => {
+    setIsMounted(true);
     const session = getActiveSession();
     const account = getAccountForSession();
     const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
@@ -46,6 +48,16 @@ export default function ExcelImportWizardPage() {
   const [fileName, setFileName] = useState<string>('');
   const [sheets, setSheets] = useState<RawExcelSheet[]>([]);
   const [selectedSheetIndex, setSelectedSheetIndex] = useState<number>(0);
+
+  const handleReimport = () => {
+    setStep(1);
+    setFileName('');
+    setSheets([]);
+    setValidationResult(null);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   // Column Mappings
   const [mapping, setMapping] = useState<ColumnMapping>({
@@ -524,7 +536,7 @@ export default function ExcelImportWizardPage() {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={handleReimport}
                   className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-1.5"
                 >
                   <Upload className="w-3.5 h-3.5" /> Re-importar / Reemplazar Excel

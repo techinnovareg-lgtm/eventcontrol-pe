@@ -351,12 +351,16 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
 
 export function saveEventGuestGroups(eventId: string, workspaceId: string, groups: Omit<GuestGroup, 'id' | 'created_at' | 'updated_at'>[]): GuestGroup[] {
   const store = getGroupsStore();
-  const created: GuestGroup[] = groups.map((g, idx) => ({
-    ...g,
-    id: `gg-${eventId}-${idx + 1}-${Date.now()}`,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  }));
+  const created: GuestGroup[] = groups.map((g, idx) => {
+    const padNum = String(idx + 1).padStart(3, '0');
+    const stableId = `grp-${padNum}`;
+    return {
+      ...g,
+      id: (g as any).id || (idx < 12 ? stableId : `gg-${eventId}-${idx + 1}-${Date.now()}`),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  });
 
   store[eventId] = created;
   saveGroupsToStorage(store);
