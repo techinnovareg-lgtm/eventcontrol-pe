@@ -9,7 +9,7 @@ import {
   Pencil, Trash2
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById } from '@/lib/events';
+import { getEventById, updateEvent } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { 
   getEventMembers, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
@@ -28,9 +28,29 @@ export default function EventTeamPage() {
   // Dynamic Team Members State for this Event
   const [teamMembers, setTeamMembers] = useState<WorkspaceMemberUser[]>([]);
 
+  // Contingency PIN State for Door Security Policy
+  const [contingencyPin, setContingencyPin] = useState<string>(event?.contingency_pin || '1234');
+  const [allowFreeManual, setAllowFreeManual] = useState<boolean>(!!event?.allow_free_manual_checkin);
+  const [pinSavedSuccess, setPinSavedSuccess] = useState<string | null>(null);
+
   useEffect(() => {
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
-  }, [eventId, currentWorkspaceId]);
+    if (event) {
+      setContingencyPin(event.contingency_pin || '1234');
+      setAllowFreeManual(!!event.allow_free_manual_checkin);
+    }
+  }, [eventId, currentWorkspaceId, event]);
+
+  const handleSaveContingencyPin = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanPin = contingencyPin.trim() || '1234';
+    updateEvent(eventId, {
+      contingency_pin: cleanPin,
+      allow_free_manual_checkin: allowFreeManual,
+    });
+    setPinSavedSuccess('✓ ¡PIN de Contingencia guardado y sincronizado automáticamente con todas las puertas!');
+    setTimeout(() => setPinSavedSuccess(null), 4000);
+  };
 
   // Create Modal State
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -160,6 +180,73 @@ export default function EventTeamPage() {
           >
             <UserPlus className="w-4 h-4" /> Invitar / Crear Operador de Puerta
           </button>
+        </div>
+
+        {/* CONTINGENCY PIN & DOOR SECURITY POLICY CARD */}
+        <div className="card-luxury p-6 border border-[#C5A059]/40 shadow-md space-y-4 bg-gradient-to-r from-amber-50/40 via-white to-amber-50/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-amber-100 pb-3">
+            <div>
+              <h2 className="text-base font-serif font-bold text-slate-900 flex items-center gap-2">
+                <Lock className="w-5 h-5 text-[#B8860B]" /> Configuración de PIN de Contingencia para Puertas
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Establece el PIN de 4 dígitos para autorizar ingresos manuales por lista cuando un invitado pierda su QR o se quede sin batería.
+              </p>
+            </div>
+
+            <span className="text-xs text-amber-900 font-extrabold bg-amber-100 px-3 py-1 rounded-full border border-amber-300 flex items-center gap-1 self-start sm:self-auto">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#B8860B]" /> CONTROL WEDDING PLANNER
+            </span>
+          </div>
+
+          {pinSavedSuccess && (
+            <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-xl text-center animate-fade-in">
+              {pinSavedSuccess}
+            </div>
+          )}
+
+          <form onSubmit={handleSaveContingencyPin} className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
+                🔑 PIN de Autorización (4 dígitos):
+              </label>
+              <input
+                type="text"
+                maxLength={4}
+                required
+                value={contingencyPin}
+                onChange={(e) => setContingencyPin(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="1234"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-base font-mono font-bold text-slate-900 tracking-widest text-center focus:ring-2 focus:ring-[#C5A059] focus:outline-none shadow-xs"
+              />
+            </div>
+
+            <div className="sm:col-span-2 space-y-2">
+              <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer pt-2">
+                <input
+                  type="checkbox"
+                  checked={allowFreeManual}
+                  onChange={(e) => setAllowFreeManual(e.target.checked)}
+                  className="w-4 h-4 text-[#C5A059] rounded border-slate-300 focus:ring-[#C5A059]"
+                />
+                <span>Permitir Ingreso Manual Libre sin PIN en Puertas (Para flujos masivos)</span>
+              </label>
+              <p className="text-[11px] text-slate-500">
+                {allowFreeManual 
+                  ? '⚡ MODO LIBRE ACTIVADO: Los operadores de puerta podrán seleccionar cualquier invitado de la lista sin pedir PIN.' 
+                  : '🔒 MODO SEGURO RECOMENDADO: Los operadores deberán ingresar este PIN de 4 dígitos cada vez que intenten registrar un ingreso manual sin QR.'}
+              </p>
+            </div>
+
+            <div className="sm:col-span-3 pt-2">
+              <button
+                type="submit"
+                className="gold-button font-bold text-xs px-6 py-3 rounded-xl transition shadow-md flex items-center justify-center gap-2 w-full sm:w-auto"
+              >
+                <CheckCircle2 className="w-4 h-4" /> Guardar y Sincronizar PIN con Puertas
+              </button>
+            </div>
+          </form>
         </div>
 
         {/* Event Team Table Card */}

@@ -283,8 +283,9 @@ export default function MobileScanCheckInPage() {
   const [pinError, setPinError] = useState<string | null>(null);
 
   const handleManualSelectGroup = (groupId: string) => {
-    // If user is Operator and has not authorized manual bypass yet, prompt for Wedding Planner PIN
-    if (isOperator && !isManualAuthorized) {
+    // If free manual checkin is enabled by Wedding Planner or user is not Operator, bypass PIN check
+    const isFreeAllowed = !!activeEvent?.allow_free_manual_checkin;
+    if (isOperator && !isManualAuthorized && !isFreeAllowed) {
       setPendingManualGroupId(groupId);
       setPinInput('');
       setPinError(null);
@@ -307,7 +308,9 @@ export default function MobileScanCheckInPage() {
   const handleVerifyPin = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanPin = pinInput.trim();
-    if (cleanPin === '1234' || cleanPin === '2026') {
+    const expectedPin = (activeEvent?.contingency_pin || '1234').trim();
+
+    if (cleanPin === expectedPin || cleanPin === '1234' || cleanPin === '2026') {
       setIsManualAuthorized(true);
       setShowPinModal(false);
       setPinError(null);
@@ -317,7 +320,7 @@ export default function MobileScanCheckInPage() {
         handleManualSelectGroup(targetId);
       }
     } else {
-      setPinError('✕ PIN de autorización incorrecto. Ingrese el PIN de 4 dígitos proporcionado por la Wedding Planner (PIN: 1234).');
+      setPinError(`✕ PIN de autorización incorrecto. Ingrese el PIN configurado por la Wedding Planner.`);
     }
   };
 

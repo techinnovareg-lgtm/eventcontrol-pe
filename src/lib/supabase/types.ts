@@ -35,6 +35,8 @@ export interface Event {
   event_time?: string;
   venue_name?: string;
   status: EventStatus;
+  contingency_pin?: string;
+  allow_free_manual_checkin?: boolean;
   created_at: string;
   updated_at: string;
 }
