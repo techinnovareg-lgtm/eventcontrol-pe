@@ -57,34 +57,30 @@ export default function RealtimeDashboardPage() {
       const wsId = session?.user?.workspaceId || contract?.workspaceId || 'ws-a-1111';
       setCurrentWorkspaceId(wsId);
 
-      const userEvents = await getWorkspaceEventsAsync(wsId);
+      let userEvents = await getWorkspaceEventsAsync(wsId);
       if (userEvents.length === 0) {
-        setHasNoEvents(true);
-        setIsInitialLoading(false);
-        return;
-      } else {
-        setHasNoEvents(false);
-
-        let selectedId = '';
-        if (typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search);
-          selectedId = urlParams.get('eventId') || '';
-        }
-
-        const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
-        const activeEvtId = activeEvt.id;
-
-        setEventId(activeEvtId);
-        await refreshDashboardData(activeEvtId, wsId);
-        setIsInitialLoading(false);
+        userEvents = getWorkspaceEvents(wsId);
       }
+
+      let selectedId = '';
+      if (typeof window !== 'undefined') {
+        const urlParams = new URLSearchParams(window.location.search);
+        selectedId = urlParams.get('eventId') || '';
+      }
+
+      const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
+      const activeEvtId = activeEvt?.id || 'evt-principal-01';
+
+      setEventId(activeEvtId);
+      await refreshDashboardData(activeEvtId, wsId);
+      setIsInitialLoading(false);
     }
 
     initDashboard();
   }, []);
 
   useEffect(() => {
-    if (hasNoEvents || !eventId) return;
+    if (!eventId) return;
 
     const unsubscribeFn = checkInRealtimeChannel.subscribe(() => {
       refreshDashboardData(eventId, currentWorkspaceId);
@@ -102,7 +98,7 @@ export default function RealtimeDashboardPage() {
         unsubscribeFn();
       }
     };
-  }, [eventId, currentWorkspaceId, hasNoEvents]);
+  }, [eventId, currentWorkspaceId]);
 
   // Calculated donut chart stroke
   const circumference = 2 * Math.PI * 40;
@@ -122,53 +118,6 @@ export default function RealtimeDashboardPage() {
             <p className="text-xs text-slate-500">Sincronizando eventos y datos de monitoreo en tiempo real.</p>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  if (hasNoEvents) {
-    return (
-      <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col justify-between selection:bg-[#C5A059] selection:text-white">
-        <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-3">
-              <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 bg-white p-0.5">
-                <Image src="/logo-eventcontrol.jpg" alt="EventControl.pe Logo" fill className="object-cover rounded-lg" />
-              </div>
-              <div>
-                <span className="text-xl font-bold tracking-tight font-serif text-[#1A1A1A]">
-                  EventControl<span className="text-[#C5A059]">.pe</span>
-                </span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
-                  Dashboard de Monitoreo
-                </span>
-              </div>
-            </Link>
-            <Link href="/events" className="text-xs gold-button font-bold px-4 py-2 rounded-xl shadow-sm flex items-center gap-1.5">
-              <Plus className="w-4 h-4" /> Mis Eventos
-            </Link>
-          </div>
-        </header>
-
-        <main className="flex-1 max-w-xl mx-auto px-4 py-16 text-center space-y-6 flex flex-col justify-center w-full">
-          <div className="card-luxury p-10 border border-[#C5A059]/40 shadow-xl space-y-5 bg-white">
-            <div className="w-16 h-16 bg-amber-50 text-[#B8860B] rounded-2xl flex items-center justify-center mx-auto border border-[#C5A059]/40 shadow-sm">
-              <Calendar className="w-8 h-8 text-[#B8860B]" />
-            </div>
-            <div className="space-y-2">
-              <h2 className="text-2xl font-serif font-bold text-[#1A1A1A]">Sin Eventos Registrados</h2>
-              <p className="text-xs text-slate-500 leading-relaxed max-w-md mx-auto">
-                Para visualizar el panel de asistencias en tiempo real y el plano de mesas, primero debes registrar tu evento desde el Catálogo de Eventos.
-              </p>
-            </div>
-            <Link
-              href="/events"
-              className="gold-button font-bold text-xs px-6 py-3 rounded-xl transition shadow-md inline-flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" /> Ir a Crear Mi Primer Evento
-            </Link>
-          </div>
-        </main>
       </div>
     );
   }

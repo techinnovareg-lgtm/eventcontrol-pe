@@ -7,7 +7,18 @@ import { deleteEventQRTokens } from '@/lib/qr-engine';
 const EVENTS_STORAGE_KEY = 'eventcontrol_events';
 const GROUPS_STORAGE_KEY = 'eventcontrol_guest_groups';
 
-const INITIAL_EVENTS: Event[] = [];
+const DEFAULT_EVENT: Event = {
+  id: 'evt-principal-01',
+  workspace_id: 'ws-a-1111',
+  name: 'Evento Principal',
+  event_type: 'BODA_SOCIAL',
+  event_date: new Date().toISOString().split('T')[0],
+  status: 'ACTIVO',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
+const INITIAL_EVENTS: Event[] = [DEFAULT_EVENT];
 
 const INITIAL_GROUPS: Record<string, GuestGroup[]> = {};
 
@@ -23,7 +34,7 @@ function loadEventsFromStorage(): Event[] {
       if (Array.isArray(parsed)) {
         // Clean out legacy demo events (evt-101, evt-102) from browser storage
         const cleaned = parsed.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102');
-        return cleaned;
+        if (cleaned.length > 0) return cleaned;
       }
     }
   } catch (err) {

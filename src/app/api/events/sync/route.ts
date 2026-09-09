@@ -13,7 +13,18 @@ let globalServerCutsStore: Record<string, Cut[]> = {};
 let globalServerCheckInsStore: Record<string, CheckIn[]> = {};
 let globalServerVenueElementsStore: Record<string, VenueElement[]> = {};
 
-const DB_FILE = path.join(process.cwd(), '.next', 'server_events_db.json');
+const DB_FILE = path.join(process.cwd(), 'data', 'server_events_db.json');
+
+const DEFAULT_SERVER_EVENT: Event = {
+  id: 'evt-principal-01',
+  workspace_id: 'ws-a-1111',
+  name: 'Evento Principal',
+  event_type: 'BODA_SOCIAL',
+  event_date: new Date().toISOString().split('T')[0],
+  status: 'ACTIVO',
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
 
 function loadDbFromFile() {
   try {
@@ -57,6 +68,11 @@ function loadDbFromFile() {
       }
     }
   } catch (e) {}
+
+  if (globalServerEventsStore.length === 0) {
+    globalServerEventsStore = [DEFAULT_SERVER_EVENT];
+    saveDbToFile();
+  }
 }
 
 function saveDbToFile() {

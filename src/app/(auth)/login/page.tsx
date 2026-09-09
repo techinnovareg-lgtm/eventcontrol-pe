@@ -109,11 +109,8 @@ export default function LoginPage() {
         },
       });
       const userEvents = await getWorkspaceEventsAsync(wsId);
-      if (userEvents.length === 0) {
-        router.push('/events?create=true');
-      } else {
-        router.push(`/dashboard?eventId=${userEvents[0].id}`);
-      }
+      const targetEvtId = userEvents[0]?.id;
+      router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
       return;
     }
 
@@ -137,11 +134,8 @@ export default function LoginPage() {
       });
 
       const userEvents = await getWorkspaceEventsAsync(matchedAccount.workspaceId);
-      if (userEvents.length === 0) {
-        router.push('/events?create=true');
-      } else {
-        router.push(`/dashboard?eventId=${userEvents[0].id}`);
-      }
+      const targetEvtId = userEvents[0]?.id;
+      router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
       return;
     }
 
@@ -164,11 +158,8 @@ export default function LoginPage() {
         router.push(scanRoute);
       } else {
         const subUserEvents = await getWorkspaceEventsAsync(matchedSubUser.workspaceId);
-        if (subUserEvents.length === 0) {
-          router.push('/events?create=true');
-        } else {
-          router.push(`/dashboard?eventId=${subUserEvents[0].id}`);
-        }
+        const targetEvtId = subUserEvents[0]?.id;
+        router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
       }
       return;
     }
