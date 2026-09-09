@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { 
   setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice,
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts,
-  verifySuperAdminPassword 
+  verifySuperAdminPassword, authenticateAdminAccountAsync 
 } from '@/lib/superadmin-store';
 import { authenticateWorkspaceMemberAsync, findMemberByEmail } from '@/lib/workspace-users';
 
@@ -109,12 +109,8 @@ export default function LoginPage() {
       return;
     }
 
-    // Check against registered accounts store (including accounts created in Superadmin console)
-    const registeredAccounts = getAllAdminAccounts();
-    const matchedAccount = registeredAccounts.find(
-      acc => acc.contactEmail.toLowerCase() === inputEmail
-    );
-
+    // Check against registered accounts store (with cross-device central API fallback)
+    const matchedAccount = await authenticateAdminAccountAsync(inputEmail, password);
     if (matchedAccount) {
       if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
         setErrorMsg(`Acceso denegado: Su cuenta se encuentra ${matchedAccount.status.toLowerCase()}. Contacte al soporte de Tech Innova.`);
@@ -122,22 +118,6 @@ export default function LoginPage() {
         return;
       }
 
-      // Verify password strictly against registered account password
-      const expectedPassword = matchedAccount.initialPassword || 'EventControl2026!';
-      const inputPass = password.trim();
-      const isDefaultInitial = expectedPassword.toLowerCase() === 'eventcontrol2026!';
-      
-      const isMatch = isDefaultInitial 
-        ? inputPass.toLowerCase() === 'eventcontrol2026!'
-        : inputPass === expectedPassword;
-
-      if (!isMatch) {
-        setErrorMsg('Contraseña incorrecta. Verifique sus credenciales e intente nuevamente.');
-        setLoading(false);
-        return;
-      }
-
-      // Successfully authenticate registered client account
       setActiveSession({
         user: {
           id: matchedAccount.id,

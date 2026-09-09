@@ -101,11 +101,26 @@ function loadAccountsFromStorage(): AdminAccount[] {
   return INITIAL_ADMIN_ACCOUNTS;
 }
 
+export function autoSyncAccountsToServer() {
+  if (typeof window === 'undefined') return;
+  try {
+    const store = accountsMemoryStore || loadAccountsFromStorage();
+    if (store && store.length > 0) {
+      fetch('/api/auth/sync-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC', accounts: store }),
+      }).catch(() => {});
+    }
+  } catch (err) {}
+}
+
 export function saveAccountsToStorage(accounts: AdminAccount[]) {
   accountsMemoryStore = accounts;
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(accounts));
+      setTimeout(() => autoSyncAccountsToServer(), 100);
     } catch (err) {
       console.warn('[AdminAccountsStore] Failed to save to localStorage', err);
     }
@@ -115,8 +130,51 @@ export function saveAccountsToStorage(accounts: AdminAccount[]) {
 export function getAdminAccountsStore(): AdminAccount[] {
   if (!accountsMemoryStore) {
     accountsMemoryStore = loadAccountsFromStorage();
+    setTimeout(() => autoSyncAccountsToServer(), 100);
   }
   return accountsMemoryStore;
+}
+
+export async function authenticateAdminAccountAsync(emailInput: string, passwordInput: string): Promise<AdminAccount | null> {
+  const cleanedEmail = emailInput.trim().toLowerCase();
+  const trimmedPass = passwordInput.trim();
+
+  // 1. Primary: Query Central Online Server Accounts API first
+  try {
+    const res = await fetch(`/api/auth/sync-accounts?email=${encodeURIComponent(cleanedEmail)}&password=${encodeURIComponent(trimmedPass)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.account) {
+        const serverAccount: AdminAccount = data.account;
+        const store = getAdminAccountsStore();
+        const idx = store.findIndex(a => a.id === serverAccount.id || a.contactEmail.toLowerCase() === serverAccount.contactEmail.toLowerCase());
+        if (idx !== -1) {
+          store[idx] = serverAccount;
+        } else {
+          store.unshift(serverAccount);
+        }
+        saveAccountsToStorage(store);
+        return serverAccount;
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync Accounts API Auth Warning]', err);
+  }
+
+  // 2. Secondary: Fallback to local memory/localStorage store
+  const accounts = getAllAdminAccounts();
+  const matched = accounts.find(a => a.contactEmail.toLowerCase() === cleanedEmail);
+  if (matched) {
+    if (matched.status === 'SUSPENDIDA' || matched.status === 'VENCIDA') return null;
+    const expectedPassword = matched.initialPassword || 'EventControl2026!';
+    const isDefaultInitial = expectedPassword.toLowerCase() === 'eventcontrol2026!';
+    const isMatch = isDefaultInitial 
+      ? trimmedPass.toLowerCase() === 'eventcontrol2026!'
+      : trimmedPass === expectedPassword;
+    if (isMatch) return matched;
+  }
+
+  return null;
 }
 
 // Current active session state
