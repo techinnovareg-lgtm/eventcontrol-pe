@@ -316,6 +316,7 @@ export function getEventGuestGroups(eventId: string): GuestGroup[] {
 
 export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGroup[]> {
   const localStore = getGroupsStore();
+  const localGroups = localStore[eventId] || [];
 
   // 1. Primary: Query Central Online Database API first
   try {
@@ -323,6 +324,15 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.groups)) {
+        if (data.groups.length === 0 && localGroups.length > 0) {
+          // Re-push local groups to server if server is empty but local store has data
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, groups: localGroups }),
+          }).catch(err => console.warn('[Sync re-push local groups warning]', err));
+          return localGroups;
+        }
         localStore[eventId] = data.groups;
         saveGroupsToStorage(localStore);
         return data.groups;

@@ -128,3 +128,41 @@ export function getRecentCheckInsFeed(eventId: string, limit = 10): (CheckIn & {
     };
   });
 }
+
+export interface HourlyCheckInStat {
+  hour: string;
+  count: number;
+  label: string;
+}
+
+export function getHourlyCheckInBreakdown(eventId: string): HourlyCheckInStat[] {
+  const logs = getEventCheckInLogs(eventId).filter(l => l.result_status === 'SUCCESS_COMPLETE' || l.result_status === 'SUCCESS_PARTIAL');
+
+  const hoursMap: Record<string, number> = {
+    '16:00 - 18:00': 0,
+    '18:00 - 20:00': 0,
+    '20:00 - 22:00': 0,
+    '22:00 - 00:00': 0,
+    '00:00+': 0,
+  };
+
+  logs.forEach(log => {
+    const date = new Date(log.entry_timestamp || Date.now());
+    const h = date.getHours();
+    const count = log.passes_entered || 1;
+
+    if (h >= 16 && h < 18) hoursMap['16:00 - 18:00'] += count;
+    else if (h >= 18 && h < 20) hoursMap['18:00 - 20:00'] += count;
+    else if (h >= 20 && h < 22) hoursMap['20:00 - 22:00'] += count;
+    else if (h >= 22 && h < 24) hoursMap['22:00 - 00:00'] += count;
+    else hoursMap['00:00+'] += count;
+  });
+
+  return [
+    { hour: '16:00 - 18:00', count: hoursMap['16:00 - 18:00'], label: 'Recepción' },
+    { hour: '18:00 - 20:00', count: hoursMap['18:00 - 20:00'], label: 'Ingreso Principal' },
+    { hour: '20:00 - 22:00', count: hoursMap['20:00 - 22:00'], label: 'Cena & Brindis' },
+    { hour: '22:00 - 00:00', count: hoursMap['22:00 - 00:00'], label: 'Fiesta' },
+    { hour: '00:00+', count: hoursMap['00:00+'], label: 'Tardíos' },
+  ];
+}

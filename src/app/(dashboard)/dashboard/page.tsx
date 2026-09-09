@@ -8,7 +8,7 @@ import {
   Users, CheckCircle2, Clock, Grid, Plus, LogOut, QrCode, 
   MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart, ShieldCheck, BarChart3, ExternalLink
 } from 'lucide-react';
-import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed } from '@/lib/dashboard-stats';
+import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed, getHourlyCheckInBreakdown } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
 import { getWorkspaceEvents, getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync } from '@/lib/events';
@@ -108,15 +108,9 @@ export default function RealtimeDashboardPage() {
   const circumference = 2 * Math.PI * 40;
   const strokeDashoffset = circumference - (metrics.occupancyPercentage / 100) * circumference;
 
-  // Mock hourly entry breakdown data for visual bar chart
-  const hourlyData = [
-    { hour: '17:00', count: 12, label: 'Inicio' },
-    { hour: '18:00', count: 45, label: 'Coctel' },
-    { hour: '19:00', count: 85, label: 'Pico Entrada' },
-    { hour: '20:00', count: 68, label: 'Cena' },
-    { hour: '21:00', count: 21, label: 'Tardíos' },
-  ];
-  const maxHourly = Math.max(...hourlyData.map(h => h.count));
+  // Real-time hourly entry breakdown data for visual bar chart
+  const hourlyData = getHourlyCheckInBreakdown(eventId);
+  const maxHourly = Math.max(...hourlyData.map(h => h.count), 1);
 
   if (isInitialLoading) {
     return (
