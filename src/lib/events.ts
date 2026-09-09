@@ -119,7 +119,8 @@ function getGroupsStore(): Record<string, GuestGroup[]> {
 export function getWorkspaceEvents(workspaceId: string): Event[] {
   const store = getEventsStore();
   if (!workspaceId) return store;
-  return store.filter(e => e.workspace_id === workspaceId);
+  const filtered = store.filter(e => e.workspace_id === workspaceId);
+  return filtered.length > 0 ? filtered : store;
 }
 
 export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
@@ -128,12 +129,12 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
     const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.events)) {
+      if (data.success && Array.isArray(data.events) && data.events.length > 0) {
         const store = getEventsStore();
         const merged = [...data.events, ...store.filter(e => !data.events.some((de: Event) => de.id === e.id))];
         saveEventsToStorage(merged);
-        const onlineEvents = merged.filter((e: Event) => e.workspace_id === workspaceId);
-        if (onlineEvents.length > 0) return onlineEvents;
+        const filtered = merged.filter((e: Event) => e.workspace_id === workspaceId);
+        return filtered.length > 0 ? filtered : merged;
       }
     }
   } catch (err) {

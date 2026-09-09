@@ -60,7 +60,7 @@ export default function RealtimeDashboardPage() {
       const userEvents = await getWorkspaceEventsAsync(wsId);
       if (userEvents.length === 0) {
         setHasNoEvents(true);
-        window.location.href = '/events?create=true';
+        setIsInitialLoading(false);
         return;
       } else {
         setHasNoEvents(false);
