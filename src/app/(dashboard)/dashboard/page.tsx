@@ -17,11 +17,19 @@ import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 import { Calendar } from 'lucide-react';
 
 export default function RealtimeDashboardPage() {
+  const [isInitialLoading, setIsInitialLoading] = useState<boolean>(true);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
   const [eventId, setEventId] = useState<string>('');
   const [hasNoEvents, setHasNoEvents] = useState<boolean>(false);
 
-  const [metrics, setMetrics] = useState(() => calculateDashboardMetrics('', 'ws-a-1111'));
+  const [metrics, setMetrics] = useState<any>({
+    eventName: 'Cargando evento...',
+    totalGroupsCount: 0,
+    totalAuthorized: 0,
+    totalEntered: 0,
+    totalPending: 0,
+    occupancyPercentage: 0,
+  });
   const [tablesStats, setTablesStats] = useState<any[]>([]);
   const [recentCheckIns, setRecentCheckIns] = useState<any[]>([]);
   const [realtimePulse, setRealtimePulse] = useState(false);
@@ -52,6 +60,8 @@ export default function RealtimeDashboardPage() {
       const userEvents = await getWorkspaceEventsAsync(wsId);
       if (userEvents.length === 0) {
         setHasNoEvents(true);
+        window.location.href = '/events?create=true';
+        return;
       } else {
         setHasNoEvents(false);
 
@@ -66,6 +76,7 @@ export default function RealtimeDashboardPage() {
 
         setEventId(activeEvtId);
         await refreshDashboardData(activeEvtId, wsId);
+        setIsInitialLoading(false);
       }
     }
 
@@ -106,6 +117,20 @@ export default function RealtimeDashboardPage() {
     { hour: '21:00', count: 21, label: 'Tardíos' },
   ];
   const maxHourly = Math.max(...hourlyData.map(h => h.count));
+
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col justify-center items-center select-none">
+        <div className="card-luxury p-8 border border-[#C5A059]/40 shadow-xl text-center space-y-4 max-w-sm bg-white rounded-2xl">
+          <div className="w-12 h-12 border-4 border-[#C5A059] border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-serif font-bold text-slate-900">Cargando Workspace...</h3>
+            <p className="text-xs text-slate-500">Sincronizando eventos y datos de monitoreo en tiempo real.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (hasNoEvents) {
     return (

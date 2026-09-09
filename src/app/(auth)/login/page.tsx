@@ -12,6 +12,7 @@ import {
   verifySuperAdminPassword, authenticateAdminAccountAsync 
 } from '@/lib/superadmin-store';
 import { authenticateWorkspaceMemberAsync, findMemberByEmail } from '@/lib/workspace-users';
+import { getWorkspaceEvents } from '@/lib/events';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -127,7 +128,13 @@ export default function LoginPage() {
           workspaceId: matchedAccount.workspaceId,
         },
       });
-      router.push('/dashboard');
+
+      const userEvents = getWorkspaceEvents(matchedAccount.workspaceId);
+      if (userEvents.length === 0) {
+        router.push('/events?create=true');
+      } else {
+        router.push(`/dashboard?eventId=${userEvents[0].id}`);
+      }
       return;
     }
 
@@ -149,7 +156,12 @@ export default function LoginPage() {
         const scanRoute = matchedSubUser.eventId ? `/scan?event=${matchedSubUser.eventId}` : '/scan';
         router.push(scanRoute);
       } else {
-        router.push('/dashboard');
+        const subUserEvents = getWorkspaceEvents(matchedSubUser.workspaceId);
+        if (subUserEvents.length === 0) {
+          router.push('/events?create=true');
+        } else {
+          router.push(`/dashboard?eventId=${subUserEvents[0].id}`);
+        }
       }
       return;
     }

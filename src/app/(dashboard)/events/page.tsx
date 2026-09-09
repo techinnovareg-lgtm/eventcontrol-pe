@@ -35,6 +35,13 @@ export default function EventsCrudPage() {
     setUserName(name);
     setUserEmail(email);
     setUserInitial(name ? name.charAt(0).toUpperCase() : 'C');
+
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('create') === 'true' || urlParams.get('new') === 'true') {
+        setIsCreateModalOpen(true);
+      }
+    }
   }, []);
 
   // Create Modal State
