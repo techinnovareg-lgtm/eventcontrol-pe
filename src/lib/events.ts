@@ -1,5 +1,8 @@
 import { Event, EventStatus, GuestGroup } from '@/lib/supabase/types';
 import { checkInRealtimeChannel } from '@/lib/realtime';
+import { deleteEventTables, deleteEventAssignments, deleteEventVenueElements } from '@/lib/tables';
+import { deleteEventCuts } from '@/lib/cuts';
+import { deleteEventQRTokens } from '@/lib/qr-engine';
 
 const EVENTS_STORAGE_KEY = 'eventcontrol_events';
 const GROUPS_STORAGE_KEY = 'eventcontrol_guest_groups';
@@ -269,11 +272,40 @@ export async function updateEventAsync(
 }
 
 export function deleteEvent(eventId: string): void {
+  // 1. Remove from local events store
   const store = getEventsStore();
   const idx = store.findIndex(e => e.id === eventId);
   if (idx !== -1) {
     store.splice(idx, 1);
     saveEventsToStorage(store);
+  }
+
+  // 2. Cascade delete guest groups
+  const gStore = getGroupsStore();
+  delete gStore[eventId];
+  saveGroupsToStorage(gStore);
+
+  // 3. Cascade delete tables, assignments, and venue elements
+  deleteEventTables(eventId);
+  deleteEventAssignments(eventId);
+  deleteEventVenueElements(eventId);
+
+  // 4. Cascade delete cuts
+  deleteEventCuts(eventId);
+
+  // 5. Cascade delete QR tokens
+  deleteEventQRTokens(eventId);
+
+  // 6. Realtime local broadcast
+  checkInRealtimeChannel.notify({ type: 'EVENT_DELETED', eventId });
+
+  // 7. Cascade delete in central online server database
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'DELETE_EVENT', eventId }),
+    }).catch(err => console.warn('[Sync Delete Event API dispatch warning]', err));
   }
 }
 
@@ -284,61 +316,16 @@ export function getEventGuestGroups(eventId: string): GuestGroup[] {
 
 export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGroup[]> {
   const localStore = getGroupsStore();
-  const localGroups = localStore[eventId] || [];
 
   // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.groups) && data.groups.length > 0) {
-        const serverGroups: GuestGroup[] = data.groups;
-        let requiresServerReSync = false;
-
-        // Smart Reconciliation: Merge server data with local memory store without regressing check-ins
-        const mergedGroups = serverGroups.map(serverG => {
-          const localG = localGroups.find(lg => lg.id === serverG.id);
-          if (!localG) return serverG;
-
-          const localCount = localG.checked_in_count || 0;
-          const serverCount = serverG.checked_in_count || 0;
-
-          if (localCount > serverCount) {
-            requiresServerReSync = true;
-          }
-
-          const maxCount = Math.max(localCount, serverCount);
-          const status = maxCount >= serverG.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
-
-          return {
-            ...serverG,
-            checked_in_count: maxCount,
-            status: status as 'PENDIENTE' | 'PARCIAL' | 'COMPLETO',
-          };
-        });
-
-        // Also include any local groups missing from server
-        localGroups.forEach(localG => {
-          if (!mergedGroups.some(mg => mg.id === localG.id)) {
-            mergedGroups.push(localG);
-            requiresServerReSync = true;
-          }
-        });
-
-        localStore[eventId] = mergedGroups;
+      if (data.success && Array.isArray(data.groups)) {
+        localStore[eventId] = data.groups;
         saveGroupsToStorage(localStore);
-
-        // If local had higher check-in count, re-sync to server asynchronously
-        if (requiresServerReSync && typeof window !== 'undefined') {
-          const workspaceId = mergedGroups[0]?.workspace_id || '';
-          fetch('/api/events/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: mergedGroups }),
-          }).catch(err => console.warn('[Re-sync higher local count warning]', err));
-        }
-
-        return mergedGroups;
+        return data.groups;
       }
     }
   } catch (err) {
@@ -380,6 +367,19 @@ export function deleteEventGuestGroups(eventId: string): void {
   const store = getGroupsStore();
   delete store[eventId];
   saveGroupsToStorage(store);
+
+  deleteEventAssignments(eventId);
+  deleteEventQRTokens(eventId);
+
+  checkInRealtimeChannel.notify({ type: 'GROUPS_DELETED', eventId });
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'DELETE_GROUPS', eventId }),
+    }).catch(err => console.warn('[Sync Delete Groups API dispatch warning]', err));
+  }
 }
 
 export function updateSingleGuestGroupCheckIn(
@@ -389,18 +389,7 @@ export function updateSingleGuestGroupCheckIn(
   newStatus: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO'
 ): void {
   const store = getGroupsStore();
-  let eventGroups = store[eventId];
-  if (!eventGroups || eventGroups.length === 0) {
-    const allLists = Object.values(store);
-    for (const list of allLists) {
-      if (Array.isArray(list) && list.some(g => g.id === groupId)) {
-        eventGroups = list;
-        break;
-      }
-    }
-  }
-
-  if (!eventGroups) eventGroups = [];
+  const eventGroups = store[eventId] || [];
   const group = eventGroups.find(g => g.id === groupId);
 
   if (group) {

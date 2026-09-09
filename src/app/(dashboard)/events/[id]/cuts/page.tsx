@@ -16,7 +16,7 @@ import { Cut } from '@/lib/supabase/types';
 
 export default function EventCutsPage() {
   const params = useParams();
-  const eventId = String(params.id || 'evt-102');
+  const eventId = String(params.id || '');
   const currentWorkspaceId = 'ws-a-1111';
 
   const event = getEventById(eventId, currentWorkspaceId);
@@ -165,8 +165,15 @@ export default function EventCutsPage() {
             <span className="text-xs text-slate-500 font-medium">Fotografías estáticas congeladas</span>
           </div>
 
-          <div className="space-y-4">
-            {cuts.map((cut) => {
+          {cuts.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-xs text-slate-500 space-y-2">
+              <History className="w-8 h-8 text-slate-400 mx-auto" />
+              <p className="font-bold text-slate-700">Aún no se han registrado cortes de catering en este evento.</p>
+              <p className="text-slate-500">Haz clic en &quot;Realizar Corte Ahora&quot; para congelar la fotografía de invitados presentes a la hora del servicio.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {cuts.map((cut) => {
               const snapTables = (cut.table_snapshots as any[]) || [];
 
               return (
@@ -219,6 +226,7 @@ export default function EventCutsPage() {
               );
             })}
           </div>
+          )}
         </div>
       </main>
 

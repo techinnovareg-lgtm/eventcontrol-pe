@@ -4,7 +4,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { 
   BarChart3, MapPin, QrCode, MessageSquare, FileSpreadsheet, 
-  Clock, Scissors, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar, User, Users
+  Clock, Scissors, UtensilsCrossed, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar, User, Users
 } from 'lucide-react';
 import { calculateRemainingDays, getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
@@ -16,11 +16,11 @@ interface EventNavHeaderProps {
 
 export default function EventNavHeader({
   currentTab,
-  eventId = 'evt-102',
+  eventId = '',
   eventName = 'Evento Activo',
 }: EventNavHeaderProps) {
 
-  const safeEventId = (eventId && eventId.trim() !== '' && eventId !== 'undefined' && eventId !== 'null') ? eventId : 'evt-102';
+  const safeEventId = (eventId && eventId.trim() !== '' && eventId !== 'undefined' && eventId !== 'null') ? eventId : '';
 
   // Dynamic contract account & active session check
   const contractAccount = getAccountForSession();
@@ -34,14 +34,14 @@ export default function EventNavHeader({
   const userInitial = userName ? userName.charAt(0).toUpperCase() : 'A';
 
   const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: `/dashboard?eventId=${safeEventId}` },
-    { id: 'import', label: 'Importar Excel', icon: FileSpreadsheet, href: `/events/${safeEventId}/import` },
-    { id: 'tables', label: 'Plano de Mesas', icon: MapPin, href: `/events/${safeEventId}/tables` },
-    { id: 'qr', label: 'Pases & QR', icon: QrCode, href: `/events/${safeEventId}/qr` },
-    { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: `/events/${safeEventId}/whatsapp` },
-    { id: 'cuts', label: 'Cortes Catering', icon: Scissors, href: `/events/${safeEventId}/cuts` },
-    { id: 'reports', label: 'Reportes', icon: Clock, href: `/events/${safeEventId}/reports` },
-    { id: 'team', label: 'Equipo del Evento', icon: Users, href: `/events/${safeEventId}/team` },
+    { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: safeEventId ? `/dashboard?eventId=${safeEventId}` : '/dashboard' },
+    { id: 'import', label: 'Importar Excel', icon: FileSpreadsheet, href: safeEventId ? `/events/${safeEventId}/import` : '/events' },
+    { id: 'tables', label: 'Plano de Mesas', icon: MapPin, href: safeEventId ? `/events/${safeEventId}/tables` : '/events' },
+    { id: 'qr', label: 'Pases & QR', icon: QrCode, href: safeEventId ? `/events/${safeEventId}/qr` : '/events' },
+    { id: 'whatsapp', label: 'WhatsApp', icon: MessageSquare, href: safeEventId ? `/events/${safeEventId}/whatsapp` : '/events' },
+    { id: 'cuts', label: 'Cortes & Catering', icon: UtensilsCrossed, href: safeEventId ? `/events/${safeEventId}/cuts` : '/events' },
+    { id: 'team', label: 'Colaboradores & PIN', icon: Users, href: safeEventId ? `/events/${safeEventId}/team` : '/events' },
+    { id: 'reports', label: 'Reportes & Métricas', icon: Clock, href: safeEventId ? `/events/${safeEventId}/reports` : '/events' },
     { id: 'scan', label: 'Escáner PWA', icon: QrCode, href: `/scan` },
   ];
 

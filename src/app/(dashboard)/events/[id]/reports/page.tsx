@@ -17,7 +17,7 @@ import { exportEventToExcel } from '@/lib/export-engine';
 
 export default function EventReportsPage() {
   const params = useParams();
-  const eventId = String(params.id || 'evt-102');
+  const eventId = String(params.id || '');
   const currentWorkspaceId = 'ws-a-1111';
 
   const [event, setEvent] = useState(() => getEventById(eventId, currentWorkspaceId));

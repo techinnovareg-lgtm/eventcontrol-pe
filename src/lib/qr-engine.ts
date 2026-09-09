@@ -79,6 +79,14 @@ export function revokeAndRegenerateQRToken(groupId: string, eventId: string, wor
   return newToken;
 }
 
+export function deleteEventQRTokens(eventId: string): void {
+  Object.keys(qrTokenStore).forEach(key => {
+    if (qrTokenStore[key].event_id === eventId) {
+      delete qrTokenStore[key];
+    }
+  });
+}
+
 /**
  * Resolves a token hash to verify validity and return group details
  */

@@ -1,21 +1,28 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
-import { QrCode, ArrowLeft, RefreshCw, ShieldAlert, Download, Phone, Check, Copy } from 'lucide-react';
+import { QrCode, ArrowLeft, RefreshCw, ShieldAlert, Download, Phone, Check, Copy, FileSpreadsheet } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById, getEventGuestGroups } from '@/lib/events';
+import { getEventById, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { getOrCreateGroupQRToken, revokeAndRegenerateQRToken } from '@/lib/qr-engine';
 
 export default function QRManagementPage() {
   const params = useParams();
-  const eventId = String(params.id || 'evt-102');
+  const eventId = String(params.id || '');
   const currentWorkspaceId = 'ws-a-1111';
 
   const event = getEventById(eventId, currentWorkspaceId);
-  const groups = getEventGuestGroups(eventId);
+  const [groups, setGroups] = useState(() => getEventGuestGroups(eventId));
+
+  useEffect(() => {
+    setGroups(getEventGuestGroups(eventId));
+    if (eventId) {
+      getEventGuestGroupsAsync(eventId).then(g => setGroups(g));
+    }
+  }, [eventId]);
 
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
 
@@ -60,7 +67,24 @@ export default function QRManagementPage() {
           </div>
         </div>
 
-        {/* QR List Grid */}
+        {/* QR List Grid or Empty State */}
+        {groups.length === 0 ? (
+          <div className="card-luxury p-12 text-center border border-dashed border-slate-300 rounded-2xl space-y-3 bg-white">
+            <QrCode className="w-12 h-12 text-slate-400 mx-auto" />
+            <h3 className="text-base font-serif font-bold text-slate-800">Aún no hay códigos QR generados</h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              Para generar pases QR únicos por familia o grupo, primero importa tu lista de invitados desde la sección de Excel.
+            </p>
+            <div className="pt-2">
+              <Link
+                href={`/events/${eventId}/import`}
+                className="inline-flex items-center gap-2 gold-button px-5 py-2.5 rounded-xl font-bold text-xs shadow-sm"
+              >
+                <FileSpreadsheet className="w-4 h-4" /> Ir a Importar Invitados desde Excel
+              </Link>
+            </div>
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => {
             const token = getOrCreateGroupQRToken(group.id, eventId, currentWorkspaceId);
@@ -119,6 +143,7 @@ export default function QRManagementPage() {
             );
           })}
         </div>
+        )}
       </main>
     </div>
   );

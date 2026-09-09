@@ -30,6 +30,19 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Great+Vibes&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap" 
           rel="stylesheet" 
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                if (typeof window !== 'undefined' && 'caches' in window) {
+                  caches.delete('start-url');
+                  caches.delete('pages');
+                  caches.delete('pages-rsc');
+                }
+              } catch(e) {}
+            `,
+          }}
+        />
       </head>
       <body className="antialiased font-sans">{children}</body>
     </html>

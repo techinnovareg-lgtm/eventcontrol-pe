@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
@@ -17,13 +17,17 @@ import {
 
 export default function WhatsAppMessagingPage() {
   const params = useParams();
-  const eventId = String(params.id || 'evt-102');
+  const eventId = String(params.id || '');
   const currentWorkspaceId = 'ws-a-1111';
 
   const event = getEventById(eventId, currentWorkspaceId);
-  const groups = getEventGuestGroups(eventId);
+  const [groups, setGroups] = useState(() => getEventGuestGroups(eventId));
   const assignments = getEventTableAssignments(eventId);
   const tables = getEventTables(eventId);
+
+  useEffect(() => {
+    setGroups(getEventGuestGroups(eventId));
+  }, [eventId]);
 
   const [template, setTemplate] = useState<string>(DEFAULT_WHATSAPP_TEMPLATE);
   const [copiedGroup, setCopiedGroup] = useState<string | null>(null);
@@ -143,6 +147,13 @@ export default function WhatsAppMessagingPage() {
             <Users className="w-5 h-5 text-emerald-600" /> Lista de Invitados para Envío ({groups.length})
           </h3>
 
+          {groups.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-xs text-slate-500 space-y-2">
+              <Users className="w-8 h-8 text-slate-400 mx-auto" />
+              <p className="font-bold text-slate-700">Aún no hay invitados importados para este evento.</p>
+              <p className="text-slate-500">Carga tu lista de invitados desde la sección de Excel para habilitar los envíos masivos por WhatsApp.</p>
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
@@ -201,6 +212,7 @@ export default function WhatsAppMessagingPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </main>
     </div>

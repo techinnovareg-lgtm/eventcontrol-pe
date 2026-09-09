@@ -30,7 +30,7 @@ type TableShape = 'ROUND' | 'RECTANGULAR' | 'VIP_HONOR';
 
 export default function TablesManagementPage() {
   const params = useParams();
-  const eventId = String(params.id || 'evt-102');
+  const eventId = String(params.id || '');
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
 
   useEffect(() => {

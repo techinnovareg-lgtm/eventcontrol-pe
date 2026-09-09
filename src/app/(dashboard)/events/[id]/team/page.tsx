@@ -18,7 +18,7 @@ import {
 
 export default function EventTeamPage() {
   const params = useParams();
-  const eventId = String(params.id || 'evt-102');
+  const eventId = String(params.id || '');
   const session = getActiveSession();
   const contractInfo = getAccountForSession();
   const currentWorkspaceId = session?.user?.workspaceId || contractInfo.workspaceId || 'ws-a-1111';

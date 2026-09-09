@@ -34,78 +34,9 @@ const TABLES_STORAGE_KEY = 'eventcontrol_tables';
 const ASSIGNMENTS_STORAGE_KEY = 'eventcontrol_table_assignments';
 const VENUE_ELEMENTS_STORAGE_KEY = 'eventcontrol_venue_elements';
 
-const INITIAL_TABLES: Record<string, Table[]> = {
-  'evt-102': [
-    { id: 'tbl-1', workspace_id: 'ws-a-1111', event_id: 'evt-102', name: 'Mesa 1 (Familia Novia)', capacity: 10, pos_x: 140, pos_y: 110, created_at: new Date().toISOString() },
-    { id: 'tbl-2', workspace_id: 'ws-a-1111', event_id: 'evt-102', name: 'Mesa 2 (Amigos Universidad)', capacity: 10, pos_x: 140, pos_y: 310, created_at: new Date().toISOString() },
-    { id: 'tbl-3', workspace_id: 'ws-a-1111', event_id: 'evt-102', name: 'Mesa 3 (Familia Novio)', capacity: 10, pos_x: 740, pos_y: 110, created_at: new Date().toISOString() },
-    { id: 'tbl-4', workspace_id: 'ws-a-1111', event_id: 'evt-102', name: 'Mesa 4 (Compañeros Trabajo)', capacity: 12, pos_x: 740, pos_y: 310, created_at: new Date().toISOString() },
-    { id: 'tbl-5', workspace_id: 'ws-a-1111', event_id: 'evt-102', name: 'Mesa Principal VIP', capacity: 8, pos_x: 440, pos_y: 60, created_at: new Date().toISOString() },
-  ],
-};
-
-const INITIAL_ASSIGNMENTS: Record<string, TableAssignment[]> = {
-  'evt-102': [
-    { id: 'asgn-1', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-1', group_id: 'grp-001', assigned_passes: 1, created_at: new Date().toISOString() },
-    { id: 'asgn-2', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-1', group_id: 'grp-002', assigned_passes: 6, created_at: new Date().toISOString() },
-    { id: 'asgn-3', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-2', group_id: 'grp-003', assigned_passes: 4, created_at: new Date().toISOString() },
-    { id: 'asgn-4', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-2', group_id: 'grp-004', assigned_passes: 2, created_at: new Date().toISOString() },
-    { id: 'asgn-5', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-3', group_id: 'grp-005', assigned_passes: 1, created_at: new Date().toISOString() },
-    { id: 'asgn-6', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-3', group_id: 'grp-006', assigned_passes: 4, created_at: new Date().toISOString() },
-    { id: 'asgn-7', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-4', group_id: 'grp-007', assigned_passes: 2, created_at: new Date().toISOString() },
-    { id: 'asgn-8', workspace_id: 'ws-a-1111', event_id: 'evt-102', table_id: 'tbl-4', group_id: 'grp-008', assigned_passes: 3, created_at: new Date().toISOString() },
-  ],
-};
-
-const INITIAL_VENUE_ELEMENTS: Record<string, VenueElement[]> = {
-  'evt-102': [
-    {
-      id: 've-1',
-      event_id: 'evt-102',
-      workspace_id: 'ws-a-1111',
-      type: 'PISTA_ORQUESTA',
-      label: 'PISTA DE BAILE CENTRAL & ORQUESTA EN VIVO',
-      size: 'large',
-      pos_x: 420,
-      pos_y: 200,
-      width: 280,
-      height: 140,
-      orientation: 'horizontal',
-      shape: 'round_rect',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 've-2',
-      event_id: 'evt-102',
-      workspace_id: 'ws-a-1111',
-      type: 'BAR',
-      label: 'Barra de Coctelería de Honor',
-      size: 'medium',
-      pos_x: 140,
-      pos_y: 520,
-      width: 200,
-      height: 95,
-      orientation: 'horizontal',
-      shape: 'round_rect',
-      created_at: new Date().toISOString(),
-    },
-    {
-      id: 've-3',
-      event_id: 'evt-102',
-      workspace_id: 'ws-a-1111',
-      type: 'MACETERO',
-      label: 'Jardinera Ornamental Gigante',
-      size: 'medium',
-      pos_x: 740,
-      pos_y: 520,
-      width: 110,
-      height: 110,
-      orientation: 'horizontal',
-      shape: 'circle',
-      created_at: new Date().toISOString(),
-    },
-  ],
-};
+const INITIAL_TABLES: Record<string, Table[]> = {};
+const INITIAL_ASSIGNMENTS: Record<string, TableAssignment[]> = {};
+const INITIAL_VENUE_ELEMENTS: Record<string, VenueElement[]> = {};
 
 let tablesMemoryStore: Record<string, Table[]> | null = null;
 let assignmentsMemoryStore: Record<string, TableAssignment[]> | null = null;
@@ -138,6 +69,8 @@ function loadTablesFromStorage(): Record<string, Table[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
+        delete parsed['evt-101'];
+        delete parsed['evt-102'];
         tablesMemoryStore = parsed;
         setTimeout(() => autoSyncTablesToServer(), 100);
         return parsed;
@@ -170,6 +103,8 @@ function loadAssignmentsFromStorage(): Record<string, TableAssignment[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
+        delete parsed['evt-101'];
+        delete parsed['evt-102'];
         assignmentsMemoryStore = parsed;
         setTimeout(() => autoSyncTablesToServer(), 100);
         return parsed;
@@ -202,6 +137,8 @@ function loadVenueElementsFromStorage(): Record<string, VenueElement[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
+        delete parsed['evt-101'];
+        delete parsed['evt-102'];
         venueElementsMemoryStore = parsed;
         return parsed;
       }
@@ -316,13 +253,7 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
 
 export function getEventTables(eventId: string): Table[] {
   const store = loadTablesFromStorage();
-  if (store[eventId] && store[eventId].length > 0) return store[eventId];
-  // Fallback: Check if any event key in store has tables
-  const allLists = Object.values(store);
-  for (const list of allLists) {
-    if (Array.isArray(list) && list.length > 0) return list;
-  }
-  return [];
+  return store[eventId] || [];
 }
 
 export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
@@ -330,7 +261,7 @@ export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.tables) && data.tables.length > 0) {
+      if (data.success && Array.isArray(data.tables)) {
         const store = loadTablesFromStorage();
         store[eventId] = data.tables;
         saveTablesToStorage(store);
@@ -343,12 +274,7 @@ export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
 
 export function getEventTableAssignments(eventId: string): TableAssignment[] {
   const store = loadAssignmentsFromStorage();
-  if (store[eventId] !== undefined) return store[eventId];
-  const allLists = Object.values(store);
-  for (const list of allLists) {
-    if (Array.isArray(list)) return list;
-  }
-  return INITIAL_ASSIGNMENTS[eventId] || INITIAL_ASSIGNMENTS['evt-102'] || [];
+  return store[eventId] || [];
 }
 
 export async function getEventTableAssignmentsAsync(eventId: string): Promise<TableAssignment[]> {
@@ -365,6 +291,24 @@ export async function getEventTableAssignmentsAsync(eventId: string): Promise<Ta
     }
   } catch (err) {}
   return getEventTableAssignments(eventId);
+}
+
+export function deleteEventTables(eventId: string): void {
+  const store = loadTablesFromStorage();
+  delete store[eventId];
+  saveTablesToStorage(store);
+}
+
+export function deleteEventAssignments(eventId: string): void {
+  const store = loadAssignmentsFromStorage();
+  delete store[eventId];
+  saveAssignmentsToStorage(store);
+}
+
+export function deleteEventVenueElements(eventId: string): void {
+  const store = loadVenueElementsFromStorage();
+  delete store[eventId];
+  saveVenueElementsToStorage(store);
 }
 
 export function assignGroupToTable(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): TableAssignment {

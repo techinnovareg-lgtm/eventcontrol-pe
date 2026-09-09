@@ -21,13 +21,39 @@ function loadDbFromFile() {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed) {
-        if (Array.isArray(parsed.events)) globalServerEventsStore = parsed.events;
-        if (parsed.groups) globalServerGroupsStore = parsed.groups;
-        if (parsed.tables) globalServerTablesStore = parsed.tables;
-        if (parsed.assignments) globalServerAssignmentsStore = parsed.assignments;
-        if (parsed.cuts) globalServerCutsStore = parsed.cuts;
-        if (parsed.checkIns) globalServerCheckInsStore = parsed.checkIns;
-        if (parsed.venueElements) globalServerVenueElementsStore = parsed.venueElements;
+        if (Array.isArray(parsed.events)) {
+          globalServerEventsStore = parsed.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102');
+        }
+        if (parsed.groups) {
+          delete parsed.groups['evt-101'];
+          delete parsed.groups['evt-102'];
+          globalServerGroupsStore = parsed.groups;
+        }
+        if (parsed.tables) {
+          delete parsed.tables['evt-101'];
+          delete parsed.tables['evt-102'];
+          globalServerTablesStore = parsed.tables;
+        }
+        if (parsed.assignments) {
+          delete parsed.assignments['evt-101'];
+          delete parsed.assignments['evt-102'];
+          globalServerAssignmentsStore = parsed.assignments;
+        }
+        if (parsed.cuts) {
+          delete parsed.cuts['evt-101'];
+          delete parsed.cuts['evt-102'];
+          globalServerCutsStore = parsed.cuts;
+        }
+        if (parsed.checkIns) {
+          delete parsed.checkIns['evt-101'];
+          delete parsed.checkIns['evt-102'];
+          globalServerCheckInsStore = parsed.checkIns;
+        }
+        if (parsed.venueElements) {
+          delete parsed.venueElements['evt-101'];
+          delete parsed.venueElements['evt-102'];
+          globalServerVenueElementsStore = parsed.venueElements;
+        }
       }
     }
   } catch (e) {}
@@ -59,94 +85,17 @@ export async function GET(req: Request) {
   const eventId = searchParams.get('eventId');
 
   if (eventId) {
-    let event = globalServerEventsStore.find(e => e.id === eventId);
-    if (!event && workspaceId) {
-      event = globalServerEventsStore.find(e => e.workspace_id === workspaceId);
-    }
-
-    let groups = globalServerGroupsStore[eventId] || [];
-    if (groups.length === 0) {
-      const allGroupLists = Object.values(globalServerGroupsStore);
-      for (const list of allGroupLists) {
-        if (Array.isArray(list) && list.length > 0) {
-          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
-            groups = list;
-            break;
-          }
-        }
-      }
-    }
-
-    let tables = globalServerTablesStore[eventId] || [];
-    if (tables.length === 0) {
-      const allTableLists = Object.values(globalServerTablesStore);
-      for (const list of allTableLists) {
-        if (Array.isArray(list) && list.length > 0) {
-          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
-            tables = list;
-            break;
-          }
-        }
-      }
-    }
-
-    let assignments = globalServerAssignmentsStore[eventId];
-    if (assignments === undefined) {
-      const allAsgnLists = Object.values(globalServerAssignmentsStore);
-      for (const list of allAsgnLists) {
-        if (Array.isArray(list) && list.length > 0) {
-          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
-            assignments = list;
-            break;
-          }
-        }
-      }
-      if (!assignments) {
-        assignments = [
-          { id: 'asgn-1', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-1', group_id: 'grp-001', assigned_passes: 1, created_at: new Date().toISOString() },
-          { id: 'asgn-2', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-1', group_id: 'grp-002', assigned_passes: 6, created_at: new Date().toISOString() },
-          { id: 'asgn-3', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-2', group_id: 'grp-003', assigned_passes: 4, created_at: new Date().toISOString() },
-          { id: 'asgn-4', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-2', group_id: 'grp-004', assigned_passes: 2, created_at: new Date().toISOString() },
-          { id: 'asgn-5', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-3', group_id: 'grp-005', assigned_passes: 1, created_at: new Date().toISOString() },
-          { id: 'asgn-6', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-3', group_id: 'grp-006', assigned_passes: 4, created_at: new Date().toISOString() },
-          { id: 'asgn-7', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-4', group_id: 'grp-007', assigned_passes: 2, created_at: new Date().toISOString() },
-          { id: 'asgn-8', workspace_id: 'ws-a-1111', event_id: eventId, table_id: 'tbl-4', group_id: 'grp-008', assigned_passes: 3, created_at: new Date().toISOString() },
-        ];
-      }
-      globalServerAssignmentsStore[eventId] = assignments;
-    }
-
-    let cuts = globalServerCutsStore[eventId] || [];
-    if (cuts.length === 0) {
-      const allCutLists = Object.values(globalServerCutsStore);
-      for (const list of allCutLists) {
-        if (Array.isArray(list) && list.length > 0) {
-          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
-            cuts = list;
-            break;
-          }
-        }
-      }
-    }
-
-    let checkIns = globalServerCheckInsStore[eventId] || [];
-    if (checkIns.length === 0) {
-      const allCheckInLists = Object.values(globalServerCheckInsStore);
-      for (const list of allCheckInLists) {
-        if (Array.isArray(list) && list.length > 0) {
-          if (!workspaceId || list[0]?.workspace_id === workspaceId) {
-            checkIns = list;
-            break;
-          }
-        }
-      }
-    }
-
-    let venueElements = globalServerVenueElementsStore[eventId] || [];
+    const event = globalServerEventsStore.find(e => e.id === eventId) || null;
+    const groups = globalServerGroupsStore[eventId] || [];
+    const tables = globalServerTablesStore[eventId] || [];
+    const assignments = globalServerAssignmentsStore[eventId] || [];
+    const cuts = globalServerCutsStore[eventId] || [];
+    const checkIns = globalServerCheckInsStore[eventId] || [];
+    const venueElements = globalServerVenueElementsStore[eventId] || [];
 
     return NextResponse.json({
       success: true,
-      event: event || null,
+      event,
       groups,
       tables,
       assignments,
@@ -187,8 +136,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, event });
     }
 
-    if (action === 'SYNC_GROUPS' && Array.isArray(groups)) {
-      const targetEvtId = eventId || (groups[0]?.event_id) || 'evt-102';
+    if (action === 'SYNC_GROUPS' && Array.isArray(groups) && (eventId || groups[0]?.event_id)) {
+      const targetEvtId = eventId || groups[0].event_id;
       
       const existingGroups = globalServerGroupsStore[targetEvtId] || [];
       const mergedGroups = groups.map((g: GuestGroup) => {
@@ -205,17 +154,29 @@ export async function POST(req: Request) {
       });
 
       globalServerGroupsStore[targetEvtId] = mergedGroups;
-
-      // Update all key entries in globalServerGroupsStore
-      Object.keys(globalServerGroupsStore).forEach(k => {
-        globalServerGroupsStore[k] = globalServerGroupsStore[k].map(g => {
-          const match = mergedGroups.find(m => m.id === g.id);
-          return match || g;
-        });
-      });
-
       saveDbToFile();
       return NextResponse.json({ success: true, count: mergedGroups.length });
+    }
+
+    if (action === 'DELETE_GROUPS' && eventId) {
+      delete globalServerGroupsStore[eventId];
+      if (globalServerAssignmentsStore[eventId]) {
+        globalServerAssignmentsStore[eventId] = [];
+      }
+      saveDbToFile();
+      return NextResponse.json({ success: true, eventId });
+    }
+
+    if (action === 'DELETE_EVENT' && eventId) {
+      globalServerEventsStore = globalServerEventsStore.filter(e => e.id !== eventId);
+      delete globalServerGroupsStore[eventId];
+      delete globalServerTablesStore[eventId];
+      delete globalServerAssignmentsStore[eventId];
+      delete globalServerCutsStore[eventId];
+      delete globalServerCheckInsStore[eventId];
+      delete globalServerVenueElementsStore[eventId];
+      saveDbToFile();
+      return NextResponse.json({ success: true, deletedEventId: eventId });
     }
 
     if (action === 'SYNC_TABLES' && eventId) {

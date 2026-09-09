@@ -367,7 +367,7 @@ export default function RealtimeDashboardPage() {
               <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
                 <Grid className="w-4 h-4 text-purple-600" /> Ocupación de Mesas de Gala ({tablesStats.length})
               </h3>
-              <Link href="/events/evt-102/tables" className="text-xs text-[#B8860B] hover:underline font-bold">
+              <Link href={eventId ? `/events/${eventId}/tables` : '/events'} className="text-xs text-[#B8860B] hover:underline font-bold">
                 Ver Mapa de Mesas →
               </Link>
             </div>

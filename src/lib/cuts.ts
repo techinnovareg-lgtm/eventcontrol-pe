@@ -14,6 +14,8 @@ function loadCutsFromStorage(): Record<string, Cut[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
+        delete parsed['evt-101'];
+        delete parsed['evt-102'];
         cutsMemoryStore = parsed;
         setTimeout(() => autoSyncCutsToServer(), 100);
         return parsed;
@@ -57,13 +59,7 @@ function autoSyncCutsToServer(eventId?: string) {
 
 export function getEventCuts(eventId: string): Cut[] {
   const store = loadCutsFromStorage();
-  if (store[eventId] && store[eventId].length > 0) return store[eventId];
-
-  const allLists = Object.values(store);
-  for (const list of allLists) {
-    if (Array.isArray(list) && list.length > 0) return list;
-  }
-  return [];
+  return store[eventId] || [];
 }
 
 export async function getEventCutsAsync(eventId: string): Promise<Cut[]> {
@@ -71,7 +67,7 @@ export async function getEventCutsAsync(eventId: string): Promise<Cut[]> {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.cuts) && data.cuts.length > 0) {
+      if (data.success && Array.isArray(data.cuts)) {
         const store = loadCutsFromStorage();
         store[eventId] = data.cuts;
         saveCutsToStorage(store);
@@ -80,6 +76,12 @@ export async function getEventCutsAsync(eventId: string): Promise<Cut[]> {
     }
   } catch (err) {}
   return getEventCuts(eventId);
+}
+
+export function deleteEventCuts(eventId: string): void {
+  const store = loadCutsFromStorage();
+  delete store[eventId];
+  saveCutsToStorage(store);
 }
 
 /**

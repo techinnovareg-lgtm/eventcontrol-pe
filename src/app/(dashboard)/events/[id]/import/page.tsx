@@ -12,7 +12,7 @@ import {
   parseExcelFile, validateMappedRows, generateErrorReportExcel, generateTemplateExcel,
   RawExcelSheet, ColumnMapping, ImportValidationResult 
 } from '@/lib/excel-parser';
-import { getEventById, saveEventGuestGroups, getEventGuestGroups, deleteEventGuestGroups } from '@/lib/events';
+import { getEventById, saveEventGuestGroups, getEventGuestGroups, getEventGuestGroupsAsync, deleteEventGuestGroups } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { GuestGroup } from '@/lib/supabase/types';
 import EventNavHeader from '@/components/EventNavHeader';
@@ -22,7 +22,7 @@ type WizardStep = 1 | 2 | 3;
 export default function ExcelImportWizardPage() {
   const router = useRouter();
   const params = useParams();
-  const eventId = String(params.id || 'evt-102');
+  const eventId = String(params.id || '');
 
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
@@ -35,6 +35,11 @@ export default function ExcelImportWizardPage() {
     const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
     setCurrentWorkspaceId(wsId);
     setExistingGroups(getEventGuestGroups(eventId));
+    if (eventId) {
+      getEventGuestGroupsAsync(eventId).then(grps => {
+        setExistingGroups(grps);
+      });
+    }
   }, [eventId]);
 
   const refreshGuestGroups = () => {

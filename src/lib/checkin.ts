@@ -28,7 +28,7 @@ export function executeAtomicCheckIn(
   tokenHash: string,
   passesRequested: number,
   operatorId = 'user-security-01',
-  eventId = 'evt-102',
+  eventId = '',
   isOfflineSync = false
 ): CheckInExecutionResult {
 
@@ -166,7 +166,7 @@ export async function executeAtomicCheckInAsync(
   tokenHash: string,
   passesRequested: number,
   operatorId = 'user-security-01',
-  eventId = 'evt-102',
+  eventId = '',
   isOfflineSync = false
 ): Promise<CheckInExecutionResult> {
   const result = executeAtomicCheckIn(tokenHash, passesRequested, operatorId, eventId, isOfflineSync);
