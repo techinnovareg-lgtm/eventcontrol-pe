@@ -8,7 +8,7 @@ import {
   CheckCircle, Clock, MessageSquare, ArrowRight, BarChart3, 
   Scissors, Edit3, Home, LogOut, Trash2
 } from 'lucide-react';
-import { getWorkspaceEvents, createEvent, updateEvent, deleteEvent } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, updateEvent, deleteEvent } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
@@ -35,6 +35,12 @@ export default function EventsCrudPage() {
     setUserName(name);
     setUserEmail(email);
     setUserInitial(name ? name.charAt(0).toUpperCase() : 'C');
+
+    getWorkspaceEventsAsync(wsId).then(onlineEvts => {
+      if (Array.isArray(onlineEvts)) {
+        setEvents(onlineEvts);
+      }
+    });
 
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);

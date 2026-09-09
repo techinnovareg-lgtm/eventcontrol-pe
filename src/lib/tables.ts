@@ -47,16 +47,31 @@ export function autoSyncTablesToServer(eventId?: string) {
   try {
     const allTables = loadTablesFromStorage();
     const allAssignments = loadAssignmentsFromStorage();
-    const targetEventIds = eventId ? [eventId] : Array.from(new Set([...Object.keys(allTables), ...Object.keys(allAssignments)]));
+    const allVenueElements = loadVenueElementsFromStorage();
+    const targetEventIds = eventId ? [eventId] : Array.from(new Set([
+      ...Object.keys(allTables), 
+      ...Object.keys(allAssignments),
+      ...Object.keys(allVenueElements)
+    ]));
 
     targetEventIds.forEach(evtId => {
       const tables = allTables[evtId] || [];
       const assignments = allAssignments[evtId] || [];
+      const venueElements = allVenueElements[evtId] || [];
+
       fetch('/api/events/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
       }).catch(() => {});
+
+      if (venueElements.length > 0) {
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_VENUE_ELEMENTS', eventId: evtId, venueElements }),
+        }).catch(() => {});
+      }
     });
   } catch (err) {}
 }
@@ -394,6 +409,36 @@ export function getEventVenueElements(eventId: string): VenueElement[] {
   return store[eventId] || [];
 }
 
+export async function getEventVenueElementsAsync(eventId: string): Promise<VenueElement[]> {
+  try {
+    const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.venueElements)) {
+        const store = loadVenueElementsFromStorage();
+        const localElements = store[eventId] || [];
+
+        if (localElements.length > 0) {
+          const serverIds = new Set(data.venueElements.map((v: VenueElement) => v.id));
+          const missingLocals = localElements.filter(v => !serverIds.has(v.id));
+          if (missingLocals.length > 0) {
+            const merged = [...data.venueElements, ...missingLocals];
+            store[eventId] = merged;
+            saveVenueElementsToStorage(store);
+            autoSyncTablesToServer(eventId);
+            return merged;
+          }
+        }
+
+        store[eventId] = data.venueElements;
+        saveVenueElementsToStorage(store);
+        return data.venueElements;
+      }
+    }
+  } catch (err) {}
+  return getEventVenueElements(eventId);
+}
+
 export function createVenueElement(
   eventId: string, 
   workspaceId: string, 
@@ -430,6 +475,7 @@ export function createVenueElement(
 
   store[eventId].push(newElem);
   saveVenueElementsToStorage(store);
+  autoSyncTablesToServer(eventId);
   return newElem;
 }
 
@@ -441,6 +487,7 @@ export function updateVenueElementPosition(eventId: string, elementId: string, p
       elem.pos_x = posX;
       elem.pos_y = posY;
       saveVenueElementsToStorage(store);
+      autoSyncTablesToServer(eventId);
     }
   }
 }
@@ -466,6 +513,7 @@ export function updateVenueElement(
         height: dims.height,
       });
       saveVenueElementsToStorage(store);
+      autoSyncTablesToServer(eventId);
       return elem;
     }
   }
@@ -477,5 +525,6 @@ export function deleteVenueElement(eventId: string, elementId: string): void {
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(e => e.id !== elementId);
     saveVenueElementsToStorage(store);
+    autoSyncTablesToServer(eventId);
   }
 }

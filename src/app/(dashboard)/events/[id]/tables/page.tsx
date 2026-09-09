@@ -17,7 +17,7 @@ import { getEventById, getEventGuestGroups, getEventGuestGroupsAsync } from '@/l
 import { 
   getEventTables, getEventTablesAsync, createTable, deleteTable, updateTable, getEventTableAssignments, 
   getEventTableAssignmentsAsync, assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
-  getEventVenueElements, createVenueElement, updateVenueElement, updateVenueElementPosition, 
+  getEventVenueElements, getEventVenueElementsAsync, createVenueElement, updateVenueElement, updateVenueElementPosition, 
   deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions,
   autoSyncTablesToServer 
 } from '@/lib/tables';
@@ -126,10 +126,11 @@ export default function TablesManagementPage() {
     const updatedTables = await getEventTablesAsync(eventId);
     const updatedAssignments = await getEventTableAssignmentsAsync(eventId);
     const updatedGroups = await getEventGuestGroupsAsync(eventId);
+    const updatedVenueElements = await getEventVenueElementsAsync(eventId);
     setTables([...updatedTables]);
     setAssignments([...updatedAssignments]);
     setGroups([...updatedGroups]);
-    setVenueElements([...getEventVenueElements(eventId)]);
+    setVenueElements([...updatedVenueElements]);
 
     setTablePositions(prev => {
       const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };

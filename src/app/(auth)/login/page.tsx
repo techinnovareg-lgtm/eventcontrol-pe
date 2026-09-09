@@ -12,7 +12,7 @@ import {
   verifySuperAdminPassword, authenticateAdminAccountAsync 
 } from '@/lib/superadmin-store';
 import { authenticateWorkspaceMemberAsync, findMemberByEmail } from '@/lib/workspace-users';
-import { getWorkspaceEvents } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync } from '@/lib/events';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -98,15 +98,22 @@ export default function LoginPage() {
     }
 
     if (authUser) {
+      const wsId = authUser.user_metadata?.workspaceId || 'ws-a-1111';
       setActiveSession({
         user: {
           id: authUser.id,
           email: authUser.email || inputEmail,
           name: authUser.user_metadata?.name || 'Administrador de Evento',
           role: 'ADMIN',
+          workspaceId: wsId,
         },
       });
-      router.push('/dashboard');
+      const userEvents = await getWorkspaceEventsAsync(wsId);
+      if (userEvents.length === 0) {
+        router.push('/events?create=true');
+      } else {
+        router.push(`/dashboard?eventId=${userEvents[0].id}`);
+      }
       return;
     }
 
@@ -129,7 +136,7 @@ export default function LoginPage() {
         },
       });
 
-      const userEvents = getWorkspaceEvents(matchedAccount.workspaceId);
+      const userEvents = await getWorkspaceEventsAsync(matchedAccount.workspaceId);
       if (userEvents.length === 0) {
         router.push('/events?create=true');
       } else {
@@ -156,7 +163,7 @@ export default function LoginPage() {
         const scanRoute = matchedSubUser.eventId ? `/scan?event=${matchedSubUser.eventId}` : '/scan';
         router.push(scanRoute);
       } else {
-        const subUserEvents = getWorkspaceEvents(matchedSubUser.workspaceId);
+        const subUserEvents = await getWorkspaceEventsAsync(matchedSubUser.workspaceId);
         if (subUserEvents.length === 0) {
           router.push('/events?create=true');
         } else {
