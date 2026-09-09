@@ -166,6 +166,7 @@ export default function TablesManagementPage() {
   const handleCreateTable = (e: React.FormEvent) => {
     e.preventDefault();
     const newTbl = createTable(eventId, currentWorkspaceId, tableName || 'Nueva Mesa', tableCapacity, 500, 250);
+    setTables(prev => [...prev.filter(t => t.id !== newTbl.id), newTbl]);
     setTablePositions(prev => ({
       ...prev,
       [newTbl.id]: { x: 500, y: 250, shape: tableShape }
@@ -190,7 +191,7 @@ export default function TablesManagementPage() {
       ENTRADA: 'Entrada Principal / Photocall',
     };
 
-    createVenueElement(
+    const newElem = createVenueElement(
       eventId,
       currentWorkspaceId,
       elementType,
@@ -202,6 +203,7 @@ export default function TablesManagementPage() {
       350
     );
 
+    setVenueElements(prev => [...prev.filter(ve => ve.id !== newElem.id), newElem]);
     setElementLabel('');
     setShowAddElementModal(false);
     refreshData();
@@ -550,6 +552,16 @@ export default function TablesManagementPage() {
   const handlePointerDownItemGrip = (e: React.PointerEvent, id: string, type: 'table' | 'venue_element', initialX: number, initialY: number) => {
     e.preventDefault();
     e.stopPropagation();
+
+    try {
+      if (e.currentTarget && typeof (e.currentTarget as HTMLElement).releasePointerCapture === 'function') {
+        (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+      }
+    } catch (err) {}
+
+    if (activeDragRef.current) {
+      handleGlobalPointerUp(e as any);
+    }
 
     const gripEl = e.currentTarget as HTMLElement;
     const nodeEl = gripEl.closest('[data-drag-node]') as HTMLElement;
