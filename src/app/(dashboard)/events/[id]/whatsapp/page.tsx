@@ -8,8 +8,10 @@ import {
   Copy, ExternalLink, Settings, Sparkles, MapPin, QrCode, Users
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById, getEventGuestGroups } from '@/lib/events';
+import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { getEventTables, getEventTableAssignments } from '@/lib/tables';
+import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
+import { Event } from '@/lib/supabase/types';
 import { getOrCreateGroupQRToken } from '@/lib/qr-engine';
 import { 
   DEFAULT_WHATSAPP_TEMPLATE, formatWhatsAppMessage, generateWhatsAppLink 
@@ -18,15 +20,30 @@ import {
 export default function WhatsAppMessagingPage() {
   const params = useParams();
   const eventId = String(params.id || '');
-  const currentWorkspaceId = 'ws-a-1111';
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
 
-  const event = getEventById(eventId, currentWorkspaceId);
+  const [event, setEvent] = useState<Event | undefined>(() => getEventById(eventId));
   const [groups, setGroups] = useState(() => getEventGuestGroups(eventId));
   const assignments = getEventTableAssignments(eventId);
   const tables = getEventTables(eventId);
 
   useEffect(() => {
-    setGroups(getEventGuestGroups(eventId));
+    async function loadOnlineData() {
+      const session = getActiveSession();
+      const account = getAccountForSession();
+      const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+      setCurrentWorkspaceId(wsId);
+
+      if (eventId) {
+        const [evt, grps] = await Promise.all([
+          getEventByIdAsync(eventId, wsId),
+          getEventGuestGroupsAsync(eventId),
+        ]);
+        if (evt) setEvent(evt);
+        if (grps) setGroups(grps);
+      }
+    }
+    loadOnlineData();
   }, [eventId]);
 
   const [template, setTemplate] = useState<string>(DEFAULT_WHATSAPP_TEMPLATE);

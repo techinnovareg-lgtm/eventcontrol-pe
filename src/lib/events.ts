@@ -164,13 +164,10 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
 }
 
 export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
+  if (!eventId) return undefined;
   const store = getEventsStore();
-  let found = store.find(e => e.id === eventId);
+  const found = store.find(e => e.id === eventId);
   if (found) return found;
-  if (workspaceId) {
-    found = store.find(e => e.workspace_id === workspaceId);
-    if (found) return found;
-  }
   return undefined;
 }
 

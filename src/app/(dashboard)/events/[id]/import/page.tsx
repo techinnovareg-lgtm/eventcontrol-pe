@@ -12,9 +12,9 @@ import {
   parseExcelFile, validateMappedRows, generateErrorReportExcel, generateTemplateExcel,
   RawExcelSheet, ColumnMapping, ImportValidationResult 
 } from '@/lib/excel-parser';
-import { getEventById, saveEventGuestGroups, getEventGuestGroups, getEventGuestGroupsAsync, deleteEventGuestGroups } from '@/lib/events';
+import { getEventById, getEventByIdAsync, saveEventGuestGroups, getEventGuestGroups, getEventGuestGroupsAsync, deleteEventGuestGroups } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
-import { GuestGroup } from '@/lib/supabase/types';
+import { GuestGroup, Event } from '@/lib/supabase/types';
 import EventNavHeader from '@/components/EventNavHeader';
 
 type WizardStep = 1 | 2 | 3;
@@ -26,27 +26,33 @@ export default function ExcelImportWizardPage() {
 
   const [isMounted, setIsMounted] = useState<boolean>(false);
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
+  const [event, setEvent] = useState<Event | undefined>(() => getEventById(eventId));
   const [existingGroups, setExistingGroups] = useState<GuestGroup[]>([]);
 
   useEffect(() => {
     setIsMounted(true);
-    const session = getActiveSession();
-    const account = getAccountForSession();
-    const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
-    setCurrentWorkspaceId(wsId);
-    setExistingGroups(getEventGuestGroups(eventId));
-    if (eventId) {
-      getEventGuestGroupsAsync(eventId).then(grps => {
-        setExistingGroups(grps);
-      });
+    async function loadOnlineData() {
+      const session = getActiveSession();
+      const account = getAccountForSession();
+      const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+      setCurrentWorkspaceId(wsId);
+      setExistingGroups(getEventGuestGroups(eventId));
+
+      if (eventId) {
+        const [evt, grps] = await Promise.all([
+          getEventByIdAsync(eventId, wsId),
+          getEventGuestGroupsAsync(eventId),
+        ]);
+        if (evt) setEvent(evt);
+        if (grps) setExistingGroups(grps);
+      }
     }
+    loadOnlineData();
   }, [eventId]);
 
   const refreshGuestGroups = () => {
     setExistingGroups(getEventGuestGroups(eventId));
   };
-
-  const event = getEventById(eventId, currentWorkspaceId);
 
   // Wizard Steps: 1 = Upload, 2 = Map, 3 = Validate & Import
   const [step, setStep] = useState<WizardStep>(1);

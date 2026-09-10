@@ -6,22 +6,34 @@ import { useParams } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';
 import { QrCode, ArrowLeft, RefreshCw, ShieldAlert, Download, Phone, Check, Copy, FileSpreadsheet } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
+import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { getOrCreateGroupQRToken, revokeAndRegenerateQRToken } from '@/lib/qr-engine';
+import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
+import { Event } from '@/lib/supabase/types';
 
 export default function QRManagementPage() {
   const params = useParams();
   const eventId = String(params.id || '');
-  const currentWorkspaceId = 'ws-a-1111';
-
-  const event = getEventById(eventId, currentWorkspaceId);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
+  const [event, setEvent] = useState<Event | undefined>(() => getEventById(eventId));
   const [groups, setGroups] = useState(() => getEventGuestGroups(eventId));
 
   useEffect(() => {
-    setGroups(getEventGuestGroups(eventId));
-    if (eventId) {
-      getEventGuestGroupsAsync(eventId).then(g => setGroups(g));
+    async function loadOnlineData() {
+      const session = getActiveSession();
+      const account = getAccountForSession();
+      const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+      setCurrentWorkspaceId(wsId);
+      if (eventId) {
+        const [evt, grps] = await Promise.all([
+          getEventByIdAsync(eventId, wsId),
+          getEventGuestGroupsAsync(eventId),
+        ]);
+        if (evt) setEvent(evt);
+        if (grps) setGroups(grps);
+      }
     }
+    loadOnlineData();
   }, [eventId]);
 
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);

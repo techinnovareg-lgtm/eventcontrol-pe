@@ -194,15 +194,21 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_TABLES' && eventId) {
-      if (tables) globalServerTablesStore[eventId] = tables;
-      if (assignments) globalServerAssignmentsStore[eventId] = assignments;
+      if (Array.isArray(tables) && tables.length > 0) {
+        globalServerTablesStore[eventId] = tables;
+      }
+      if (Array.isArray(assignments) && assignments.length > 0) {
+        globalServerAssignmentsStore[eventId] = assignments;
+      }
       saveDbToFile();
       return NextResponse.json({ success: true });
     }
 
     if (action === 'SYNC_CUTS' && eventId && Array.isArray(cuts)) {
-      globalServerCutsStore[eventId] = cuts;
-      saveDbToFile();
+      if (cuts.length > 0) {
+        globalServerCutsStore[eventId] = cuts;
+        saveDbToFile();
+      }
       return NextResponse.json({ success: true, count: cuts.length });
     }
 
@@ -217,8 +223,10 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_VENUE_ELEMENTS' && eventId && Array.isArray(venueElements)) {
-      globalServerVenueElementsStore[eventId] = venueElements;
-      saveDbToFile();
+      if (venueElements.length > 0) {
+        globalServerVenueElementsStore[eventId] = venueElements;
+        saveDbToFile();
+      }
       return NextResponse.json({ success: true });
     }
 

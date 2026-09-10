@@ -59,11 +59,13 @@ export function autoSyncTablesToServer(eventId?: string) {
       const assignments = allAssignments[evtId] || [];
       const venueElements = allVenueElements[evtId] || [];
 
-      fetch('/api/events/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
-      }).catch(() => {});
+      if (tables.length > 0 || assignments.length > 0) {
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
+        }).catch(() => {});
+      }
 
       if (venueElements.length > 0) {
         fetch('/api/events/sync', {

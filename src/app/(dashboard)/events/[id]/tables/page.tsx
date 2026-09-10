@@ -13,7 +13,7 @@ import {
   Flower2, Columns, Waves, Trees, DoorOpen, Layers, Maximize, UserPlus, Printer, Download, FileText,
   FoldVertical, UnfoldVertical
 } from 'lucide-react';
-import { getEventById, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
+import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { 
   getEventTables, getEventTablesAsync, createTable, deleteTable, updateTable, getEventTableAssignments, 
   getEventTableAssignmentsAsync, assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
@@ -23,7 +23,7 @@ import {
 } from '@/lib/tables';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
-import { Table, TableAssignment, GuestGroup } from '@/lib/supabase/types';
+import { Table, TableAssignment, GuestGroup, Event } from '@/lib/supabase/types';
 
 type LayoutMode = 'SPATIAL_CIRCULAR' | 'SPATIAL_MULTI_ZONE' | 'GRID_CARDS';
 type TableShape = 'ROUND' | 'RECTANGULAR' | 'VIP_HONOR';
@@ -33,23 +33,39 @@ export default function TablesManagementPage() {
   const eventId = String(params.id || '');
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
 
-  useEffect(() => {
-    const session = getActiveSession();
-    const account = getAccountForSession();
-    const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
-    setCurrentWorkspaceId(wsId);
-  }, []);
-
-  useEffect(() => {
-    autoSyncTablesToServer(eventId);
-  }, [eventId]);
-
-  const event = getEventById(eventId, currentWorkspaceId);
+  const [currentEvent, setCurrentEvent] = useState<Event | undefined>(() => getEventById(eventId));
+  const event = currentEvent;
   const [groups, setGroups] = useState<GuestGroup[]>(() => getEventGuestGroups(eventId));
-
   const [tables, setTables] = useState<Table[]>(() => getEventTables(eventId));
   const [assignments, setAssignments] = useState<TableAssignment[]>(() => getEventTableAssignments(eventId));
   const [venueElements, setVenueElements] = useState<VenueElement[]>(() => getEventVenueElements(eventId));
+
+  useEffect(() => {
+    async function loadOnlineData() {
+      const session = getActiveSession();
+      const account = getAccountForSession();
+      const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+      setCurrentWorkspaceId(wsId);
+
+      if (eventId) {
+        const [evt, grps, tbls, asgns, elms] = await Promise.all([
+          getEventByIdAsync(eventId, wsId),
+          getEventGuestGroupsAsync(eventId),
+          getEventTablesAsync(eventId),
+          getEventTableAssignmentsAsync(eventId),
+          getEventVenueElementsAsync(eventId),
+        ]);
+
+        if (evt) setCurrentEvent(evt);
+        if (grps) setGroups(grps);
+        if (tbls) setTables(tbls);
+        if (asgns) setAssignments(asgns);
+        if (elms) setVenueElements(elms);
+      }
+    }
+
+    loadOnlineData();
+  }, [eventId]);
 
   const [layoutMode, setLayoutMode] = useState<LayoutMode>('SPATIAL_CIRCULAR');
   

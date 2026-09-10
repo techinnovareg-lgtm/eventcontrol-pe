@@ -15,25 +15,32 @@ import { getEventTablesAsync } from '@/lib/tables';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { exportEventToExcel } from '@/lib/export-engine';
 
+import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
+
 export default function EventReportsPage() {
   const params = useParams();
   const eventId = String(params.id || '');
-  const currentWorkspaceId = 'ws-a-1111';
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
 
-  const [event, setEvent] = useState(() => getEventById(eventId, currentWorkspaceId));
+  const [event, setEvent] = useState(() => getEventById(eventId));
   const [metrics, setMetrics] = useState(() => calculateDashboardMetrics(eventId));
   const [groups, setGroups] = useState(() => getEventGuestGroups(eventId));
   const [tablesStats, setTablesStats] = useState(() => getTablesOccupancyStats(eventId));
   const [cateringDiff, setCateringDiff] = useState(() => calculateCateringDiff(eventId));
 
   const refreshData = async () => {
-    await Promise.all([
-      getEventByIdAsync(eventId, currentWorkspaceId),
+    const session = getActiveSession();
+    const account = getAccountForSession();
+    const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+    setCurrentWorkspaceId(wsId);
+
+    const [onlineEvt] = await Promise.all([
+      getEventByIdAsync(eventId, wsId),
       getEventGuestGroupsAsync(eventId),
       getEventTablesAsync(eventId),
       getEventCutsAsync(eventId),
     ]);
-    setEvent(getEventById(eventId, currentWorkspaceId));
+    if (onlineEvt) setEvent(onlineEvt);
     setMetrics(calculateDashboardMetrics(eventId));
     setGroups(getEventGuestGroups(eventId));
     setTablesStats(getTablesOccupancyStats(eventId));

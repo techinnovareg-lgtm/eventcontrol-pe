@@ -12,14 +12,14 @@ import EventNavHeader from '@/components/EventNavHeader';
 import { getEventById, getEventGuestGroupsAsync, getEventByIdAsync } from '@/lib/events';
 import { getEventCuts, getEventCutsAsync, createEventCut, calculateCateringDiff } from '@/lib/cuts';
 import { checkInRealtimeChannel } from '@/lib/realtime';
-import { Cut } from '@/lib/supabase/types';
+import { Cut, Event } from '@/lib/supabase/types';
+import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 
 export default function EventCutsPage() {
   const params = useParams();
   const eventId = String(params.id || '');
-  const currentWorkspaceId = 'ws-a-1111';
-
-  const event = getEventById(eventId, currentWorkspaceId);
+  const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
+  const [event, setEvent] = useState<Event | undefined>(() => getEventById(eventId));
 
   const [cuts, setCuts] = useState<Cut[]>(() => getEventCuts(eventId));
   const [cateringDiff, setCateringDiff] = useState(() => calculateCateringDiff(eventId));
@@ -27,7 +27,13 @@ export default function EventCutsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   const refreshCuts = async () => {
-    await getEventByIdAsync(eventId, currentWorkspaceId);
+    const session = getActiveSession();
+    const account = getAccountForSession();
+    const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
+    setCurrentWorkspaceId(wsId);
+
+    const evt = await getEventByIdAsync(eventId, wsId);
+    if (evt) setEvent(evt);
     await getEventGuestGroupsAsync(eventId);
     const freshCuts = await getEventCutsAsync(eventId);
     setCuts([...freshCuts]);
