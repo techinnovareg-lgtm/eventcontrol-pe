@@ -383,6 +383,26 @@ export function saveEventGuestGroups(eventId: string, workspaceId: string, group
   return created;
 }
 
+export async function saveEventGuestGroupsAsync(
+  eventId: string,
+  workspaceId: string,
+  groups: Omit<GuestGroup, 'id' | 'created_at' | 'updated_at'>[]
+): Promise<GuestGroup[]> {
+  const created = saveEventGuestGroups(eventId, workspaceId, groups);
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: created }),
+      });
+    } catch (err) {
+      console.warn('[Sync Groups API dispatch error]', err);
+    }
+  }
+  return created;
+}
+
 export function deleteEventGuestGroups(eventId: string): void {
   const store = getGroupsStore();
   delete store[eventId];
@@ -399,6 +419,21 @@ export function deleteEventGuestGroups(eventId: string): void {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'DELETE_GROUPS', eventId }),
     }).catch(err => console.warn('[Sync Delete Groups API dispatch warning]', err));
+  }
+}
+
+export async function deleteEventGuestGroupsAsync(eventId: string): Promise<void> {
+  deleteEventGuestGroups(eventId);
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'DELETE_GROUPS', eventId }),
+      });
+    } catch (err) {
+      console.warn('[Sync Delete Groups API dispatch error]', err);
+    }
   }
 }
 

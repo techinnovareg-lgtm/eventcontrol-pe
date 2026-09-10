@@ -12,7 +12,7 @@ import {
   parseExcelFile, validateMappedRows, generateErrorReportExcel, generateTemplateExcel,
   RawExcelSheet, ColumnMapping, ImportValidationResult 
 } from '@/lib/excel-parser';
-import { getEventById, getEventByIdAsync, saveEventGuestGroups, getEventGuestGroups, getEventGuestGroupsAsync, deleteEventGuestGroups } from '@/lib/events';
+import { getEventById, getEventByIdAsync, saveEventGuestGroups, saveEventGuestGroupsAsync, getEventGuestGroups, getEventGuestGroupsAsync, deleteEventGuestGroups, deleteEventGuestGroupsAsync } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { GuestGroup, Event } from '@/lib/supabase/types';
 import EventNavHeader from '@/components/EventNavHeader';
@@ -188,7 +188,7 @@ export default function ExcelImportWizardPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleConfirmImport = () => {
+  const handleConfirmImport = async () => {
     if (!validationResult || validationResult.validCount === 0) return;
 
     const guestGroups = validationResult.validRows.map(r => ({
@@ -203,15 +203,15 @@ export default function ExcelImportWizardPage() {
       status: 'PENDIENTE' as const,
     }));
 
-    saveEventGuestGroups(eventId, currentWorkspaceId, guestGroups);
+    await saveEventGuestGroupsAsync(eventId, currentWorkspaceId, guestGroups);
     refreshGuestGroups();
     alert(`¡Éxito! Se han importado ${validationResult.validCount} pases/grupos de invitados con ${validationResult.totalPasses} personas autorizadas totales.`);
     setStep(1);
   };
 
-  const handleClearAllGuests = () => {
+  const handleClearAllGuests = async () => {
     if (confirm(`¿Estás seguro de eliminar y limpiar toda la lista de ${existingGroups.length} pases cargados para este evento? Esta acción permitirá subir un nuevo archivo Excel.`)) {
-      deleteEventGuestGroups(eventId);
+      await deleteEventGuestGroupsAsync(eventId);
       refreshGuestGroups();
       alert('La lista de invitados ha sido eliminada exitosamente. Puedes proceder a cargar un nuevo archivo Excel.');
     }
