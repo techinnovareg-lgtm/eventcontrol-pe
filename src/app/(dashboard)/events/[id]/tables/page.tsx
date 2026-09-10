@@ -381,7 +381,11 @@ export default function TablesManagementPage() {
     if (confirm('¿Eliminar esta mesa y liberar sus asignaciones?')) {
       lastMutationTimeRef.current = Date.now();
       setTables(prev => prev.filter(t => t.id !== tableId));
-      setAssignments(prev => prev.filter(a => a.table_id !== tableId));
+      setAssignments(prev => {
+        const next = prev.filter(a => a.table_id !== tableId);
+        saveEventAssignmentsLocally(eventId, next);
+        return next;
+      });
       if (selectedTableId === tableId) setSelectedTableId(null);
       setEditingTableObj(null);
       await deleteTableAsync(eventId, tableId);
@@ -399,24 +403,30 @@ export default function TablesManagementPage() {
 
   const handleAssign = async (tableId: string, groupId: string, passes: number) => {
     lastMutationTimeRef.current = Date.now();
-    setAssignments(prev => [
-      ...prev.filter(a => a.group_id !== groupId),
-      {
-        id: `asgn-${Date.now()}`,
-        workspace_id: currentWorkspaceId,
-        event_id: eventId,
-        table_id: tableId,
-        group_id: groupId,
-        assigned_passes: passes,
-        created_at: new Date().toISOString(),
-      }
-    ]);
+    const nextAssignment: TableAssignment = {
+      id: `asgn-${Date.now()}`,
+      workspace_id: currentWorkspaceId,
+      event_id: eventId,
+      table_id: tableId,
+      group_id: groupId,
+      assigned_passes: passes,
+      created_at: new Date().toISOString(),
+    };
+    setAssignments(prev => {
+      const next = [...prev.filter(a => a.group_id !== groupId), nextAssignment];
+      saveEventAssignmentsLocally(eventId, next);
+      return next;
+    });
     await assignGroupToTableAsync(eventId, currentWorkspaceId, tableId, groupId, passes);
   };
 
   const handleUnassign = async (groupId: string) => {
     lastMutationTimeRef.current = Date.now();
-    setAssignments(prev => prev.filter(a => a.group_id !== groupId));
+    setAssignments(prev => {
+      const next = prev.filter(a => a.group_id !== groupId);
+      saveEventAssignmentsLocally(eventId, next);
+      return next;
+    });
     await unassignGroupFromTableAsync(eventId, groupId);
   };
 

@@ -45,15 +45,29 @@ let venueElementsMemoryStore: Record<string, VenueElement[]> | null = null;
 export async function syncTablesToServerAsync(eventId: string, explicitTables?: Table[], explicitAssignments?: TableAssignment[]): Promise<void> {
   if (typeof window === 'undefined' || !eventId) return;
   try {
-    const allTables = loadTablesFromStorage();
-    const allAssignments = loadAssignmentsFromStorage();
-    const tables = explicitTables || allTables[eventId] || [];
-    const assignments = explicitAssignments || allAssignments[eventId] || [];
+    const payload: { action: string; eventId: string; tables?: Table[]; assignments?: TableAssignment[] } = {
+      action: 'SYNC_TABLES',
+      eventId,
+    };
+
+    if (explicitTables !== undefined) {
+      payload.tables = explicitTables;
+    }
+    if (explicitAssignments !== undefined) {
+      payload.assignments = explicitAssignments;
+    }
+
+    if (explicitTables === undefined && explicitAssignments === undefined) {
+      const allTables = loadTablesFromStorage();
+      const allAssignments = loadAssignmentsFromStorage();
+      payload.tables = allTables[eventId] || [];
+      payload.assignments = allAssignments[eventId] || [];
+    }
 
     await fetch('/api/events/sync', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SYNC_TABLES', eventId, tables, assignments }),
+      body: JSON.stringify(payload),
     });
   } catch (err) {}
 }
@@ -249,33 +263,35 @@ export function createTable(eventId: string, workspaceId: string, name: string, 
   };
   store[eventId].push(newTbl);
   saveTablesToStorage(store);
-  syncTablesToServerAsync(eventId);
+  syncTablesToServerAsync(eventId, store[eventId]);
   return newTbl;
 }
 
 export async function createTableAsync(eventId: string, workspaceId: string, name: string, capacity: number, posX = 440, posY = 220): Promise<Table> {
   const newTbl = createTable(eventId, workspaceId, name, capacity, posX, posY);
-  await syncTablesToServerAsync(eventId);
   return newTbl;
 }
 
 export function deleteTable(eventId: string, tableId: string): void {
+  let updatedTbls: Table[] | undefined;
   const store = loadTablesFromStorage();
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(t => t.id !== tableId);
     saveTablesToStorage(store);
+    updatedTbls = store[eventId];
   }
   const asgnStore = loadAssignmentsFromStorage();
+  let updatedAsgns: TableAssignment[] | undefined;
   if (asgnStore[eventId]) {
     asgnStore[eventId] = asgnStore[eventId].filter(a => a.table_id !== tableId);
     saveAssignmentsToStorage(asgnStore);
+    updatedAsgns = asgnStore[eventId];
   }
-  syncTablesToServerAsync(eventId);
+  syncTablesToServerAsync(eventId, updatedTbls, updatedAsgns);
 }
 
 export async function deleteTableAsync(eventId: string, tableId: string): Promise<void> {
   deleteTable(eventId, tableId);
-  await syncTablesToServerAsync(eventId);
 }
 
 export function updateTablePosition(eventId: string, tableId: string, posX: number, posY: number): void {
@@ -286,14 +302,13 @@ export function updateTablePosition(eventId: string, tableId: string, posX: numb
       tbl.pos_x = posX;
       tbl.pos_y = posY;
       saveTablesToStorage(store);
-      syncTablesToServerAsync(eventId);
+      syncTablesToServerAsync(eventId, store[eventId]);
     }
   }
 }
 
 export async function updateTablePositionAsync(eventId: string, tableId: string, posX: number, posY: number): Promise<void> {
   updateTablePosition(eventId, tableId, posX, posY);
-  await syncTablesToServerAsync(eventId);
 }
 
 export function updateTable(eventId: string, tableId: string, name: string, capacity: number): Table | null {
@@ -304,7 +319,7 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
       tbl.name = name;
       tbl.capacity = capacity;
       saveTablesToStorage(store);
-      syncTablesToServerAsync(eventId);
+      syncTablesToServerAsync(eventId, store[eventId]);
       return tbl;
     }
   }
@@ -313,7 +328,6 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
 
 export async function updateTableAsync(eventId: string, tableId: string, name: string, capacity: number): Promise<Table | null> {
   const res = updateTable(eventId, tableId, name, capacity);
-  await syncTablesToServerAsync(eventId);
   return res;
 }
 
@@ -399,13 +413,12 @@ export function assignGroupToTable(eventId: string, workspaceId: string, tableId
   };
   store[eventId].push(newAsgn);
   saveAssignmentsToStorage(store);
-  syncTablesToServerAsync(eventId);
+  syncTablesToServerAsync(eventId, undefined, store[eventId]);
   return newAsgn;
 }
 
 export async function assignGroupToTableAsync(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): Promise<TableAssignment> {
   const asgn = assignGroupToTable(eventId, workspaceId, tableId, groupId, passes);
-  await syncTablesToServerAsync(eventId);
   return asgn;
 }
 
@@ -414,13 +427,12 @@ export function unassignGroupFromTable(eventId: string, groupId: string): void {
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
     saveAssignmentsToStorage(store);
-    syncTablesToServerAsync(eventId);
+    syncTablesToServerAsync(eventId, undefined, store[eventId]);
   }
 }
 
 export async function unassignGroupFromTableAsync(eventId: string, groupId: string): Promise<void> {
   unassignGroupFromTable(eventId, groupId);
-  await syncTablesToServerAsync(eventId);
 }
 
 export function calculateTableOccupancy(eventId: string, tableId: string, capacity: number) {
