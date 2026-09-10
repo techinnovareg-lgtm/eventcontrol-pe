@@ -1178,7 +1178,19 @@ export default function TablesManagementPage() {
               </span>
             </div>
 
-            {unassignedGroups.length === 0 ? (
+            {groups.length === 0 ? (
+              <div className="p-4 text-center bg-slate-50 rounded-xl border border-slate-200 text-slate-700 text-xs space-y-2">
+                <Users className="w-6 h-6 text-slate-400 mx-auto" />
+                <p className="font-bold text-slate-800">No hay invitados cargados</p>
+                <p className="text-[11px] text-slate-500">Carga tu lista desde Importar Excel para comenzar a asignarlos a las mesas.</p>
+                <Link
+                  href={`/events/${eventId}/import`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#DBBB6E] hover:bg-[#C5A059] text-white text-[11px] font-bold rounded-lg transition shadow-xs mt-1"
+                >
+                  Ir a Importar Excel
+                </Link>
+              </div>
+            ) : unassignedGroups.length === 0 ? (
               <div className="p-4 text-center bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-900 text-xs">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
                 <strong>¡Todos Asignados!</strong> Todos los invitados tienen mesa reservada.
