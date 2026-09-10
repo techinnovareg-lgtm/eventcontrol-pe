@@ -15,17 +15,6 @@ let globalServerVenueElementsStore: Record<string, VenueElement[]> = {};
 
 const DB_FILE = path.join(process.cwd(), 'data', 'server_events_db.json');
 
-const DEFAULT_SERVER_EVENT: Event = {
-  id: 'evt-principal-01',
-  workspace_id: 'ws-a-1111',
-  name: 'Evento Principal',
-  event_type: 'BODA_SOCIAL',
-  event_date: new Date().toISOString().split('T')[0],
-  status: 'ACTIVO',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
-
 function loadDbFromFile() {
   try {
     if (fs.existsSync(DB_FILE)) {
@@ -33,46 +22,47 @@ function loadDbFromFile() {
       const parsed = JSON.parse(raw);
       if (parsed) {
         if (Array.isArray(parsed.events)) {
-          globalServerEventsStore = parsed.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102');
+          globalServerEventsStore = parsed.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
         }
         if (parsed.groups) {
           delete parsed.groups['evt-101'];
           delete parsed.groups['evt-102'];
+          delete parsed.groups['evt-principal-01'];
           globalServerGroupsStore = parsed.groups;
         }
         if (parsed.tables) {
           delete parsed.tables['evt-101'];
           delete parsed.tables['evt-102'];
+          delete parsed.tables['evt-principal-01'];
           globalServerTablesStore = parsed.tables;
         }
         if (parsed.assignments) {
           delete parsed.assignments['evt-101'];
           delete parsed.assignments['evt-102'];
+          delete parsed.assignments['evt-principal-01'];
           globalServerAssignmentsStore = parsed.assignments;
         }
         if (parsed.cuts) {
           delete parsed.cuts['evt-101'];
           delete parsed.cuts['evt-102'];
+          delete parsed.cuts['evt-principal-01'];
           globalServerCutsStore = parsed.cuts;
         }
         if (parsed.checkIns) {
           delete parsed.checkIns['evt-101'];
           delete parsed.checkIns['evt-102'];
+          delete parsed.checkIns['evt-principal-01'];
           globalServerCheckInsStore = parsed.checkIns;
         }
         if (parsed.venueElements) {
           delete parsed.venueElements['evt-101'];
           delete parsed.venueElements['evt-102'];
+          delete parsed.venueElements['evt-principal-01'];
           globalServerVenueElementsStore = parsed.venueElements;
         }
       }
     }
   } catch (e) {}
-
-  if (globalServerEventsStore.length === 0) {
-    globalServerEventsStore = [DEFAULT_SERVER_EVENT];
-    saveDbToFile();
-  }
 }
 
 function saveDbToFile() {

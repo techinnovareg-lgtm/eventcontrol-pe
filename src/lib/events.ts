@@ -7,18 +7,7 @@ import { deleteEventQRTokens } from '@/lib/qr-engine';
 const EVENTS_STORAGE_KEY = 'eventcontrol_events';
 const GROUPS_STORAGE_KEY = 'eventcontrol_guest_groups';
 
-const DEFAULT_EVENT: Event = {
-  id: 'evt-principal-01',
-  workspace_id: 'ws-a-1111',
-  name: 'Evento Principal',
-  event_type: 'BODA_SOCIAL',
-  event_date: new Date().toISOString().split('T')[0],
-  status: 'ACTIVO',
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
-
-const INITIAL_EVENTS: Event[] = [DEFAULT_EVENT];
+const INITIAL_EVENTS: Event[] = [];
 
 const INITIAL_GROUPS: Record<string, GuestGroup[]> = {};
 
@@ -32,9 +21,9 @@ function loadEventsFromStorage(): Event[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // Clean out legacy demo events (evt-101, evt-102) from browser storage
-        const cleaned = parsed.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102');
-        if (cleaned.length > 0) return cleaned;
+        // Clean out legacy demo/phantom events (evt-101, evt-102, evt-principal-01) from browser storage
+        const cleaned = parsed.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+        return cleaned;
       }
     }
   } catch (err) {
@@ -142,9 +131,10 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
     const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && Array.isArray(data.events) && data.events.length > 0) {
-        const store = getEventsStore();
-        const merged = [...data.events, ...store.filter(e => !data.events.some((de: Event) => de.id === e.id))];
+      if (data.success && Array.isArray(data.events)) {
+        const serverEvents = data.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+        const localStore = getEventsStore().filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+        const merged = [...serverEvents, ...localStore.filter(e => !serverEvents.some((se: Event) => se.id === e.id))];
         saveEventsToStorage(merged);
         const filtered = merged.filter((e: Event) => e.workspace_id === workspaceId);
         return filtered.length > 0 ? filtered : merged;
