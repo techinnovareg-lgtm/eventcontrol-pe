@@ -15,10 +15,10 @@ import {
 } from 'lucide-react';
 import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { 
-  getEventTables, getEventTablesAsync, createTable, createTableAsync, deleteTable, updateTable, getEventTableAssignments, 
-  getEventTableAssignmentsAsync, assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
-  getEventVenueElements, getEventVenueElementsAsync, createVenueElement, createVenueElementAsync, updateVenueElement, updateVenueElementPosition, 
-  deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions,
+  getEventTables, getEventTablesAsync, createTable, createTableAsync, deleteTable, deleteTableAsync, updateTable, updateTableAsync, getEventTableAssignments, 
+  getEventTableAssignmentsAsync, assignGroupToTable, assignGroupToTableAsync, unassignGroupFromTable, unassignGroupFromTableAsync, calculateTableOccupancy, updateTablePosition, updateTablePositionAsync,
+  getEventVenueElements, getEventVenueElementsAsync, createVenueElement, createVenueElementAsync, updateVenueElement, updateVenueElementAsync, updateVenueElementPosition, updateVenueElementPositionAsync,
+  deleteVenueElement, deleteVenueElementAsync, VenueElement, VenueElementType, ElementSize, computeElementDimensions,
   autoSyncTablesToServer, autoSyncTablesToServerAsync
 } from '@/lib/tables';
 
@@ -139,11 +139,23 @@ export default function TablesManagementPage() {
   const [elementOrientation, setElementOrientation] = useState<'horizontal' | 'vertical'>('horizontal');
   const [elementShape, setElementShape] = useState<'rect' | 'round_rect' | 'circle' | 'oval'>('circle');
 
+  const lastMutationTimeRef = useRef<number>(0);
+
   const refreshDataAsync = async () => {
+    // Prevent stale GET responses from overwriting local state during active dragging or within 2.5s of local mutation
+    if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 2500) {
+      return;
+    }
+
     const updatedTables = await getEventTablesAsync(eventId);
     const updatedAssignments = await getEventTableAssignmentsAsync(eventId);
     const updatedGroups = await getEventGuestGroupsAsync(eventId);
     const updatedVenueElements = await getEventVenueElementsAsync(eventId);
+
+    if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 2500) {
+      return;
+    }
+
     setTables([...updatedTables]);
     setAssignments([...updatedAssignments]);
     setGroups([...updatedGroups]);
@@ -152,17 +164,14 @@ export default function TablesManagementPage() {
     setTablePositions(prev => {
       const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
       updatedTables.forEach((t, i) => {
-        if (!updatedPos[t.id]) {
-          updatedPos[t.id] = {
-            x: t.pos_x || (140 + (i % 4) * 280),
-            y: t.pos_y || (140 + Math.floor(i / 4) * 200),
-            shape: 'ROUND',
-          };
-        }
+        updatedPos[t.id] = {
+          x: t.pos_x || (140 + (i % 4) * 280),
+          y: t.pos_y || (140 + Math.floor(i / 4) * 200),
+          shape: updatedPos[t.id]?.shape || 'ROUND',
+        };
       });
       return updatedPos;
     });
-    autoSyncTablesToServer(eventId);
   };
 
   const refreshData = () => {
@@ -183,6 +192,7 @@ export default function TablesManagementPage() {
 
   const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault();
+    lastMutationTimeRef.current = Date.now();
     const newTbl = await createTableAsync(eventId, currentWorkspaceId, tableName || 'Nueva Mesa', tableCapacity, 500, 250);
     setTables(prev => [...prev.filter(t => t.id !== newTbl.id), newTbl]);
     setTablePositions(prev => ({
@@ -195,6 +205,7 @@ export default function TablesManagementPage() {
 
   const handleCreateVenueElement = async (e: React.FormEvent) => {
     e.preventDefault();
+    lastMutationTimeRef.current = Date.now();
     const defaultLabels: Record<VenueElementType, string> = {
       ESCENARIO: 'Escenario Principal',
       PISTA_BAILE: 'Pista de Baile Central',
@@ -228,46 +239,46 @@ export default function TablesManagementPage() {
   const handleSaveEditTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTableObj) return;
-    updateTable(eventId, editingTableObj.id, editingTableObj.name, editingTableObj.capacity);
-    await autoSyncTablesToServerAsync(eventId);
+    lastMutationTimeRef.current = Date.now();
+    await updateTableAsync(eventId, editingTableObj.id, editingTableObj.name, editingTableObj.capacity);
     setEditingTableObj(null);
   };
 
   const handleSaveEditVenueElement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVenueElementObj) return;
-    updateVenueElement(eventId, editingVenueElementObj.id, {
+    lastMutationTimeRef.current = Date.now();
+    await updateVenueElementAsync(eventId, editingVenueElementObj.id, {
       label: editingVenueElementObj.label,
       size: editingVenueElementObj.size || 'medium',
       orientation: editingVenueElementObj.orientation,
       shape: editingVenueElementObj.shape,
     });
-    await autoSyncTablesToServerAsync(eventId);
     setEditingVenueElementObj(null);
   };
 
   const handleDeleteTable = async (tableId: string) => {
     if (confirm('¿Eliminar esta mesa y liberar sus asignaciones?')) {
-      deleteTable(eventId, tableId);
+      lastMutationTimeRef.current = Date.now();
       setTables(prev => prev.filter(t => t.id !== tableId));
       setAssignments(prev => prev.filter(a => a.table_id !== tableId));
       if (selectedTableId === tableId) setSelectedTableId(null);
       setEditingTableObj(null);
-      await autoSyncTablesToServerAsync(eventId);
+      await deleteTableAsync(eventId, tableId);
     }
   };
 
   const handleDeleteVenueElement = async (elemId: string) => {
     if (confirm('¿Eliminar este elemento del salón?')) {
-      deleteVenueElement(eventId, elemId);
+      lastMutationTimeRef.current = Date.now();
       setVenueElements(prev => prev.filter(ve => ve.id !== elemId));
       setEditingVenueElementObj(null);
-      await autoSyncTablesToServerAsync(eventId);
+      await deleteVenueElementAsync(eventId, elemId);
     }
   };
 
   const handleAssign = async (tableId: string, groupId: string, passes: number) => {
-    assignGroupToTable(eventId, currentWorkspaceId, tableId, groupId, passes);
+    lastMutationTimeRef.current = Date.now();
     setAssignments(prev => [
       ...prev.filter(a => a.group_id !== groupId),
       {
@@ -280,13 +291,13 @@ export default function TablesManagementPage() {
         created_at: new Date().toISOString(),
       }
     ]);
-    await autoSyncTablesToServerAsync(eventId);
+    await assignGroupToTableAsync(eventId, currentWorkspaceId, tableId, groupId, passes);
   };
 
   const handleUnassign = async (groupId: string) => {
-    unassignGroupFromTable(eventId, groupId);
+    lastMutationTimeRef.current = Date.now();
     setAssignments(prev => prev.filter(a => a.group_id !== groupId));
-    await autoSyncTablesToServerAsync(eventId);
+    await unassignGroupFromTableAsync(eventId, groupId);
   };
 
   // Drag and Drop Handlers for Guest Groups -> Table Nodes
@@ -651,7 +662,7 @@ export default function TablesManagementPage() {
     drag.nodeEl.style.top = `${newY}px`;
   };
 
-  const handleGlobalPointerUp = (e?: any) => {
+  const handleGlobalPointerUp = async (e?: any) => {
     window.removeEventListener('pointermove', handleGlobalPointerMove);
     window.removeEventListener('pointerup', handleGlobalPointerUp);
     window.removeEventListener('touchmove', handleGlobalTouchMove);
@@ -659,20 +670,19 @@ export default function TablesManagementPage() {
 
     if (activeDragRef.current) {
       const { id, type, currentX, currentY } = activeDragRef.current;
+      activeDragRef.current = null;
+      lastMutationTimeRef.current = Date.now();
 
       if (type === 'table') {
-        updateTablePosition(eventId, id, currentX, currentY);
         setTablePositions(prev => ({
           ...prev,
           [id]: { ...(prev[id] || { shape: 'ROUND' }), x: currentX, y: currentY }
         }));
+        await updateTablePositionAsync(eventId, id, currentX, currentY);
       } else {
-        updateVenueElementPosition(eventId, id, currentX, currentY);
         setVenueElements(prev => prev.map(ve => ve.id === id ? { ...ve, pos_x: currentX, pos_y: currentY } : ve));
+        await updateVenueElementPositionAsync(eventId, id, currentX, currentY);
       }
-
-      activeDragRef.current = null;
-      autoSyncTablesToServer(eventId);
     }
   };
 

@@ -244,6 +244,12 @@ export function deleteTable(eventId: string, tableId: string): void {
     asgnStore[eventId] = asgnStore[eventId].filter(a => a.table_id !== tableId);
     saveAssignmentsToStorage(asgnStore);
   }
+  autoSyncTablesToServer(eventId);
+}
+
+export async function deleteTableAsync(eventId: string, tableId: string): Promise<void> {
+  deleteTable(eventId, tableId);
+  await autoSyncTablesToServerAsync(eventId);
 }
 
 export function updateTablePosition(eventId: string, tableId: string, posX: number, posY: number): void {
@@ -254,8 +260,14 @@ export function updateTablePosition(eventId: string, tableId: string, posX: numb
       tbl.pos_x = posX;
       tbl.pos_y = posY;
       saveTablesToStorage(store);
+      autoSyncTablesToServer(eventId);
     }
   }
+}
+
+export async function updateTablePositionAsync(eventId: string, tableId: string, posX: number, posY: number): Promise<void> {
+  updateTablePosition(eventId, tableId, posX, posY);
+  await autoSyncTablesToServerAsync(eventId);
 }
 
 export function updateTable(eventId: string, tableId: string, name: string, capacity: number): Table | null {
@@ -266,10 +278,17 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
       tbl.name = name;
       tbl.capacity = capacity;
       saveTablesToStorage(store);
+      autoSyncTablesToServer(eventId);
       return tbl;
     }
   }
   return null;
+}
+
+export async function updateTableAsync(eventId: string, tableId: string, name: string, capacity: number): Promise<Table | null> {
+  const res = updateTable(eventId, tableId, name, capacity);
+  await autoSyncTablesToServerAsync(eventId);
+  return res;
 }
 
 export function getEventTables(eventId: string): Table[] {
@@ -355,6 +374,12 @@ export function assignGroupToTable(eventId: string, workspaceId: string, tableId
   return newAsgn;
 }
 
+export async function assignGroupToTableAsync(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): Promise<TableAssignment> {
+  const asgn = assignGroupToTable(eventId, workspaceId, tableId, groupId, passes);
+  await autoSyncTablesToServerAsync(eventId);
+  return asgn;
+}
+
 export function unassignGroupFromTable(eventId: string, groupId: string): void {
   const store = loadAssignmentsFromStorage();
   if (store[eventId]) {
@@ -362,6 +387,11 @@ export function unassignGroupFromTable(eventId: string, groupId: string): void {
     saveAssignmentsToStorage(store);
     autoSyncTablesToServer(eventId);
   }
+}
+
+export async function unassignGroupFromTableAsync(eventId: string, groupId: string): Promise<void> {
+  unassignGroupFromTable(eventId, groupId);
+  await autoSyncTablesToServerAsync(eventId);
 }
 
 export function calculateTableOccupancy(eventId: string, tableId: string, capacity: number) {
@@ -472,6 +502,11 @@ export function updateVenueElementPosition(eventId: string, elementId: string, p
   }
 }
 
+export async function updateVenueElementPositionAsync(eventId: string, elementId: string, posX: number, posY: number): Promise<void> {
+  updateVenueElementPosition(eventId, elementId, posX, posY);
+  await autoSyncTablesToServerAsync(eventId);
+}
+
 export function updateVenueElement(
   eventId: string, 
   elementId: string, 
@@ -500,6 +535,16 @@ export function updateVenueElement(
   return null;
 }
 
+export async function updateVenueElementAsync(
+  eventId: string, 
+  elementId: string, 
+  data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>
+): Promise<VenueElement | null> {
+  const res = updateVenueElement(eventId, elementId, data);
+  await autoSyncTablesToServerAsync(eventId);
+  return res;
+}
+
 export function deleteVenueElement(eventId: string, elementId: string): void {
   const store = loadVenueElementsFromStorage();
   if (store[eventId]) {
@@ -507,4 +552,9 @@ export function deleteVenueElement(eventId: string, elementId: string): void {
     saveVenueElementsToStorage(store);
     autoSyncTablesToServer(eventId);
   }
+}
+
+export async function deleteVenueElementAsync(eventId: string, elementId: string): Promise<void> {
+  deleteVenueElement(eventId, elementId);
+  await autoSyncTablesToServerAsync(eventId);
 }

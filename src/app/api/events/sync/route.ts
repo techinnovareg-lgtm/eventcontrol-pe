@@ -36,37 +36,37 @@ function loadDbFromFile() {
           delete parsed.groups['evt-101'];
           delete parsed.groups['evt-102'];
           delete parsed.groups['evt-principal-01'];
-          globalServerGroupsStore = { ...parsed.groups, ...globalServerGroupsStore };
+          globalServerGroupsStore = { ...globalServerGroupsStore, ...parsed.groups };
         }
         if (parsed.tables) {
           delete parsed.tables['evt-101'];
           delete parsed.tables['evt-102'];
           delete parsed.tables['evt-principal-01'];
-          globalServerTablesStore = { ...parsed.tables, ...globalServerTablesStore };
+          globalServerTablesStore = { ...globalServerTablesStore, ...parsed.tables };
         }
         if (parsed.assignments) {
           delete parsed.assignments['evt-101'];
           delete parsed.assignments['evt-102'];
           delete parsed.assignments['evt-principal-01'];
-          globalServerAssignmentsStore = { ...parsed.assignments, ...globalServerAssignmentsStore };
+          globalServerAssignmentsStore = { ...globalServerAssignmentsStore, ...parsed.assignments };
         }
         if (parsed.cuts) {
           delete parsed.cuts['evt-101'];
           delete parsed.cuts['evt-102'];
           delete parsed.cuts['evt-principal-01'];
-          globalServerCutsStore = { ...parsed.cuts, ...globalServerCutsStore };
+          globalServerCutsStore = { ...globalServerCutsStore, ...parsed.cuts };
         }
         if (parsed.checkIns) {
           delete parsed.checkIns['evt-101'];
           delete parsed.checkIns['evt-102'];
           delete parsed.checkIns['evt-principal-01'];
-          globalServerCheckInsStore = { ...parsed.checkIns, ...globalServerCheckInsStore };
+          globalServerCheckInsStore = { ...globalServerCheckInsStore, ...parsed.checkIns };
         }
         if (parsed.venueElements) {
           delete parsed.venueElements['evt-101'];
           delete parsed.venueElements['evt-102'];
           delete parsed.venueElements['evt-principal-01'];
-          globalServerVenueElementsStore = { ...parsed.venueElements, ...globalServerVenueElementsStore };
+          globalServerVenueElementsStore = { ...globalServerVenueElementsStore, ...parsed.venueElements };
         }
       }
     }
