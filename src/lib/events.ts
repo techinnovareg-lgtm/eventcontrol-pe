@@ -49,6 +49,7 @@ function saveEventsToStorage(events: Event[]) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
+      setTimeout(() => autoSyncLocalStoresToServer(), 50);
     } catch (err) {
       console.warn('[EventsStore] Failed to save to localStorage', err);
     }
@@ -79,6 +80,7 @@ function saveGroupsToStorage(groups: Record<string, GuestGroup[]>) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+      setTimeout(() => autoSyncLocalStoresToServer(), 50);
     } catch (err) {
       console.warn('[GuestGroupsStore] Failed to save to localStorage', err);
     }

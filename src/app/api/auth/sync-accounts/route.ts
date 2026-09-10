@@ -72,7 +72,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
 
 let globalServerAccountsStore: AdminAccount[] = [];
 
-const ACCOUNTS_DB_FILE = path.join(process.cwd(), '.next', 'server_accounts_db.json');
+const ACCOUNTS_DB_FILE = path.join(process.cwd(), 'data', 'server_accounts_db.json');
 
 function loadAccountsFromFile() {
   try {

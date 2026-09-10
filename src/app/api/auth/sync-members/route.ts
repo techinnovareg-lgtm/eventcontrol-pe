@@ -20,7 +20,7 @@ export interface WorkspaceMemberUser {
 // Global server-side memory store for sub-users and door operators across devices
 let globalServerMembersStore: WorkspaceMemberUser[] = [];
 
-const MEMBERS_DB_FILE = path.join(process.cwd(), '.next', 'server_members_db.json');
+const MEMBERS_DB_FILE = path.join(process.cwd(), 'data', 'server_members_db.json');
 
 function loadMembersFromFile() {
   try {
