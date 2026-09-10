@@ -180,6 +180,27 @@ function saveVenueElementsToStorage(data: Record<string, VenueElement[]>) {
   }
 }
 
+export function saveEventTablesLocally(eventId: string, tables: Table[]) {
+  if (!eventId) return;
+  const store = loadTablesFromStorage();
+  store[eventId] = tables;
+  saveTablesToStorage(store);
+}
+
+export function saveEventAssignmentsLocally(eventId: string, assignments: TableAssignment[]) {
+  if (!eventId) return;
+  const store = loadAssignmentsFromStorage();
+  store[eventId] = assignments;
+  saveAssignmentsToStorage(store);
+}
+
+export function saveEventVenueElementsLocally(eventId: string, venueElements: VenueElement[]) {
+  if (!eventId) return;
+  const store = loadVenueElementsFromStorage();
+  store[eventId] = venueElements;
+  saveVenueElementsToStorage(store);
+}
+
 export function computeElementDimensions(
   size: ElementSize = 'medium', 
   shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect', 
