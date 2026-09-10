@@ -449,8 +449,8 @@ export function createVenueElement(
   size: ElementSize = 'medium',
   orientation: 'horizontal' | 'vertical' = 'horizontal',
   shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect',
-  posX = 420, 
-  posY = 400
+  posX = 750, 
+  posY = 320
 ): VenueElement {
   const store = loadVenueElementsFromStorage();
   if (!store[eventId]) {
@@ -489,8 +489,8 @@ export async function createVenueElementAsync(
   size: ElementSize = 'medium',
   orientation: 'horizontal' | 'vertical' = 'horizontal',
   shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect',
-  posX = 420, 
-  posY = 400
+  posX = 750, 
+  posY = 320
 ): Promise<VenueElement> {
   const newElem = createVenueElement(eventId, workspaceId, type, label, size, orientation, shape, posX, posY);
   await syncVenueElementsToServerAsync(eventId);

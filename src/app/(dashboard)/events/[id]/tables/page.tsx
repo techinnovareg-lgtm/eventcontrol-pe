@@ -13,7 +13,7 @@ import {
   Flower2, Columns, Waves, Trees, DoorOpen, Layers, Maximize, UserPlus, Printer, Download, FileText,
   FoldVertical, UnfoldVertical
 } from 'lucide-react';
-import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
+import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync, saveEventGuestGroupsAsync } from '@/lib/events';
 import { 
   getEventTables, getEventTablesAsync, createTable, createTableAsync, deleteTable, deleteTableAsync, updateTable, updateTableAsync, getEventTableAssignments, 
   getEventTableAssignmentsAsync, assignGroupToTable, assignGroupToTableAsync, unassignGroupFromTable, unassignGroupFromTableAsync, calculateTableOccupancy, updateTablePosition, updateTablePositionAsync,
@@ -55,7 +55,19 @@ export default function TablesManagementPage() {
             const data = await res.json();
             if (data.success) {
               if (data.event) setCurrentEvent(data.event);
-              if (Array.isArray(data.groups)) setGroups(data.groups);
+              if (Array.isArray(data.groups)) {
+                if (data.groups.length > 0) {
+                  setGroups(data.groups);
+                } else {
+                  const localGrps = getEventGuestGroups(eventId);
+                  if (localGrps.length > 0) {
+                    setGroups(localGrps);
+                    saveEventGuestGroupsAsync(eventId, wsId, localGrps);
+                  } else {
+                    setGroups([]);
+                  }
+                }
+              }
               if (Array.isArray(data.tables)) {
                 setTables(data.tables);
                 setTablePositions(prev => {
@@ -177,7 +189,17 @@ export default function TablesManagementPage() {
 
       setTables(updatedTables);
       setAssignments(updatedAssignments);
-      setGroups(updatedGroups);
+      if (updatedGroups.length > 0) {
+        setGroups(updatedGroups);
+      } else {
+        const localGrps = getEventGuestGroups(eventId);
+        if (localGrps.length > 0) {
+          setGroups(localGrps);
+          saveEventGuestGroupsAsync(eventId, currentWorkspaceId, localGrps);
+        } else {
+          setGroups([]);
+        }
+      }
       setVenueElements(updatedVenueElements);
 
       setTablePositions(prev => {
@@ -247,8 +269,8 @@ export default function TablesManagementPage() {
       elementSize,
       elementOrientation,
       elementShape,
-      480,
-      350
+      750,
+      320
     );
 
     setVenueElements(prev => [...prev.filter(ve => ve.id !== newElem.id), newElem]);

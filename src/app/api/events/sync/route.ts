@@ -158,6 +158,12 @@ export async function POST(req: Request) {
       const targetEvtId = eventId || groups[0].event_id;
       
       const existingGroups = globalServerGroupsStore[targetEvtId] || [];
+
+      // Protect against empty groups payload wiping existing server groups store
+      if (groups.length === 0 && existingGroups.length > 0) {
+        return NextResponse.json({ success: true, count: existingGroups.length, preserved: true });
+      }
+
       const mergedGroups = groups.map((g: GuestGroup) => {
         const exG = existingGroups.find(e => e.id === g.id);
         const maxCount = Math.max(g.checked_in_count || 0, exG ? (exG.checked_in_count || 0) : 0);

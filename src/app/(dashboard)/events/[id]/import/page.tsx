@@ -83,6 +83,10 @@ export default function ExcelImportWizardPage() {
   // Validation Results
   const [validationResult, setValidationResult] = useState<ImportValidationResult | null>(null);
 
+  // Success Animated Modal State
+  const [showSuccessModal, setShowSuccessModal] = useState<boolean>(false);
+  const [importedSummary, setImportedSummary] = useState<{ validCount: number; totalPasses: number } | null>(null);
+
   // Download official Excel template matching Formato_ejemplo.xlsx
   const handleDownloadTemplate = () => {
     const excelBytes = generateTemplateExcel(event?.name);
@@ -205,8 +209,12 @@ export default function ExcelImportWizardPage() {
 
     await saveEventGuestGroupsAsync(eventId, currentWorkspaceId, guestGroups);
     refreshGuestGroups();
-    alert(`¡Éxito! Se han importado ${validationResult.validCount} pases/grupos de invitados con ${validationResult.totalPasses} personas autorizadas totales.`);
-    setStep(1);
+    
+    setImportedSummary({
+      validCount: validationResult.validCount,
+      totalPasses: validationResult.totalPasses,
+    });
+    setShowSuccessModal(true);
   };
 
   const handleClearAllGuests = async () => {
@@ -608,6 +616,81 @@ export default function ExcelImportWizardPage() {
           )}
         </div>
       </main>
+
+      {/* SUCCESS IMPORT ANIMATED LUXURY MODAL */}
+      {showSuccessModal && importedSummary && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-200 select-none">
+          <div className="bg-white border-2 border-[#C5A059] rounded-3xl p-8 max-w-lg w-full shadow-2xl space-y-6 text-center relative overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Background Decorative Gold & Emerald Accent Blur Rays */}
+            <div className="absolute -top-16 -right-16 w-36 h-36 bg-amber-100 rounded-full blur-2xl opacity-60 pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-36 h-36 bg-emerald-100 rounded-full blur-2xl opacity-60 pointer-events-none" />
+
+            {/* Animated Celebration Icon Badge */}
+            <div className="relative mx-auto w-20 h-20 flex items-center justify-center">
+              <div className="absolute inset-0 bg-emerald-100 rounded-full animate-ping opacity-30" />
+              <div className="w-20 h-20 bg-emerald-50 rounded-full border-2 border-emerald-400 flex items-center justify-center shadow-lg">
+                <CheckCircle2 className="w-10 h-10 text-emerald-600 animate-in zoom-in duration-300" />
+              </div>
+              <Sparkles className="w-6 h-6 text-[#B8860B] absolute -top-1 -right-1 animate-bounce" />
+            </div>
+
+            {/* Title & Subtitle */}
+            <div className="space-y-1">
+              <span className="text-xs font-bold uppercase tracking-widest text-[#B8860B] block">
+                Operación Exitosa
+              </span>
+              <h2 className="text-2xl font-serif font-bold text-slate-900">
+                ¡Pases e Invitados Cargados Correctamente!
+              </h2>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                La lista de invitados se guardó y sincronizó con éxito en la base de datos central.
+              </p>
+            </div>
+
+            {/* Detailed Metric Cards Grid */}
+            <div className="grid grid-cols-2 gap-3 p-4 bg-amber-50/50 rounded-2xl border border-[#C5A059]/30 text-left">
+              <div className="bg-white p-3.5 rounded-xl border border-amber-200 shadow-2xs">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Pases / Grupos</span>
+                <strong className="text-xl font-serif font-bold text-slate-900 block mt-0.5">
+                  {importedSummary.validCount}
+                </strong>
+                <span className="text-[10px] text-amber-700 font-medium">Registrados</span>
+              </div>
+              <div className="bg-white p-3.5 rounded-xl border border-amber-200 shadow-2xs">
+                <span className="text-[10px] text-slate-400 font-bold uppercase block">Personas Autorizadas</span>
+                <strong className="text-xl font-serif font-bold text-emerald-700 block mt-0.5">
+                  {importedSummary.totalPasses}
+                </strong>
+                <span className="text-[10px] text-emerald-800 font-medium">Capacidad total</span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+              <Link
+                href={`/events/${eventId}/tables`}
+                style={{ backgroundColor: '#DBBB6E' }}
+                className="w-full sm:w-auto flex-1 inline-flex items-center justify-center gap-2 text-white font-extrabold text-xs px-6 py-3.5 rounded-xl shadow-md hover:brightness-110 transition"
+              >
+                <TableIcon className="w-4 h-4 text-white" /> Ir al Plano de Mesas <ArrowRight className="w-4 h-4 text-white" />
+              </Link>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setStep(1);
+                  setFileName('');
+                  setSheets([]);
+                  setValidationResult(null);
+                }}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs px-5 py-3.5 rounded-xl shadow-xs transition"
+              >
+                Continuar en Importación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
