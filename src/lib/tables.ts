@@ -233,7 +233,7 @@ export async function createTableAsync(eventId: string, workspaceId: string, nam
   return newTbl;
 }
 
-export function deleteTable(eventId: string, tableId: string, skipSync = false): void {
+export function deleteTable(eventId: string, tableId: string): void {
   const store = loadTablesFromStorage();
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(t => t.id !== tableId);
@@ -244,17 +244,15 @@ export function deleteTable(eventId: string, tableId: string, skipSync = false):
     asgnStore[eventId] = asgnStore[eventId].filter(a => a.table_id !== tableId);
     saveAssignmentsToStorage(asgnStore);
   }
-  if (!skipSync) {
-    autoSyncTablesToServer(eventId);
-  }
+  autoSyncTablesToServer(eventId);
 }
 
 export async function deleteTableAsync(eventId: string, tableId: string): Promise<void> {
-  deleteTable(eventId, tableId, true);
+  deleteTable(eventId, tableId);
   await autoSyncTablesToServerAsync(eventId);
 }
 
-export function updateTablePosition(eventId: string, tableId: string, posX: number, posY: number, skipSync = false): void {
+export function updateTablePosition(eventId: string, tableId: string, posX: number, posY: number): void {
   const store = loadTablesFromStorage();
   if (store[eventId]) {
     const tbl = store[eventId].find(t => t.id === tableId);
@@ -262,19 +260,17 @@ export function updateTablePosition(eventId: string, tableId: string, posX: numb
       tbl.pos_x = posX;
       tbl.pos_y = posY;
       saveTablesToStorage(store);
-      if (!skipSync) {
-        autoSyncTablesToServer(eventId);
-      }
+      autoSyncTablesToServer(eventId);
     }
   }
 }
 
 export async function updateTablePositionAsync(eventId: string, tableId: string, posX: number, posY: number): Promise<void> {
-  updateTablePosition(eventId, tableId, posX, posY, true);
+  updateTablePosition(eventId, tableId, posX, posY);
   await autoSyncTablesToServerAsync(eventId);
 }
 
-export function updateTable(eventId: string, tableId: string, name: string, capacity: number, skipSync = false): Table | null {
+export function updateTable(eventId: string, tableId: string, name: string, capacity: number): Table | null {
   const store = loadTablesFromStorage();
   if (store[eventId]) {
     const tbl = store[eventId].find(t => t.id === tableId);
@@ -282,9 +278,7 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
       tbl.name = name;
       tbl.capacity = capacity;
       saveTablesToStorage(store);
-      if (!skipSync) {
-        autoSyncTablesToServer(eventId);
-      }
+      autoSyncTablesToServer(eventId);
       return tbl;
     }
   }
@@ -292,7 +286,7 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
 }
 
 export async function updateTableAsync(eventId: string, tableId: string, name: string, capacity: number): Promise<Table | null> {
-  const res = updateTable(eventId, tableId, name, capacity, true);
+  const res = updateTable(eventId, tableId, name, capacity);
   await autoSyncTablesToServerAsync(eventId);
   return res;
 }
@@ -357,7 +351,7 @@ export function deleteEventVenueElements(eventId: string): void {
   saveVenueElementsToStorage(store);
 }
 
-export function assignGroupToTable(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number, skipSync = false): TableAssignment {
+export function assignGroupToTable(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): TableAssignment {
   const store = loadAssignmentsFromStorage();
   if (!store[eventId]) {
     store[eventId] = [];
@@ -376,31 +370,27 @@ export function assignGroupToTable(eventId: string, workspaceId: string, tableId
   };
   store[eventId].push(newAsgn);
   saveAssignmentsToStorage(store);
-  if (!skipSync) {
-    autoSyncTablesToServer(eventId);
-  }
+  autoSyncTablesToServer(eventId);
   return newAsgn;
 }
 
 export async function assignGroupToTableAsync(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): Promise<TableAssignment> {
-  const asgn = assignGroupToTable(eventId, workspaceId, tableId, groupId, passes, true);
+  const asgn = assignGroupToTable(eventId, workspaceId, tableId, groupId, passes);
   await autoSyncTablesToServerAsync(eventId);
   return asgn;
 }
 
-export function unassignGroupFromTable(eventId: string, groupId: string, skipSync = false): void {
+export function unassignGroupFromTable(eventId: string, groupId: string): void {
   const store = loadAssignmentsFromStorage();
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
     saveAssignmentsToStorage(store);
-    if (!skipSync) {
-      autoSyncTablesToServer(eventId);
-    }
+    autoSyncTablesToServer(eventId);
   }
 }
 
 export async function unassignGroupFromTableAsync(eventId: string, groupId: string): Promise<void> {
-  unassignGroupFromTable(eventId, groupId, true);
+  unassignGroupFromTable(eventId, groupId);
   await autoSyncTablesToServerAsync(eventId);
 }
 
@@ -452,8 +442,7 @@ export function createVenueElement(
   orientation: 'horizontal' | 'vertical' = 'horizontal',
   shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect',
   posX = 420, 
-  posY = 400,
-  skipSync = false
+  posY = 400
 ): VenueElement {
   const store = loadVenueElementsFromStorage();
   if (!store[eventId]) {
@@ -480,9 +469,7 @@ export function createVenueElement(
 
   store[eventId].push(newElem);
   saveVenueElementsToStorage(store);
-  if (!skipSync) {
-    autoSyncTablesToServer(eventId);
-  }
+  autoSyncTablesToServer(eventId);
   return newElem;
 }
 
@@ -497,12 +484,12 @@ export async function createVenueElementAsync(
   posX = 420, 
   posY = 400
 ): Promise<VenueElement> {
-  const newElem = createVenueElement(eventId, workspaceId, type, label, size, orientation, shape, posX, posY, true);
+  const newElem = createVenueElement(eventId, workspaceId, type, label, size, orientation, shape, posX, posY);
   await autoSyncTablesToServerAsync(eventId);
   return newElem;
 }
 
-export function updateVenueElementPosition(eventId: string, elementId: string, posX: number, posY: number, skipSync = false): void {
+export function updateVenueElementPosition(eventId: string, elementId: string, posX: number, posY: number): void {
   const store = loadVenueElementsFromStorage();
   if (store[eventId]) {
     const elem = store[eventId].find(e => e.id === elementId);
@@ -510,23 +497,20 @@ export function updateVenueElementPosition(eventId: string, elementId: string, p
       elem.pos_x = posX;
       elem.pos_y = posY;
       saveVenueElementsToStorage(store);
-      if (!skipSync) {
-        autoSyncTablesToServer(eventId);
-      }
+      autoSyncTablesToServer(eventId);
     }
   }
 }
 
 export async function updateVenueElementPositionAsync(eventId: string, elementId: string, posX: number, posY: number): Promise<void> {
-  updateVenueElementPosition(eventId, elementId, posX, posY, true);
+  updateVenueElementPosition(eventId, elementId, posX, posY);
   await autoSyncTablesToServerAsync(eventId);
 }
 
 export function updateVenueElement(
   eventId: string, 
   elementId: string, 
-  data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>,
-  skipSync = false
+  data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>
 ): VenueElement | null {
   const store = loadVenueElementsFromStorage();
   if (store[eventId]) {
@@ -544,9 +528,7 @@ export function updateVenueElement(
         height: dims.height,
       });
       saveVenueElementsToStorage(store);
-      if (!skipSync) {
-        autoSyncTablesToServer(eventId);
-      }
+      autoSyncTablesToServer(eventId);
       return elem;
     }
   }
@@ -558,23 +540,21 @@ export async function updateVenueElementAsync(
   elementId: string, 
   data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>
 ): Promise<VenueElement | null> {
-  const res = updateVenueElement(eventId, elementId, data, true);
+  const res = updateVenueElement(eventId, elementId, data);
   await autoSyncTablesToServerAsync(eventId);
   return res;
 }
 
-export function deleteVenueElement(eventId: string, elementId: string, skipSync = false): void {
+export function deleteVenueElement(eventId: string, elementId: string): void {
   const store = loadVenueElementsFromStorage();
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(e => e.id !== elementId);
     saveVenueElementsToStorage(store);
-    if (!skipSync) {
-      autoSyncTablesToServer(eventId);
-    }
+    autoSyncTablesToServer(eventId);
   }
 }
 
 export async function deleteVenueElementAsync(eventId: string, elementId: string): Promise<void> {
-  deleteVenueElement(eventId, elementId, true);
+  deleteVenueElement(eventId, elementId);
   await autoSyncTablesToServerAsync(eventId);
 }

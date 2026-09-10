@@ -15,7 +15,11 @@ let globalServerVenueElementsStore: Record<string, VenueElement[]> = {};
 
 const DB_FILE = path.join(process.cwd(), 'data', 'server_events_db.json');
 
+let isDbLoaded = false;
+
 function loadDbFromFile() {
+  if (isDbLoaded) return;
+  isDbLoaded = true;
   try {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
@@ -93,6 +97,7 @@ function saveDbToFile() {
 loadDbFromFile();
 
 export async function GET(req: Request) {
+  loadDbFromFile();
   const { searchParams } = new URL(req.url);
   const workspaceId = searchParams.get('workspaceId');
   const eventId = searchParams.get('eventId');
@@ -134,6 +139,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    loadDbFromFile();
     const body = await req.json();
     const { action, event, eventId, workspaceId, groups, tables, assignments, cuts, checkIn, venueElements } = body;
 
