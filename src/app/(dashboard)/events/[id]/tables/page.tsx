@@ -147,31 +147,38 @@ export default function TablesManagementPage() {
       return;
     }
 
-    const updatedTables = await getEventTablesAsync(eventId);
-    const updatedAssignments = await getEventTableAssignmentsAsync(eventId);
-    const updatedGroups = await getEventGuestGroupsAsync(eventId);
-    const updatedVenueElements = await getEventVenueElementsAsync(eventId);
+    try {
+      const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.success) return;
 
-    if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 2500) {
-      return;
-    }
+      if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 2500) {
+        return;
+      }
 
-    setTables([...updatedTables]);
-    setAssignments([...updatedAssignments]);
-    setGroups([...updatedGroups]);
-    setVenueElements([...updatedVenueElements]);
+      const updatedTables: Table[] = Array.isArray(data.tables) ? data.tables : [];
+      const updatedAssignments: TableAssignment[] = Array.isArray(data.assignments) ? data.assignments : [];
+      const updatedGroups: GuestGroup[] = Array.isArray(data.groups) ? data.groups : [];
+      const updatedVenueElements: VenueElement[] = Array.isArray(data.venueElements) ? data.venueElements : [];
 
-    setTablePositions(prev => {
-      const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-      updatedTables.forEach((t, i) => {
-        updatedPos[t.id] = {
-          x: t.pos_x || (140 + (i % 4) * 280),
-          y: t.pos_y || (140 + Math.floor(i / 4) * 200),
-          shape: updatedPos[t.id]?.shape || 'ROUND',
-        };
+      setTables(updatedTables);
+      setAssignments(updatedAssignments);
+      setGroups(updatedGroups);
+      setVenueElements(updatedVenueElements);
+
+      setTablePositions(prev => {
+        const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+        updatedTables.forEach((t, i) => {
+          updatedPos[t.id] = {
+            x: t.pos_x || (140 + (i % 4) * 280),
+            y: t.pos_y || (140 + Math.floor(i / 4) * 200),
+            shape: updatedPos[t.id]?.shape || 'ROUND',
+          };
+        });
+        return updatedPos;
       });
-      return updatedPos;
-    });
+    } catch (err) {}
   };
 
   const refreshData = () => {
