@@ -199,10 +199,20 @@ export async function POST(req: Request) {
 
     if (action === 'SYNC_TABLES' && eventId) {
       if (Array.isArray(tables)) {
-        globalServerTablesStore[eventId] = tables;
+        const existingTables = globalServerTablesStore[eventId] || [];
+        if (tables.length === 0 && existingTables.length > 0) {
+          // Preserve existing server tables if payload is empty
+        } else {
+          globalServerTablesStore[eventId] = tables;
+        }
       }
       if (Array.isArray(assignments)) {
-        globalServerAssignmentsStore[eventId] = assignments;
+        const existingAsgns = globalServerAssignmentsStore[eventId] || [];
+        if (assignments.length === 0 && existingAsgns.length > 0) {
+          // Preserve existing server assignments if payload is empty
+        } else {
+          globalServerAssignmentsStore[eventId] = assignments;
+        }
       }
       saveDbToFile();
       return NextResponse.json({ success: true });
@@ -225,7 +235,12 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_VENUE_ELEMENTS' && eventId && Array.isArray(venueElements)) {
-      globalServerVenueElementsStore[eventId] = venueElements;
+      const existingVenueElems = globalServerVenueElementsStore[eventId] || [];
+      if (venueElements.length === 0 && existingVenueElems.length > 0) {
+        // Preserve existing server venue elements if payload is empty
+      } else {
+        globalServerVenueElementsStore[eventId] = venueElements;
+      }
       saveDbToFile();
       return NextResponse.json({ success: true });
     }
