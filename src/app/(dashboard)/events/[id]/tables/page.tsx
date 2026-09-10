@@ -49,19 +49,32 @@ export default function TablesManagementPage() {
       setCurrentWorkspaceId(wsId);
 
       if (eventId) {
-        const [evt, grps, tbls, asgns, elms] = await Promise.all([
-          getEventByIdAsync(eventId, wsId),
-          getEventGuestGroupsAsync(eventId),
-          getEventTablesAsync(eventId),
-          getEventTableAssignmentsAsync(eventId),
-          getEventVenueElementsAsync(eventId),
-        ]);
-
-        if (evt) setCurrentEvent(evt);
-        if (grps) setGroups(grps);
-        if (tbls) setTables(tbls);
-        if (asgns) setAssignments(asgns);
-        if (elms) setVenueElements(elms);
+        try {
+          const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              if (data.event) setCurrentEvent(data.event);
+              if (Array.isArray(data.groups)) setGroups(data.groups);
+              if (Array.isArray(data.tables)) {
+                setTables(data.tables);
+                setTablePositions(prev => {
+                  const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+                  data.tables.forEach((t: Table, i: number) => {
+                    updatedPos[t.id] = {
+                      x: t.pos_x || (140 + (i % 4) * 280),
+                      y: t.pos_y || (140 + Math.floor(i / 4) * 200),
+                      shape: updatedPos[t.id]?.shape || 'ROUND',
+                    };
+                  });
+                  return updatedPos;
+                });
+              }
+              if (Array.isArray(data.assignments)) setAssignments(data.assignments);
+              if (Array.isArray(data.venueElements)) setVenueElements(data.venueElements);
+            }
+          }
+        } catch (err) {}
       }
     }
 
