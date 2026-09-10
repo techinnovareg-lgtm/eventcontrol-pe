@@ -13,6 +13,7 @@ import { testCrossWorkspaceIsolation } from '@/lib/workspace';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
 import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
+import { getWorkspaceEvents, getWorkspaceEventsAsync } from '@/lib/events';
 
 export default function AccountProfilePage() {
   const session = getActiveSession();
@@ -26,9 +27,14 @@ export default function AccountProfilePage() {
 
   // Team Members Dynamic State
   const [teamMembers, setTeamMembers] = useState<WorkspaceMemberUser[]>([]);
+  const [activeEventsCount, setActiveEventsCount] = useState<number>(0);
 
   useEffect(() => {
     setTeamMembers(getWorkspaceMembers(currentWorkspaceId));
+    setActiveEventsCount(getWorkspaceEvents(currentWorkspaceId).length);
+    getWorkspaceEventsAsync(currentWorkspaceId).then(evts => {
+      setActiveEventsCount(evts.length);
+    });
   }, [currentWorkspaceId]);
 
   // Change Password Form State
@@ -274,11 +280,18 @@ export default function AccountProfilePage() {
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold text-slate-700 uppercase">Eventos Activos</span>
                     <strong className="text-slate-900 font-bold">
-                      1 / {plan.maxActiveEvents === -1 ? 'Ilimitados' : plan.maxActiveEvents}
+                      {activeEventsCount} / {plan.maxActiveEvents === -1 ? 'Ilimitados' : plan.maxActiveEvents}
                     </strong>
                   </div>
                   <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                    <div className="bg-[#C5A059] h-full w-1/3"></div>
+                    <div 
+                      className="bg-[#C5A059] h-full transition-all duration-300"
+                      style={{ 
+                        width: plan.maxActiveEvents === -1 
+                          ? `${Math.min(100, Math.max(0, activeEventsCount * 20))}%` 
+                          : `${Math.min(100, (activeEventsCount / plan.maxActiveEvents) * 100)}%` 
+                      }}
+                    ></div>
                   </div>
                   <span className="text-[10px] text-slate-500 block">Capacidad para gestionar bodas simultáneas</span>
                 </div>
