@@ -59,21 +59,17 @@ export function autoSyncTablesToServer(eventId?: string) {
       const assignments = allAssignments[evtId] || [];
       const venueElements = allVenueElements[evtId] || [];
 
-      if (tables.length > 0 || assignments.length > 0) {
-        fetch('/api/events/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
-        }).catch(() => {});
-      }
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
+      }).catch(() => {});
 
-      if (venueElements.length > 0) {
-        fetch('/api/events/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'SYNC_VENUE_ELEMENTS', eventId: evtId, venueElements }),
-        }).catch(() => {});
-      }
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_VENUE_ELEMENTS', eventId: evtId, venueElements }),
+      }).catch(() => {});
     });
   } catch (err) {}
 }
@@ -280,20 +276,6 @@ export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
       const data = await res.json();
       if (data.success && Array.isArray(data.tables)) {
         const store = loadTablesFromStorage();
-        const localTables = store[eventId] || [];
-        
-        if (localTables.length > 0) {
-          const serverIds = new Set(data.tables.map((t: Table) => t.id));
-          const missingLocals = localTables.filter(t => !serverIds.has(t.id));
-          if (missingLocals.length > 0) {
-            const merged = [...data.tables, ...missingLocals];
-            store[eventId] = merged;
-            saveTablesToStorage(store);
-            autoSyncTablesToServer(eventId);
-            return merged;
-          }
-        }
-        
         store[eventId] = data.tables;
         saveTablesToStorage(store);
         return data.tables;
@@ -315,20 +297,6 @@ export async function getEventTableAssignmentsAsync(eventId: string): Promise<Ta
       const data = await res.json();
       if (data.success && Array.isArray(data.assignments)) {
         const store = loadAssignmentsFromStorage();
-        const localAssignments = store[eventId] || [];
-
-        if (localAssignments.length > 0) {
-          const serverIds = new Set(data.assignments.map((a: TableAssignment) => a.id));
-          const missingLocals = localAssignments.filter(a => !serverIds.has(a.id));
-          if (missingLocals.length > 0) {
-            const merged = [...data.assignments, ...missingLocals];
-            store[eventId] = merged;
-            saveAssignmentsToStorage(store);
-            autoSyncTablesToServer(eventId);
-            return merged;
-          }
-        }
-
         store[eventId] = data.assignments;
         saveAssignmentsToStorage(store);
         return data.assignments;
@@ -418,20 +386,6 @@ export async function getEventVenueElementsAsync(eventId: string): Promise<Venue
       const data = await res.json();
       if (data.success && Array.isArray(data.venueElements)) {
         const store = loadVenueElementsFromStorage();
-        const localElements = store[eventId] || [];
-
-        if (localElements.length > 0) {
-          const serverIds = new Set(data.venueElements.map((v: VenueElement) => v.id));
-          const missingLocals = localElements.filter(v => !serverIds.has(v.id));
-          if (missingLocals.length > 0) {
-            const merged = [...data.venueElements, ...missingLocals];
-            store[eventId] = merged;
-            saveVenueElementsToStorage(store);
-            autoSyncTablesToServer(eventId);
-            return merged;
-          }
-        }
-
         store[eventId] = data.venueElements;
         saveVenueElementsToStorage(store);
         return data.venueElements;

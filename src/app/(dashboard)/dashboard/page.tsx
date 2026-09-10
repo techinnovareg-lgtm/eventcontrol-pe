@@ -95,17 +95,38 @@ export default function RealtimeDashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!eventId) return;
+    if (!currentWorkspaceId) return;
+
+    const pollDashboard = async () => {
+      const userEvents = await getWorkspaceEventsAsync(currentWorkspaceId);
+      if (userEvents.length > 0) {
+        setHasNoEvents(false);
+        let selectedId = eventId;
+        if (!selectedId) {
+          if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search);
+            selectedId = urlParams.get('eventId') || '';
+          }
+        }
+        const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
+        if (activeEvt) {
+          setEventId(activeEvt.id);
+          await refreshDashboardData(activeEvt.id, currentWorkspaceId);
+        }
+      } else {
+        setHasNoEvents(true);
+      }
+    };
 
     const unsubscribeFn = checkInRealtimeChannel.subscribe(() => {
-      refreshDashboardData(eventId, currentWorkspaceId);
+      pollDashboard();
       setRealtimePulse(true);
       setTimeout(() => setRealtimePulse(false), 2000);
     });
 
     const timer = setInterval(() => {
-      refreshDashboardData(eventId, currentWorkspaceId);
-    }, 3000);
+      pollDashboard();
+    }, 1500);
 
     return () => {
       clearInterval(timer);

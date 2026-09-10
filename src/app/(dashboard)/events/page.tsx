@@ -36,11 +36,16 @@ export default function EventsCrudPage() {
     setUserEmail(email);
     setUserInitial(name ? name.charAt(0).toUpperCase() : 'C');
 
-    getWorkspaceEventsAsync(wsId).then(onlineEvts => {
-      if (Array.isArray(onlineEvts)) {
-        setEvents(onlineEvts);
-      }
-    });
+    const fetchEvents = () => {
+      getWorkspaceEventsAsync(wsId).then(onlineEvts => {
+        if (Array.isArray(onlineEvts)) {
+          setEvents(onlineEvts);
+        }
+      });
+    };
+
+    fetchEvents();
+    const timer = setInterval(fetchEvents, 1500);
 
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
@@ -48,6 +53,8 @@ export default function EventsCrudPage() {
         setIsCreateModalOpen(true);
       }
     }
+
+    return () => clearInterval(timer);
   }, []);
 
   // Create Modal State

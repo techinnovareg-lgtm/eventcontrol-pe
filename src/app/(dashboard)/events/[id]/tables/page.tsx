@@ -170,7 +170,7 @@ export default function TablesManagementPage() {
 
   useEffect(() => {
     refreshDataAsync();
-    const interval = setInterval(refreshDataAsync, 3000);
+    const interval = setInterval(refreshDataAsync, 1500);
     const unsub = checkInRealtimeChannel.subscribe(() => {
       refreshDataAsync();
     });
@@ -250,28 +250,44 @@ export default function TablesManagementPage() {
   const handleDeleteTable = (tableId: string) => {
     if (confirm('¿Eliminar esta mesa y liberar sus asignaciones?')) {
       deleteTable(eventId, tableId);
+      setTables(prev => prev.filter(t => t.id !== tableId));
+      setAssignments(prev => prev.filter(a => a.table_id !== tableId));
       if (selectedTableId === tableId) setSelectedTableId(null);
       setEditingTableObj(null);
-      refreshData();
+      autoSyncTablesToServer(eventId);
     }
   };
 
   const handleDeleteVenueElement = (elemId: string) => {
     if (confirm('¿Eliminar este elemento del salón?')) {
       deleteVenueElement(eventId, elemId);
+      setVenueElements(prev => prev.filter(ve => ve.id !== elemId));
       setEditingVenueElementObj(null);
-      refreshData();
+      autoSyncTablesToServer(eventId);
     }
   };
 
   const handleAssign = (tableId: string, groupId: string, passes: number) => {
     assignGroupToTable(eventId, currentWorkspaceId, tableId, groupId, passes);
-    refreshData();
+    setAssignments(prev => [
+      ...prev.filter(a => a.group_id !== groupId),
+      {
+        id: `asgn-${Date.now()}`,
+        workspace_id: currentWorkspaceId,
+        event_id: eventId,
+        table_id: tableId,
+        group_id: groupId,
+        assigned_passes: passes,
+        created_at: new Date().toISOString(),
+      }
+    ]);
+    autoSyncTablesToServer(eventId);
   };
 
   const handleUnassign = (groupId: string) => {
     unassignGroupFromTable(eventId, groupId);
-    refreshData();
+    setAssignments(prev => prev.filter(a => a.group_id !== groupId));
+    autoSyncTablesToServer(eventId);
   };
 
   // Drag and Drop Handlers for Guest Groups -> Table Nodes
@@ -534,7 +550,10 @@ export default function TablesManagementPage() {
   const isPanningRef = useRef(false);
   const startPanPointRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  const handleCanvasStartPan = (clientX: number, clientY: number) => {
+  const handleCanvasStartPan = (clientX: number, clientY: number, target?: HTMLElement) => {
+    if (target && (target.closest('[data-drag-node]') || target.closest('[data-grip-handle]'))) {
+      return;
+    }
     isPanningRef.current = true;
     startPanPointRef.current = {
       x: clientX - panOffset.x,
@@ -554,7 +573,7 @@ export default function TablesManagementPage() {
     isPanningRef.current = false;
   };
 
-  // POINTER DRAGGING FOR TABLES & VENUE ELEMENTS (UNTRAPPABLE 60FPS)
+  // POINTER & TOUCH DRAGGING FOR TABLES & VENUE ELEMENTS (UNTRAPPABLE 60FPS)
   const canvasWorldRef = useRef<HTMLDivElement>(null);
   const activeDragRef = useRef<{
     id: string;
@@ -569,6 +588,7 @@ export default function TablesManagementPage() {
   const handlePointerDownItemGrip = (e: React.PointerEvent, id: string, type: 'table' | 'venue_element', initialX: number, initialY: number) => {
     e.preventDefault();
     e.stopPropagation();
+    isPanningRef.current = false;
 
     try {
       if (e.currentTarget && typeof (e.currentTarget as HTMLElement).releasePointerCapture === 'function') {
@@ -599,12 +619,23 @@ export default function TablesManagementPage() {
 
     window.addEventListener('pointermove', handleGlobalPointerMove);
     window.addEventListener('pointerup', handleGlobalPointerUp);
-    window.addEventListener('pointercancel', handleGlobalPointerUp);
+    window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false });
+    window.addEventListener('touchend', handleGlobalPointerUp);
+  };
+
+  const handleGlobalTouchMove = (e: TouchEvent) => {
+    if (!activeDragRef.current || !canvasWorldRef.current || e.touches.length === 0) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    handleGlobalPointerMove({
+      clientX: touch.clientX,
+      clientY: touch.clientY,
+      preventDefault: () => e.preventDefault(),
+    } as any);
   };
 
   const handleGlobalPointerMove = (e: PointerEvent) => {
     if (!activeDragRef.current || !canvasWorldRef.current) return;
-    e.preventDefault();
 
     const drag = activeDragRef.current;
     const canvasRect = canvasWorldRef.current.getBoundingClientRect();
@@ -621,10 +652,11 @@ export default function TablesManagementPage() {
     drag.nodeEl.style.top = `${newY}px`;
   };
 
-  const handleGlobalPointerUp = (e: PointerEvent) => {
+  const handleGlobalPointerUp = (e?: any) => {
     window.removeEventListener('pointermove', handleGlobalPointerMove);
     window.removeEventListener('pointerup', handleGlobalPointerUp);
-    window.removeEventListener('pointercancel', handleGlobalPointerUp);
+    window.removeEventListener('touchmove', handleGlobalTouchMove);
+    window.removeEventListener('touchend', handleGlobalPointerUp);
 
     if (activeDragRef.current) {
       const { id, type, currentX, currentY } = activeDragRef.current;
@@ -641,6 +673,7 @@ export default function TablesManagementPage() {
       }
 
       activeDragRef.current = null;
+      autoSyncTablesToServer(eventId);
     }
   };
 
@@ -1131,20 +1164,44 @@ export default function TablesManagementPage() {
                       e.dataTransfer.setData('text/plain', grp.id);
                       setDraggedGroupId(grp.id);
                     }}
-                    className="p-3 bg-white hover:bg-amber-50/60 rounded-xl border border-slate-200 hover:border-[#C5A059] shadow-sm transition cursor-grab active:cursor-grabbing flex items-center justify-between group"
+                    className="p-3 bg-white hover:bg-amber-50/60 rounded-xl border border-slate-200 hover:border-[#C5A059] shadow-sm transition flex flex-col gap-2 group"
                   >
-                    <div>
-                      <strong className="text-xs font-bold text-slate-900 block group-hover:text-[#B8860B] transition">
-                        {grp.group_name}
-                      </strong>
-                      <span className="text-[10px] text-slate-400 font-mono">ID: {grp.id}</span>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <strong className="text-xs font-bold text-slate-900 block group-hover:text-[#B8860B] transition">
+                          {grp.group_name}
+                        </strong>
+                        <span className="text-[10px] text-slate-400 font-mono">ID: {grp.id}</span>
+                      </div>
+                      <span 
+                        style={{ backgroundColor: '#DBBB6E' }}
+                        className="px-2.5 py-1 text-white font-extrabold text-xs rounded-lg shadow-sm shrink-0"
+                      >
+                        {grp.max_passes} p.
+                      </span>
                     </div>
-                    <span 
-                      style={{ backgroundColor: '#DBBB6E' }}
-                      className="px-2.5 py-1 text-white font-extrabold text-xs rounded-lg shadow-sm"
-                    >
-                      {grp.max_passes} p.
-                    </span>
+
+                    {/* Quick Touch/Mobile Table Selector Dropdown */}
+                    <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                      <span className="text-[10px] text-slate-500 font-semibold shrink-0">Asignar a:</span>
+                      <select
+                        defaultValue=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAssign(e.target.value, grp.id, grp.max_passes);
+                            e.target.value = '';
+                          }
+                        }}
+                        className="text-[10px] font-bold bg-amber-50 text-amber-950 border border-[#DBBB6E] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#C5A059] w-full cursor-pointer"
+                      >
+                        <option value="" disabled>-- Seleccionar Mesa --</option>
+                        {tables.map(tbl => (
+                          <option key={tbl.id} value={tbl.id}>
+                            {tbl.name} ({calculateTableOccupancy(eventId, tbl.id, tbl.capacity).occupancyRatio})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1216,6 +1273,8 @@ export default function TablesManagementPage() {
                     >
                       <div
                         onPointerDown={(e) => handlePointerDownItemGrip(e, elem.id, 'venue_element', elem.pos_x, elem.pos_y)}
+                        data-grip-handle="true"
+                        style={{ touchAction: 'none' }}
                         className="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#DBBB6E] text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase shadow-md cursor-grab active:cursor-grabbing flex items-center gap-1 z-20"
                       >
                         <GripVertical className="w-3 h-3" /> Mover
@@ -1267,6 +1326,8 @@ export default function TablesManagementPage() {
                     >
                       <div
                         onPointerDown={(e) => handlePointerDownItemGrip(e, tbl.id, 'table', pos.x, pos.y)}
+                        data-grip-handle="true"
+                        style={{ touchAction: 'none' }}
                         className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#DBBB6E] text-slate-950 px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase shadow-md cursor-grab active:cursor-grabbing flex items-center gap-1 z-30"
                       >
                         <GripVertical className="w-3 h-3" /> {tbl.name.split(' ')[0]} {tbl.name.split(' ')[1] || ''}

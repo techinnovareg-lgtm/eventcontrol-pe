@@ -194,10 +194,10 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_TABLES' && eventId) {
-      if (Array.isArray(tables) && tables.length > 0) {
+      if (Array.isArray(tables)) {
         globalServerTablesStore[eventId] = tables;
       }
-      if (Array.isArray(assignments) && assignments.length > 0) {
+      if (Array.isArray(assignments)) {
         globalServerAssignmentsStore[eventId] = assignments;
       }
       saveDbToFile();
@@ -205,10 +205,8 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_CUTS' && eventId && Array.isArray(cuts)) {
-      if (cuts.length > 0) {
-        globalServerCutsStore[eventId] = cuts;
-        saveDbToFile();
-      }
+      globalServerCutsStore[eventId] = cuts;
+      saveDbToFile();
       return NextResponse.json({ success: true, count: cuts.length });
     }
 
@@ -223,10 +221,8 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_VENUE_ELEMENTS' && eventId && Array.isArray(venueElements)) {
-      if (venueElements.length > 0) {
-        globalServerVenueElementsStore[eventId] = venueElements;
-        saveDbToFile();
-      }
+      globalServerVenueElementsStore[eventId] = venueElements;
+      saveDbToFile();
       return NextResponse.json({ success: true });
     }
 
