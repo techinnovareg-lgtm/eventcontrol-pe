@@ -134,11 +134,25 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         const serverEvents = data.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
         const localStore = getEventsStore().filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
         
-        // Preserve local events belonging to OTHER workspaces, but for this workspaceId, replace with authoritative serverEvents
+        // Preserve local events belonging to this workspace that are not yet on the server
+        const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
+        const unsyncedLocalEvents = localWorkspaceEvents.filter(le => !serverEvents.some((se: Event) => se.id === le.id));
+        
+        // Immediately sync unsynced local events to the central server
+        unsyncedLocalEvents.forEach(evt => {
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+          }).catch(() => {});
+        });
+
         const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId);
-        const merged = [...otherWorkspaceEvents, ...serverEvents];
-        saveEventsToStorage(merged);
-        return serverEvents;
+        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents];
+        const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
+        
+        saveEventsToStorage(finalMerged);
+        return mergedWorkspaceEvents;
       }
     }
   } catch (err) {
@@ -213,6 +227,22 @@ export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'
     }).catch(err => console.warn('[Sync Event API dispatch warning]', err));
   }
 
+  return newEvt;
+}
+
+export async function createEventAsync(data: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Promise<Event> {
+  const newEvt = createEvent(data);
+  if (typeof window !== 'undefined') {
+    try {
+      await fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_EVENT', event: newEvt }),
+      });
+    } catch (err) {
+      console.warn('[Sync Event API dispatch error]', err);
+    }
+  }
   return newEvt;
 }
 

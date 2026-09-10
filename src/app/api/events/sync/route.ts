@@ -22,43 +22,51 @@ function loadDbFromFile() {
       const parsed = JSON.parse(raw);
       if (parsed) {
         if (Array.isArray(parsed.events)) {
-          globalServerEventsStore = parsed.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+          const fileEvents = parsed.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+          fileEvents.forEach((fe: Event) => {
+            const idx = globalServerEventsStore.findIndex(e => e.id === fe.id);
+            if (idx !== -1) {
+              globalServerEventsStore[idx] = { ...fe, ...globalServerEventsStore[idx] };
+            } else {
+              globalServerEventsStore.push(fe);
+            }
+          });
         }
         if (parsed.groups) {
           delete parsed.groups['evt-101'];
           delete parsed.groups['evt-102'];
           delete parsed.groups['evt-principal-01'];
-          globalServerGroupsStore = parsed.groups;
+          globalServerGroupsStore = { ...parsed.groups, ...globalServerGroupsStore };
         }
         if (parsed.tables) {
           delete parsed.tables['evt-101'];
           delete parsed.tables['evt-102'];
           delete parsed.tables['evt-principal-01'];
-          globalServerTablesStore = parsed.tables;
+          globalServerTablesStore = { ...parsed.tables, ...globalServerTablesStore };
         }
         if (parsed.assignments) {
           delete parsed.assignments['evt-101'];
           delete parsed.assignments['evt-102'];
           delete parsed.assignments['evt-principal-01'];
-          globalServerAssignmentsStore = parsed.assignments;
+          globalServerAssignmentsStore = { ...parsed.assignments, ...globalServerAssignmentsStore };
         }
         if (parsed.cuts) {
           delete parsed.cuts['evt-101'];
           delete parsed.cuts['evt-102'];
           delete parsed.cuts['evt-principal-01'];
-          globalServerCutsStore = parsed.cuts;
+          globalServerCutsStore = { ...parsed.cuts, ...globalServerCutsStore };
         }
         if (parsed.checkIns) {
           delete parsed.checkIns['evt-101'];
           delete parsed.checkIns['evt-102'];
           delete parsed.checkIns['evt-principal-01'];
-          globalServerCheckInsStore = parsed.checkIns;
+          globalServerCheckInsStore = { ...parsed.checkIns, ...globalServerCheckInsStore };
         }
         if (parsed.venueElements) {
           delete parsed.venueElements['evt-101'];
           delete parsed.venueElements['evt-102'];
           delete parsed.venueElements['evt-principal-01'];
-          globalServerVenueElementsStore = parsed.venueElements;
+          globalServerVenueElementsStore = { ...parsed.venueElements, ...globalServerVenueElementsStore };
         }
       }
     }

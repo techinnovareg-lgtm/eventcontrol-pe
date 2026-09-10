@@ -8,7 +8,7 @@ import {
   CheckCircle, Clock, MessageSquare, ArrowRight, BarChart3, 
   Scissors, Edit3, Home, LogOut, Trash2
 } from 'lucide-react';
-import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, updateEvent, deleteEvent } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, deleteEvent } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
@@ -63,11 +63,11 @@ export default function EventsCrudPage() {
   const [editLocation, setEditLocation] = useState('');
   const [editStatus, setEditStatus] = useState<EventStatus>('ACTIVO');
 
-  const handleCreateEvent = (e: React.FormEvent) => {
+  const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !date) return;
 
-    createEvent({
+    await createEventAsync({
       workspace_id: currentWorkspaceId,
       name,
       event_type: 'Boda / Gala',
@@ -76,7 +76,8 @@ export default function EventsCrudPage() {
       status: 'BORRADOR',
     });
 
-    setEvents(getWorkspaceEvents(currentWorkspaceId));
+    const updatedEvents = await getWorkspaceEventsAsync(currentWorkspaceId);
+    setEvents(updatedEvents);
     setName('');
     setDate('');
     setLocation('');
