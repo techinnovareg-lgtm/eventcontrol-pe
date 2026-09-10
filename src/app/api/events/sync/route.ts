@@ -93,7 +93,6 @@ function saveDbToFile() {
 loadDbFromFile();
 
 export async function GET(req: Request) {
-  loadDbFromFile();
   const { searchParams } = new URL(req.url);
   const workspaceId = searchParams.get('workspaceId');
   const eventId = searchParams.get('eventId');
@@ -135,7 +134,6 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    loadDbFromFile();
     const body = await req.json();
     const { action, event, eventId, workspaceId, groups, tables, assignments, cuts, checkIn, venueElements } = body;
 
@@ -159,12 +157,6 @@ export async function POST(req: Request) {
         const maxCount = Math.max(g.checked_in_count || 0, exG ? (exG.checked_in_count || 0) : 0);
         const status: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO' = maxCount >= g.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
         return { ...g, checked_in_count: maxCount, status };
-      });
-
-      existingGroups.forEach((exG: GuestGroup) => {
-        if (!mergedGroups.some(mg => mg.id === exG.id)) {
-          mergedGroups.push(exG);
-        }
       });
 
       globalServerGroupsStore[targetEvtId] = mergedGroups;

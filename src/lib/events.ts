@@ -33,12 +33,14 @@ function loadEventsFromStorage(): Event[] {
   return INITIAL_EVENTS;
 }
 
-function saveEventsToStorage(events: Event[]) {
+function saveEventsToStorage(events: Event[], skipSync = false) {
   eventsMemoryStore = events;
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
-      setTimeout(() => autoSyncLocalStoresToServer(), 50);
+      if (!skipSync) {
+        setTimeout(() => autoSyncLocalStoresToServer(), 50);
+      }
     } catch (err) {
       console.warn('[EventsStore] Failed to save to localStorage', err);
     }
@@ -60,16 +62,18 @@ function loadGroupsFromStorage(): Record<string, GuestGroup[]> {
   } catch (err) {
     console.warn('[GuestGroupsStore] Failed to load from localStorage', err);
   }
-  saveGroupsToStorage(INITIAL_GROUPS);
+  saveGroupsToStorage(INITIAL_GROUPS, true);
   return INITIAL_GROUPS;
 }
 
-function saveGroupsToStorage(groups: Record<string, GuestGroup[]>) {
+function saveGroupsToStorage(groups: Record<string, GuestGroup[]>, skipSync = false) {
   guestGroupsMemoryStore = groups;
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
-      setTimeout(() => autoSyncLocalStoresToServer(), 50);
+      if (!skipSync) {
+        setTimeout(() => autoSyncLocalStoresToServer(), 50);
+      }
     } catch (err) {
       console.warn('[GuestGroupsStore] Failed to save to localStorage', err);
     }
@@ -105,7 +109,6 @@ function autoSyncLocalStoresToServer() {
 function getEventsStore(): Event[] {
   if (!eventsMemoryStore) {
     eventsMemoryStore = loadEventsFromStorage();
-    setTimeout(() => autoSyncLocalStoresToServer(), 100);
   }
   return eventsMemoryStore;
 }
@@ -113,7 +116,6 @@ function getEventsStore(): Event[] {
 function getGroupsStore(): Record<string, GuestGroup[]> {
   if (!guestGroupsMemoryStore) {
     guestGroupsMemoryStore = loadGroupsFromStorage();
-    setTimeout(() => autoSyncLocalStoresToServer(), 100);
   }
   return guestGroupsMemoryStore;
 }
@@ -339,7 +341,6 @@ export function getEventGuestGroups(eventId: string): GuestGroup[] {
 
 export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGroup[]> {
   const localStore = getGroupsStore();
-  const localGroups = localStore[eventId] || [];
 
   // 1. Primary: Query Central Online Database API first
   try {
@@ -347,17 +348,8 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.groups)) {
-        if (data.groups.length === 0 && localGroups.length > 0) {
-          // Re-push local groups to server if server is empty but local store has data
-          fetch('/api/events/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, groups: localGroups }),
-          }).catch(err => console.warn('[Sync re-push local groups warning]', err));
-          return localGroups;
-        }
         localStore[eventId] = data.groups;
-        saveGroupsToStorage(localStore);
+        saveGroupsToStorage(localStore, true);
         return data.groups;
       }
     }
@@ -469,5 +461,39 @@ export async function updateSingleGuestGroupCheckInAsync(
         console.warn('[Sync Groups CheckIn Async dispatch warning]', err);
       }
     }
+  }
+}
+
+export function deleteSingleGuestGroup(eventId: string, groupId: string): void {
+  const store = getGroupsStore();
+  if (store[eventId]) {
+    store[eventId] = store[eventId].filter(g => g.id !== groupId);
+    saveGroupsToStorage(store);
+    deleteEventAssignments(eventId);
+
+    if (typeof window !== 'undefined') {
+      const workspaceId = store[eventId][0]?.workspace_id || '';
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: store[eventId] }),
+      }).catch(err => console.warn('[Sync Delete Single Group warning]', err));
+    }
+  }
+}
+
+export async function deleteSingleGuestGroupAsync(eventId: string, groupId: string): Promise<void> {
+  deleteSingleGuestGroup(eventId, groupId);
+  const store = getGroupsStore();
+  const remaining = store[eventId] || [];
+  if (typeof window !== 'undefined') {
+    const workspaceId = remaining[0]?.workspace_id || '';
+    try {
+      await fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: remaining }),
+      });
+    } catch (err) {}
   }
 }
