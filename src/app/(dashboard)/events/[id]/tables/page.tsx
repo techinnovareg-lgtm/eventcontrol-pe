@@ -617,7 +617,7 @@ export default function TablesManagementPage() {
   const startPanPointRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
   const handleCanvasStartPan = (clientX: number, clientY: number, target?: HTMLElement) => {
-    if (target && (target.closest('[data-drag-node]') || target.closest('[data-grip-handle]'))) {
+    if (target && (target.closest('[data-drag-node]') || target.closest('[data-grip-handle]') || target.closest('button') || target.closest('input') || target.closest('select'))) {
       return;
     }
     isPanningRef.current = true;
@@ -692,6 +692,7 @@ export default function TablesManagementPage() {
   const handleGlobalTouchMove = (e: TouchEvent) => {
     if (!activeDragRef.current || !canvasWorldRef.current || e.touches.length === 0) return;
     e.preventDefault();
+    isPanningRef.current = false;
     const touch = e.touches[0];
     handleGlobalPointerMove({
       clientX: touch.clientX,
@@ -882,7 +883,11 @@ export default function TablesManagementPage() {
           onMouseMove={(e) => handleCanvasMovePan(e.clientX, e.clientY)}
           onMouseUp={handleCanvasEndPan}
           onTouchStart={(e) => {
-            if (e.touches.length === 1) handleCanvasStartPan(e.touches[0].clientX, e.touches[0].clientY);
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-drag-node]') || target.closest('[data-grip-handle]') || target.closest('button') || target.closest('input') || target.closest('select')) {
+              return;
+            }
+            if (e.touches.length === 1) handleCanvasStartPan(e.touches[0].clientX, e.touches[0].clientY, target);
           }}
           onTouchMove={(e) => {
             if (e.touches.length === 1) handleCanvasMovePan(e.touches[0].clientX, e.touches[0].clientY);
@@ -1300,7 +1305,11 @@ export default function TablesManagementPage() {
               onMouseUp={handleCanvasEndPan}
               onMouseLeave={handleCanvasEndPan}
               onTouchStart={(e) => {
-                if (e.touches.length === 1) handleCanvasStartPan(e.touches[0].clientX, e.touches[0].clientY);
+                const target = e.target as HTMLElement;
+                if (target.closest('[data-drag-node]') || target.closest('[data-grip-handle]') || target.closest('button') || target.closest('input') || target.closest('select')) {
+                  return;
+                }
+                if (e.touches.length === 1) handleCanvasStartPan(e.touches[0].clientX, e.touches[0].clientY, target);
               }}
               onTouchMove={(e) => {
                 if (e.touches.length === 1) handleCanvasMovePan(e.touches[0].clientX, e.touches[0].clientY);

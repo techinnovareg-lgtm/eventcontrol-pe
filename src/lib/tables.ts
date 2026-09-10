@@ -42,13 +42,13 @@ let tablesMemoryStore: Record<string, Table[]> | null = null;
 let assignmentsMemoryStore: Record<string, TableAssignment[]> | null = null;
 let venueElementsMemoryStore: Record<string, VenueElement[]> | null = null;
 
-export async function syncTablesToServerAsync(eventId: string): Promise<void> {
+export async function syncTablesToServerAsync(eventId: string, explicitTables?: Table[], explicitAssignments?: TableAssignment[]): Promise<void> {
   if (typeof window === 'undefined' || !eventId) return;
   try {
     const allTables = loadTablesFromStorage();
     const allAssignments = loadAssignmentsFromStorage();
-    const tables = allTables[eventId] || [];
-    const assignments = allAssignments[eventId] || [];
+    const tables = explicitTables || allTables[eventId] || [];
+    const assignments = explicitAssignments || allAssignments[eventId] || [];
 
     await fetch('/api/events/sync', {
       method: 'POST',
@@ -58,11 +58,11 @@ export async function syncTablesToServerAsync(eventId: string): Promise<void> {
   } catch (err) {}
 }
 
-export async function syncVenueElementsToServerAsync(eventId: string): Promise<void> {
+export async function syncVenueElementsToServerAsync(eventId: string, explicitElements?: VenueElement[]): Promise<void> {
   if (typeof window === 'undefined' || !eventId) return;
   try {
     const allVenueElements = loadVenueElementsFromStorage();
-    const venueElements = allVenueElements[eventId] || [];
+    const venueElements = explicitElements || allVenueElements[eventId] || [];
 
     await fetch('/api/events/sync', {
       method: 'POST',
