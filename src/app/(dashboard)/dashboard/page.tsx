@@ -58,9 +58,6 @@ export default function RealtimeDashboardPage() {
       setCurrentWorkspaceId(wsId);
 
       let userEvents = await getWorkspaceEventsAsync(wsId);
-      if (userEvents.length === 0) {
-        userEvents = getWorkspaceEvents(wsId);
-      }
 
       let selectedId = '';
       if (typeof window !== 'undefined') {
@@ -68,11 +65,29 @@ export default function RealtimeDashboardPage() {
         selectedId = urlParams.get('eventId') || '';
       }
 
-      const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
-      const activeEvtId = activeEvt?.id || 'evt-principal-01';
+      if (userEvents.length === 0) {
+        setHasNoEvents(true);
+        setEventId('');
+        setMetrics({
+          eventName: 'Sin Eventos Registrados',
+          totalGroupsCount: 0,
+          totalAuthorized: 0,
+          totalEntered: 0,
+          totalPending: 0,
+          occupancyPercentage: 0,
+        });
+        setIsInitialLoading(false);
+        return;
+      }
 
-      setEventId(activeEvtId);
-      await refreshDashboardData(activeEvtId, wsId);
+      setHasNoEvents(false);
+      const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
+      const activeEvtId = activeEvt?.id || '';
+
+      if (activeEvtId) {
+        setEventId(activeEvtId);
+        await refreshDashboardData(activeEvtId, wsId);
+      }
       setIsInitialLoading(false);
     }
 

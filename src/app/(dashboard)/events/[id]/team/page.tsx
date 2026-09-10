@@ -170,7 +170,7 @@ export default function EventTeamPage() {
               <Users className="w-7 h-7 text-[#B8860B]" /> Equipo & Operadores del Evento
             </h1>
             <p className="text-xs text-slate-500 mt-1">
-              {event?.name || 'Evento Principal'} • {event?.event_date || 'Fecha programada'} • {event?.venue_name || 'Local'}
+              {event?.name || 'Evento Activo'} • {event?.event_date || 'Fecha programada'} • {event?.venue_name || 'Local'}
             </p>
           </div>
 

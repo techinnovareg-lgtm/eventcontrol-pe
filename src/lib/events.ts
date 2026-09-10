@@ -121,8 +121,7 @@ function getGroupsStore(): Record<string, GuestGroup[]> {
 export function getWorkspaceEvents(workspaceId: string): Event[] {
   const store = getEventsStore();
   if (!workspaceId) return store;
-  const filtered = store.filter(e => e.workspace_id === workspaceId);
-  return filtered.length > 0 ? filtered : store;
+  return store.filter(e => e.workspace_id === workspaceId);
 }
 
 export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
@@ -134,10 +133,12 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
       if (data.success && Array.isArray(data.events)) {
         const serverEvents = data.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
         const localStore = getEventsStore().filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
-        const merged = [...serverEvents, ...localStore.filter(e => !serverEvents.some((se: Event) => se.id === e.id))];
+        
+        // Preserve local events belonging to OTHER workspaces, but for this workspaceId, replace with authoritative serverEvents
+        const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId);
+        const merged = [...otherWorkspaceEvents, ...serverEvents];
         saveEventsToStorage(merged);
-        const filtered = merged.filter((e: Event) => e.workspace_id === workspaceId);
-        return filtered.length > 0 ? filtered : merged;
+        return serverEvents;
       }
     }
   } catch (err) {
@@ -165,7 +166,7 @@ export async function getEventByIdAsync(eventId: string, workspaceId?: string): 
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && data.event) {
+      if (data.success && data.event && data.event.id !== 'evt-principal-01') {
         const store = getEventsStore();
         const idx = store.findIndex(e => e.id === data.event.id);
         if (idx !== -1) {
@@ -215,26 +216,15 @@ export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'
   return newEvt;
 }
 
-export function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'created_at'>>): Event {
+export function updateEvent(eventId: string, data: Partial<Omit<Event, 'id' | 'created_at'>>): Event | undefined {
   const store = getEventsStore();
   let evt = store.find(e => e.id === eventId);
   if (!evt) {
-    evt = {
-      id: eventId,
-      workspace_id: 'ws-a-1111',
-      name: 'Evento Principal',
-      event_type: 'BODA_SOCIAL',
-      event_date: new Date().toISOString().split('T')[0],
-      status: 'ACTIVO',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      ...data,
-    };
-    store.unshift(evt);
-  } else {
-    Object.assign(evt, data, { updated_at: new Date().toISOString() });
+    // Return early if event does not exist, never re-create phantom Evento Principal
+    return undefined;
   }
-
+  
+  Object.assign(evt, data, { updated_at: new Date().toISOString() });
   saveEventsToStorage(store);
   checkInRealtimeChannel.notify({ type: 'EVENT_UPDATED', eventId, event: evt });
 
@@ -253,8 +243,10 @@ export async function updateEventAsync(
   eventId: string,
   data: Partial<Omit<Event, 'id' | 'created_at'>>,
   workspaceId?: string
-): Promise<Event> {
+): Promise<Event | undefined> {
   const updatedEvt = updateEvent(eventId, data);
+  if (!updatedEvt) return undefined;
+
   if (workspaceId && updatedEvt.workspace_id !== workspaceId) {
     updatedEvt.workspace_id = workspaceId;
     saveEventsToStorage(getEventsStore());

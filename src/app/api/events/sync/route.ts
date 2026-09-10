@@ -115,7 +115,7 @@ export async function GET(req: Request) {
     const events = globalServerEventsStore.filter(e => e.workspace_id === workspaceId);
     return NextResponse.json({
       success: true,
-      events: events.length > 0 ? events : globalServerEventsStore,
+      events,
     });
   }
 

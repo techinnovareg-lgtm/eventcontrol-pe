@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+import { createAdminAccount, setActiveSession } from '@/lib/superadmin-store';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -14,10 +15,35 @@ export default function RegisterPage() {
 
   const handleRegister = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!workspaceName || !email || !password) return;
     setLoading(true);
-    setTimeout(() => {
-      router.push('/dashboard');
-    }, 800);
+
+    try {
+      const { account } = createAdminAccount({
+        companyName: workspaceName.trim(),
+        adminName: workspaceName.trim(),
+        contactEmail: email.trim().toLowerCase(),
+        planCode: 'STARTER',
+        durationDays: 30,
+        initialPassword: password.trim(),
+      });
+
+      setActiveSession({
+        user: {
+          id: account.id,
+          email: account.contactEmail,
+          name: account.companyName,
+          role: 'ADMIN',
+          workspaceId: account.workspaceId,
+        },
+      });
+
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 500);
+    } catch (err) {
+      setLoading(false);
+    }
   };
 
   return (

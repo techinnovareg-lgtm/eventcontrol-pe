@@ -28,7 +28,7 @@ export interface TableOccupancyStat {
 export function calculateDashboardMetrics(eventId: string, workspaceId?: string): DashboardEventMetrics {
   const groups = getEventGuestGroups(eventId);
   const evt = eventId ? getEventById(eventId, workspaceId) : undefined;
-  const eventName = evt ? evt.name : 'Evento Principal';
+  const eventName = evt ? evt.name : 'Evento Activo';
 
   let totalAuthorized = 0;
   let totalEntered = 0;
