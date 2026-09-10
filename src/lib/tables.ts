@@ -42,7 +42,7 @@ let tablesMemoryStore: Record<string, Table[]> | null = null;
 let assignmentsMemoryStore: Record<string, TableAssignment[]> | null = null;
 let venueElementsMemoryStore: Record<string, VenueElement[]> | null = null;
 
-export function autoSyncTablesToServer(eventId?: string) {
+export async function autoSyncTablesToServerAsync(eventId?: string): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
     const allTables = loadTablesFromStorage();
@@ -54,24 +54,29 @@ export function autoSyncTablesToServer(eventId?: string) {
       ...Object.keys(allVenueElements)
     ]));
 
-    targetEventIds.forEach(evtId => {
+    await Promise.all(targetEventIds.map(async (evtId) => {
       const tables = allTables[evtId] || [];
       const assignments = allAssignments[evtId] || [];
       const venueElements = allVenueElements[evtId] || [];
 
-      fetch('/api/events/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
-      }).catch(() => {});
-
-      fetch('/api/events/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_VENUE_ELEMENTS', eventId: evtId, venueElements }),
-      }).catch(() => {});
-    });
+      await Promise.all([
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evtId, tables, assignments }),
+        }),
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_VENUE_ELEMENTS', eventId: evtId, venueElements }),
+        }),
+      ]);
+    }));
   } catch (err) {}
+}
+
+export function autoSyncTablesToServer(eventId?: string) {
+  autoSyncTablesToServerAsync(eventId);
 }
 
 function loadTablesFromStorage(): Record<string, Table[]> {
@@ -85,7 +90,6 @@ function loadTablesFromStorage(): Record<string, Table[]> {
         delete parsed['evt-101'];
         delete parsed['evt-102'];
         tablesMemoryStore = parsed;
-        setTimeout(() => autoSyncTablesToServer(), 100);
         return parsed;
       }
     }
@@ -101,7 +105,6 @@ function saveTablesToStorage(data: Record<string, Table[]>) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(TABLES_STORAGE_KEY, JSON.stringify(data));
-      setTimeout(() => autoSyncTablesToServer(), 100);
     } catch (err) {
       console.warn('[TablesStore] Failed to save tables to storage', err);
     }
@@ -119,7 +122,6 @@ function loadAssignmentsFromStorage(): Record<string, TableAssignment[]> {
         delete parsed['evt-101'];
         delete parsed['evt-102'];
         assignmentsMemoryStore = parsed;
-        setTimeout(() => autoSyncTablesToServer(), 100);
         return parsed;
       }
     }
@@ -135,7 +137,6 @@ function saveAssignmentsToStorage(data: Record<string, TableAssignment[]>) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(ASSIGNMENTS_STORAGE_KEY, JSON.stringify(data));
-      setTimeout(() => autoSyncTablesToServer(), 100);
     } catch (err) {
       console.warn('[TablesStore] Failed to save assignments to storage', err);
     }
@@ -222,6 +223,13 @@ export function createTable(eventId: string, workspaceId: string, name: string, 
   };
   store[eventId].push(newTbl);
   saveTablesToStorage(store);
+  autoSyncTablesToServer(eventId);
+  return newTbl;
+}
+
+export async function createTableAsync(eventId: string, workspaceId: string, name: string, capacity: number, posX = 440, posY = 220): Promise<Table> {
+  const newTbl = createTable(eventId, workspaceId, name, capacity, posX, posY);
+  await autoSyncTablesToServerAsync(eventId);
   return newTbl;
 }
 
@@ -432,6 +440,22 @@ export function createVenueElement(
   store[eventId].push(newElem);
   saveVenueElementsToStorage(store);
   autoSyncTablesToServer(eventId);
+  return newElem;
+}
+
+export async function createVenueElementAsync(
+  eventId: string, 
+  workspaceId: string, 
+  type: VenueElementType, 
+  label: string, 
+  size: ElementSize = 'medium',
+  orientation: 'horizontal' | 'vertical' = 'horizontal',
+  shape: 'rect' | 'round_rect' | 'circle' | 'oval' = 'round_rect',
+  posX = 420, 
+  posY = 400
+): Promise<VenueElement> {
+  const newElem = createVenueElement(eventId, workspaceId, type, label, size, orientation, shape, posX, posY);
+  await autoSyncTablesToServerAsync(eventId);
   return newElem;
 }
 

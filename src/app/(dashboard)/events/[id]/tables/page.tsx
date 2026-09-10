@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { 
-  getEventTables, getEventTablesAsync, createTable, deleteTable, updateTable, getEventTableAssignments, 
+  getEventTables, getEventTablesAsync, createTable, createTableAsync, deleteTable, updateTable, getEventTableAssignments, 
   getEventTableAssignmentsAsync, assignGroupToTable, unassignGroupFromTable, calculateTableOccupancy, updateTablePosition,
-  getEventVenueElements, getEventVenueElementsAsync, createVenueElement, updateVenueElement, updateVenueElementPosition, 
+  getEventVenueElements, getEventVenueElementsAsync, createVenueElement, createVenueElementAsync, updateVenueElement, updateVenueElementPosition, 
   deleteVenueElement, VenueElement, VenueElementType, ElementSize, computeElementDimensions,
-  autoSyncTablesToServer 
+  autoSyncTablesToServer, autoSyncTablesToServerAsync
 } from '@/lib/tables';
+
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { Table, TableAssignment, GuestGroup, Event } from '@/lib/supabase/types';
@@ -180,9 +181,9 @@ export default function TablesManagementPage() {
     };
   }, [eventId]);
 
-  const handleCreateTable = (e: React.FormEvent) => {
+  const handleCreateTable = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newTbl = createTable(eventId, currentWorkspaceId, tableName || 'Nueva Mesa', tableCapacity, 500, 250);
+    const newTbl = await createTableAsync(eventId, currentWorkspaceId, tableName || 'Nueva Mesa', tableCapacity, 500, 250);
     setTables(prev => [...prev.filter(t => t.id !== newTbl.id), newTbl]);
     setTablePositions(prev => ({
       ...prev,
@@ -190,10 +191,9 @@ export default function TablesManagementPage() {
     }));
     setTableName('');
     setShowAddTableModal(false);
-    refreshData();
   };
 
-  const handleCreateVenueElement = (e: React.FormEvent) => {
+  const handleCreateVenueElement = async (e: React.FormEvent) => {
     e.preventDefault();
     const defaultLabels: Record<VenueElementType, string> = {
       ESCENARIO: 'Escenario Principal',
@@ -208,7 +208,7 @@ export default function TablesManagementPage() {
       ENTRADA: 'Entrada Principal / Photocall',
     };
 
-    const newElem = createVenueElement(
+    const newElem = await createVenueElementAsync(
       eventId,
       currentWorkspaceId,
       elementType,
@@ -223,18 +223,17 @@ export default function TablesManagementPage() {
     setVenueElements(prev => [...prev.filter(ve => ve.id !== newElem.id), newElem]);
     setElementLabel('');
     setShowAddElementModal(false);
-    refreshData();
   };
 
-  const handleSaveEditTable = (e: React.FormEvent) => {
+  const handleSaveEditTable = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingTableObj) return;
     updateTable(eventId, editingTableObj.id, editingTableObj.name, editingTableObj.capacity);
+    await autoSyncTablesToServerAsync(eventId);
     setEditingTableObj(null);
-    refreshData();
   };
 
-  const handleSaveEditVenueElement = (e: React.FormEvent) => {
+  const handleSaveEditVenueElement = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingVenueElementObj) return;
     updateVenueElement(eventId, editingVenueElementObj.id, {
@@ -243,31 +242,31 @@ export default function TablesManagementPage() {
       orientation: editingVenueElementObj.orientation,
       shape: editingVenueElementObj.shape,
     });
+    await autoSyncTablesToServerAsync(eventId);
     setEditingVenueElementObj(null);
-    refreshData();
   };
 
-  const handleDeleteTable = (tableId: string) => {
+  const handleDeleteTable = async (tableId: string) => {
     if (confirm('¿Eliminar esta mesa y liberar sus asignaciones?')) {
       deleteTable(eventId, tableId);
       setTables(prev => prev.filter(t => t.id !== tableId));
       setAssignments(prev => prev.filter(a => a.table_id !== tableId));
       if (selectedTableId === tableId) setSelectedTableId(null);
       setEditingTableObj(null);
-      autoSyncTablesToServer(eventId);
+      await autoSyncTablesToServerAsync(eventId);
     }
   };
 
-  const handleDeleteVenueElement = (elemId: string) => {
+  const handleDeleteVenueElement = async (elemId: string) => {
     if (confirm('¿Eliminar este elemento del salón?')) {
       deleteVenueElement(eventId, elemId);
       setVenueElements(prev => prev.filter(ve => ve.id !== elemId));
       setEditingVenueElementObj(null);
-      autoSyncTablesToServer(eventId);
+      await autoSyncTablesToServerAsync(eventId);
     }
   };
 
-  const handleAssign = (tableId: string, groupId: string, passes: number) => {
+  const handleAssign = async (tableId: string, groupId: string, passes: number) => {
     assignGroupToTable(eventId, currentWorkspaceId, tableId, groupId, passes);
     setAssignments(prev => [
       ...prev.filter(a => a.group_id !== groupId),
@@ -281,13 +280,13 @@ export default function TablesManagementPage() {
         created_at: new Date().toISOString(),
       }
     ]);
-    autoSyncTablesToServer(eventId);
+    await autoSyncTablesToServerAsync(eventId);
   };
 
-  const handleUnassign = (groupId: string) => {
+  const handleUnassign = async (groupId: string) => {
     unassignGroupFromTable(eventId, groupId);
     setAssignments(prev => prev.filter(a => a.group_id !== groupId));
-    autoSyncTablesToServer(eventId);
+    await autoSyncTablesToServerAsync(eventId);
   };
 
   // Drag and Drop Handlers for Guest Groups -> Table Nodes
