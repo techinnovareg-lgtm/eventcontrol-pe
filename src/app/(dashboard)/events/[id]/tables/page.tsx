@@ -57,30 +57,41 @@ export default function TablesManagementPage() {
             if (data.success) {
               if (data.event) setCurrentEvent(data.event);
               if (Array.isArray(data.groups)) {
-                setGroups(data.groups);
+                setGroups(prev => (data.groups.length === 0 && prev.length > 0 ? prev : data.groups));
               }
               if (Array.isArray(data.tables)) {
-                setTables(data.tables);
-                saveEventTablesLocally(eventId, data.tables);
-                setTablePositions(prev => {
-                  const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-                  data.tables.forEach((t: Table, i: number) => {
-                    updatedPos[t.id] = {
-                      x: t.pos_x || (140 + (i % 4) * 280),
-                      y: t.pos_y || (140 + Math.floor(i / 4) * 200),
-                      shape: updatedPos[t.id]?.shape || 'ROUND',
-                    };
-                  });
-                  return updatedPos;
+                setTables(prev => {
+                  if (data.tables.length === 0 && prev.length > 0) return prev;
+                  saveEventTablesLocally(eventId, data.tables);
+                  return data.tables;
                 });
+                if (data.tables.length > 0) {
+                  setTablePositions(prev => {
+                    const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+                    data.tables.forEach((t: Table, i: number) => {
+                      updatedPos[t.id] = {
+                        x: t.pos_x || (140 + (i % 4) * 280),
+                        y: t.pos_y || (140 + Math.floor(i / 4) * 200),
+                        shape: updatedPos[t.id]?.shape || 'ROUND',
+                      };
+                    });
+                    return updatedPos;
+                  });
+                }
               }
               if (Array.isArray(data.assignments)) {
-                setAssignments(data.assignments);
-                saveEventAssignmentsLocally(eventId, data.assignments);
+                setAssignments(prev => {
+                  if (data.assignments.length === 0 && prev.length > 0) return prev;
+                  saveEventAssignmentsLocally(eventId, data.assignments);
+                  return data.assignments;
+                });
               }
               if (Array.isArray(data.venueElements)) {
-                setVenueElements(data.venueElements);
-                saveEventVenueElementsLocally(eventId, data.venueElements);
+                setVenueElements(prev => {
+                  if (data.venueElements.length === 0 && prev.length > 0) return prev;
+                  saveEventVenueElementsLocally(eventId, data.venueElements);
+                  return data.venueElements;
+                });
               }
             }
           }
@@ -190,33 +201,44 @@ export default function TablesManagementPage() {
       }
 
       if (Array.isArray(data.tables)) {
-        setTables(data.tables);
-        saveEventTablesLocally(eventId, data.tables);
-        setTablePositions(prev => {
-          const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-          data.tables.forEach((t: Table, i: number) => {
-            updatedPos[t.id] = {
-              x: t.pos_x || (140 + (i % 4) * 280),
-              y: t.pos_y || (140 + Math.floor(i / 4) * 200),
-              shape: updatedPos[t.id]?.shape || 'ROUND',
-            };
-          });
-          return updatedPos;
+        setTables(prev => {
+          if (data.tables.length === 0 && prev.length > 0) return prev;
+          saveEventTablesLocally(eventId, data.tables);
+          return data.tables;
         });
+        if (data.tables.length > 0) {
+          setTablePositions(prev => {
+            const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+            data.tables.forEach((t: Table, i: number) => {
+              updatedPos[t.id] = {
+                x: t.pos_x || (140 + (i % 4) * 280),
+                y: t.pos_y || (140 + Math.floor(i / 4) * 200),
+                shape: updatedPos[t.id]?.shape || 'ROUND',
+              };
+            });
+            return updatedPos;
+          });
+        }
       }
 
       if (Array.isArray(data.assignments)) {
-        setAssignments(data.assignments);
-        saveEventAssignmentsLocally(eventId, data.assignments);
+        setAssignments(prev => {
+          if (data.assignments.length === 0 && prev.length > 0) return prev;
+          saveEventAssignmentsLocally(eventId, data.assignments);
+          return data.assignments;
+        });
       }
 
       if (Array.isArray(data.groups)) {
-        setGroups(data.groups);
+        setGroups(prev => (data.groups.length === 0 && prev.length > 0 ? prev : data.groups));
       }
 
       if (Array.isArray(data.venueElements)) {
-        setVenueElements(data.venueElements);
-        saveEventVenueElementsLocally(eventId, data.venueElements);
+        setVenueElements(prev => {
+          if (data.venueElements.length === 0 && prev.length > 0) return prev;
+          saveEventVenueElementsLocally(eventId, data.venueElements);
+          return data.venueElements;
+        });
       }
     } catch (err) {}
   };
