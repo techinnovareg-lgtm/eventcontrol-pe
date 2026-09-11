@@ -216,10 +216,20 @@ export async function getEventByIdAsync(eventId: string, workspaceId?: string): 
         }
         saveEventsToStorage(store);
 
-        // Save fetched guest groups if present
+        // Save fetched guest groups if present with monotonic max merge
         if (Array.isArray(data.groups) && data.groups.length > 0) {
           const gStore = getGroupsStore();
-          gStore[eventId] = data.groups;
+          const localGroups = gStore[eventId] || [];
+          const merged = data.groups.map((serverG: GuestGroup) => {
+            const localG = localGroups.find(lg => lg.id === serverG.id);
+            const maxCount = Math.max(serverG.checked_in_count || 0, localG ? (localG.checked_in_count || 0) : 0);
+            return {
+              ...serverG,
+              checked_in_count: maxCount,
+              status: maxCount >= serverG.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE',
+            };
+          });
+          gStore[eventId] = merged;
           saveGroupsToStorage(gStore);
         }
 
@@ -390,9 +400,42 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
           return localGroups;
         }
 
-        localStore[eventId] = data.groups;
+        // Monotonic Max-Merge Server Groups with Local Groups (checked_in_count never decreases)
+        let requiresResync = false;
+        const merged: GuestGroup[] = data.groups.map((serverG: GuestGroup) => {
+          const localG = localGroups.find(lg => lg.id === serverG.id);
+          const maxCount = Math.max(serverG.checked_in_count || 0, localG ? (localG.checked_in_count || 0) : 0);
+          if (localG && (localG.checked_in_count || 0) > (serverG.checked_in_count || 0)) {
+            requiresResync = true;
+          }
+          return {
+            ...serverG,
+            checked_in_count: maxCount,
+            status: maxCount >= serverG.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE',
+          };
+        });
+
+        // Preserve any local groups that might not exist on server yet
+        localGroups.forEach(lg => {
+          if (!merged.some(mg => mg.id === lg.id)) {
+            merged.push(lg);
+            requiresResync = true;
+          }
+        });
+
+        localStore[eventId] = merged;
         saveGroupsToStorage(localStore);
-        return data.groups;
+
+        if (requiresResync && merged.length > 0) {
+          const workspaceId = merged[0]?.workspace_id || '';
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: merged }),
+          }).catch(() => {});
+        }
+
+        return merged;
       }
     }
   } catch (err) {
@@ -495,10 +538,12 @@ export function updateSingleGuestGroupCheckIn(
   const group = eventGroups.find(g => g.id === groupId);
 
   if (group) {
-    group.checked_in_count = newCheckedInCount;
-    group.status = newStatus;
+    const maxCount = Math.max(group.checked_in_count || 0, newCheckedInCount);
+    const computedStatus = maxCount >= group.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
+    group.checked_in_count = maxCount;
+    group.status = computedStatus;
     saveGroupsToStorage(store);
-    checkInRealtimeChannel.notify({ type: 'CHECKIN_UPDATED', eventId, groupId, newCheckedInCount, newStatus });
+    checkInRealtimeChannel.notify({ type: 'CHECKIN_UPDATED', eventId, groupId, newCheckedInCount: maxCount, newStatus: computedStatus });
 
     if (typeof window !== 'undefined') {
       const workspaceId = group.workspace_id || '';
@@ -522,8 +567,10 @@ export async function updateSingleGuestGroupCheckInAsync(
   const group = eventGroups.find(g => g.id === groupId);
 
   if (group) {
-    group.checked_in_count = newCheckedInCount;
-    group.status = newStatus;
+    const maxCount = Math.max(group.checked_in_count || 0, newCheckedInCount);
+    const computedStatus = maxCount >= group.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
+    group.checked_in_count = maxCount;
+    group.status = computedStatus;
     saveGroupsToStorage(store);
 
     if (typeof window !== 'undefined') {

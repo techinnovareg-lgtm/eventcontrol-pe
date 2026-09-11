@@ -126,6 +126,11 @@ export default function MobileScanCheckInPage() {
 
     if (guestList.length > 0 || groups.length === 0) {
       setGroups(guestList);
+      setMatchedGroup(prev => {
+        if (!prev) return null;
+        const fresh = guestList.find(g => g.id === prev.id);
+        return fresh || prev;
+      });
     }
     if (tablesList.length > 0 || tables.length === 0) {
       setTables(tablesList);
@@ -163,6 +168,11 @@ export default function MobileScanCheckInPage() {
         getEventGuestGroupsAsync(selectedEventId).then(list => {
           if (list && list.length > 0) {
             setGroups(list);
+            setMatchedGroup(prev => {
+              if (!prev) return null;
+              const fresh = list.find(g => g.id === prev.id);
+              return fresh || prev;
+            });
           }
         });
         getEventTablesAsync(selectedEventId).then(tList => {
@@ -211,7 +221,7 @@ export default function MobileScanCheckInPage() {
           if (result) {
             const scannedText = result.getText();
             setScannedInput(scannedText);
-            processScannedCode(scannedText);
+            processScannedCode(scannedText, true);
           }
         });
       })
@@ -241,11 +251,13 @@ export default function MobileScanCheckInPage() {
   }
 
   // Instant QR Processing Engine
-  const processScannedCode = (rawCode: string) => {
+  const processScannedCode = (rawCode: string, isFromCamera = false) => {
     if (!rawCode || !rawCode.trim()) {
-      setMatchedGroup(null);
-      setSelectedTokenHash('');
-      setScanErrorMsg(null);
+      if (!isFromCamera) {
+        setMatchedGroup(null);
+        setSelectedTokenHash('');
+        setScanErrorMsg(null);
+      }
       return;
     }
 
@@ -261,6 +273,11 @@ export default function MobileScanCheckInPage() {
       setPassesRequested(Math.min(1, available));
       setResultModal(null);
     } else {
+      // Motion blur / frame loss protection: if camera scan read invalid text while a valid group is ALREADY matched, do not wipe it
+      if (isFromCamera && matchedGroup) {
+        return;
+      }
+
       setSelectedTokenHash('');
       setMatchedGroup(null);
       if (res.reason === 'REJECTED_DIFFERENT_EVENT') {
