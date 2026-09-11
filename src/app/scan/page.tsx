@@ -72,6 +72,10 @@ export default function MobileScanCheckInPage() {
         }
         if (urlToken) {
           setScannedInput(urlToken);
+          try {
+            const cleanUrl = window.location.pathname + (urlEvt ? `?event=${encodeURIComponent(urlEvt)}` : '');
+            window.history.replaceState({}, '', cleanUrl);
+          } catch (e) {}
         }
       }
 
@@ -425,14 +429,14 @@ export default function MobileScanCheckInPage() {
     }
 
     setResultModal(res);
-    await reloadEventData();
 
-    // Update matched group in memory
-    const updatedGroups = getEventGuestGroups(selectedEventId);
-    const reGroup = updatedGroups.find(g => g.id === matchedGroup.id);
-    if (reGroup) {
-      setMatchedGroup(reGroup);
-    }
+    // Completely clear scanned QR inputs and matched group so the main scanner screen returns to clean state
+    setScannedInput('');
+    setSelectedTokenHash('');
+    setMatchedGroup(null);
+    setScanErrorMsg(null);
+
+    await reloadEventData();
   };
 
   const handleSimulateConcurrency = () => {
