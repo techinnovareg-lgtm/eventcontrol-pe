@@ -15,17 +15,19 @@ let globalServerCheckInsStore: Record<string, CheckIn[]> = {};
 let globalServerVenueElementsStore: Record<string, VenueElement[]> = {};
 
 const DB_FILE = path.join(process.cwd(), 'data', 'server_events_db.json');
+const TEMP_DB_FILE = path.join(process.cwd(), 'data', 'server_events_db.json.tmp');
 
 let isDbLoaded = false;
 
 function loadDbFromFile() {
   if (isDbLoaded) return;
-  isDbLoaded = true;
   try {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
+      if (!raw || raw.trim().length === 0) return; // Skip if file is empty mid-write
       const parsed = JSON.parse(raw);
       if (parsed) {
+        isDbLoaded = true;
         if (Array.isArray(parsed.deletedEventIds)) {
           globalServerDeletedEventsStore = parsed.deletedEventIds;
         }
@@ -83,14 +85,16 @@ function loadDbFromFile() {
         }
       }
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('[Server DB Load Warning - Retrying on next request]', e);
+  }
 }
 
 function saveDbToFile() {
   try {
     const dir = path.dirname(DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(DB_FILE, JSON.stringify({
+    const content = JSON.stringify({
       events: globalServerEventsStore,
       deletedEventIds: globalServerDeletedEventsStore,
       groups: globalServerGroupsStore,
@@ -99,8 +103,13 @@ function saveDbToFile() {
       cuts: globalServerCutsStore,
       checkIns: globalServerCheckInsStore,
       venueElements: globalServerVenueElementsStore,
-    }), 'utf-8');
-  } catch (e) {}
+    }, null, 2);
+    // Atomic file write pattern: write to temp file then rename
+    fs.writeFileSync(TEMP_DB_FILE, content, 'utf-8');
+    fs.renameSync(TEMP_DB_FILE, DB_FILE);
+  } catch (e) {
+    console.warn('[Server DB Save Error]', e);
+  }
 }
 
 // Initial load on server startup
