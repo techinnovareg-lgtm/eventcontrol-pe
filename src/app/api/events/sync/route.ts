@@ -104,9 +104,20 @@ function saveDbToFile() {
       checkIns: globalServerCheckInsStore,
       venueElements: globalServerVenueElementsStore,
     }, null, 2);
-    // Atomic file write pattern: write to temp file then rename
+    // Write to temp file first
     fs.writeFileSync(TEMP_DB_FILE, content, 'utf-8');
-    fs.renameSync(TEMP_DB_FILE, DB_FILE);
+    
+    // Windows OS compatible atomic file replacement
+    try {
+      if (fs.existsSync(DB_FILE)) {
+        try { fs.unlinkSync(DB_FILE); } catch (e) {}
+      }
+      fs.renameSync(TEMP_DB_FILE, DB_FILE);
+    } catch (renameErr) {
+      // Fallback for Windows file lock constraints
+      fs.copyFileSync(TEMP_DB_FILE, DB_FILE);
+      try { fs.unlinkSync(TEMP_DB_FILE); } catch (e) {}
+    }
   } catch (e) {
     console.warn('[Server DB Save Error]', e);
   }
