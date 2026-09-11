@@ -250,6 +250,28 @@ export default function MobileScanCheckInPage() {
     }
   }
 
+  const handleToggleCamera = () => {
+    if (!isCameraActive) {
+      // Clean previous scan state when opening camera for a NEW scan
+      setScannedInput('');
+      setSelectedTokenHash('');
+      setMatchedGroup(null);
+      setScanErrorMsg(null);
+      setIsCameraActive(true);
+    } else {
+      // Stop camera stream cleanly preserving scanned result
+      setIsCameraActive(false);
+    }
+  };
+
+  const handleCloseResultModal = () => {
+    setResultModal(null);
+    setScannedInput('');
+    setSelectedTokenHash('');
+    setMatchedGroup(null);
+    setScanErrorMsg(null);
+  };
+
   // Instant QR Processing Engine
   const processScannedCode = (rawCode: string, isFromCamera = false) => {
     if (!rawCode || !rawCode.trim()) {
@@ -272,6 +294,11 @@ export default function MobileScanCheckInPage() {
       const available = Math.max(1, (res.group.max_passes || 1) - (res.group.checked_in_count || 0));
       setPassesRequested(Math.min(1, available));
       setResultModal(null);
+
+      // Lock scanned pass and stop camera on valid scan to lock guest pass and prevent infinite loop/flicker
+      if (isFromCamera) {
+        setIsCameraActive(false);
+      }
     } else {
       // Motion blur / frame loss protection: if camera scan read invalid text while a valid group is ALREADY matched, do not wipe it
       if (isFromCamera && matchedGroup) {
@@ -288,6 +315,9 @@ export default function MobileScanCheckInPage() {
         setScanErrorMsg('✕ CÓDIGO QR REVOCADO: Este pase fue invalidado por el administrador.');
       } else {
         setScanErrorMsg('✕ CÓDIGO QR INVÁLIDO: No existe en la lista de invitados de este evento.');
+      }
+      if (isFromCamera) {
+        setIsCameraActive(false);
       }
     }
   };
@@ -548,7 +578,7 @@ export default function MobileScanCheckInPage() {
               <QrCode className="w-4 h-4 text-[#C5A059]" /> Escáner de Puerta en Vivo
             </span>
             <button
-              onClick={() => setIsCameraActive(!isCameraActive)}
+              onClick={handleToggleCamera}
               className={`px-3 py-1 text-xs font-bold rounded-xl border transition flex items-center gap-1 ${
                 isCameraActive 
                   ? 'bg-red-950 text-red-400 border-red-800' 
@@ -1003,7 +1033,7 @@ export default function MobileScanCheckInPage() {
             )}
 
             <button
-              onClick={() => setResultModal(null)}
+              onClick={handleCloseResultModal}
               className="w-full py-3 bg-slate-800 hover:bg-slate-700 text-white font-bold text-sm rounded-xl transition border border-slate-700"
             >
               Cerrar y Continuar
