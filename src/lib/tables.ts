@@ -339,12 +339,18 @@ export function getEventTables(eventId: string): Table[] {
 }
 
 export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
+  const store = loadTablesFromStorage();
+  const localTables = store[eventId] || [];
+
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.tables)) {
-        const store = loadTablesFromStorage();
+        if (data.tables.length === 0 && localTables.length > 0) {
+          syncTablesToServerAsync(eventId, localTables);
+          return localTables;
+        }
         store[eventId] = data.tables;
         saveTablesToStorage(store);
         return data.tables;
@@ -360,12 +366,18 @@ export function getEventTableAssignments(eventId: string): TableAssignment[] {
 }
 
 export async function getEventTableAssignmentsAsync(eventId: string): Promise<TableAssignment[]> {
+  const store = loadAssignmentsFromStorage();
+  const localAssignments = store[eventId] || [];
+
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.assignments)) {
-        const store = loadAssignmentsFromStorage();
+        if (data.assignments.length === 0 && localAssignments.length > 0) {
+          syncTablesToServerAsync(eventId, undefined, localAssignments);
+          return localAssignments;
+        }
         store[eventId] = data.assignments;
         saveAssignmentsToStorage(store);
         return data.assignments;
@@ -467,12 +479,18 @@ export function getEventVenueElements(eventId: string): VenueElement[] {
 }
 
 export async function getEventVenueElementsAsync(eventId: string): Promise<VenueElement[]> {
+  const store = loadVenueElementsFromStorage();
+  const localElements = store[eventId] || [];
+
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.venueElements)) {
-        const store = loadVenueElementsFromStorage();
+        if (data.venueElements.length === 0 && localElements.length > 0) {
+          syncVenueElementsToServerAsync(eventId, localElements);
+          return localElements;
+        }
         store[eventId] = data.venueElements;
         saveVenueElementsToStorage(store);
         return data.venueElements;

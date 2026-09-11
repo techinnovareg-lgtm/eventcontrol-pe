@@ -47,41 +47,77 @@ function loadDbFromFile() {
             }
           });
         }
-        if (parsed.groups) {
+        if (parsed.groups && typeof parsed.groups === 'object') {
           delete parsed.groups['evt-101'];
           delete parsed.groups['evt-102'];
           delete parsed.groups['evt-principal-01'];
-          globalServerGroupsStore = { ...globalServerGroupsStore, ...parsed.groups };
+          Object.entries(parsed.groups).forEach(([evtId, grps]) => {
+            if (Array.isArray(grps) && grps.length > 0) {
+              globalServerGroupsStore[evtId] = grps as GuestGroup[];
+            } else if (!globalServerGroupsStore[evtId]) {
+              globalServerGroupsStore[evtId] = [];
+            }
+          });
         }
-        if (parsed.tables) {
+        if (parsed.tables && typeof parsed.tables === 'object') {
           delete parsed.tables['evt-101'];
           delete parsed.tables['evt-102'];
           delete parsed.tables['evt-principal-01'];
-          globalServerTablesStore = { ...globalServerTablesStore, ...parsed.tables };
+          Object.entries(parsed.tables).forEach(([evtId, tbls]) => {
+            if (Array.isArray(tbls) && tbls.length > 0) {
+              globalServerTablesStore[evtId] = tbls as Table[];
+            } else if (!globalServerTablesStore[evtId]) {
+              globalServerTablesStore[evtId] = [];
+            }
+          });
         }
-        if (parsed.assignments) {
+        if (parsed.assignments && typeof parsed.assignments === 'object') {
           delete parsed.assignments['evt-101'];
           delete parsed.assignments['evt-102'];
           delete parsed.assignments['evt-principal-01'];
-          globalServerAssignmentsStore = { ...globalServerAssignmentsStore, ...parsed.assignments };
+          Object.entries(parsed.assignments).forEach(([evtId, asgns]) => {
+            if (Array.isArray(asgns) && asgns.length > 0) {
+              globalServerAssignmentsStore[evtId] = asgns as TableAssignment[];
+            } else if (!globalServerAssignmentsStore[evtId]) {
+              globalServerAssignmentsStore[evtId] = [];
+            }
+          });
         }
-        if (parsed.cuts) {
+        if (parsed.cuts && typeof parsed.cuts === 'object') {
           delete parsed.cuts['evt-101'];
           delete parsed.cuts['evt-102'];
           delete parsed.cuts['evt-principal-01'];
-          globalServerCutsStore = { ...globalServerCutsStore, ...parsed.cuts };
+          Object.entries(parsed.cuts).forEach(([evtId, cts]) => {
+            if (Array.isArray(cts) && cts.length > 0) {
+              globalServerCutsStore[evtId] = cts as Cut[];
+            } else if (!globalServerCutsStore[evtId]) {
+              globalServerCutsStore[evtId] = [];
+            }
+          });
         }
-        if (parsed.checkIns) {
+        if (parsed.checkIns && typeof parsed.checkIns === 'object') {
           delete parsed.checkIns['evt-101'];
           delete parsed.checkIns['evt-102'];
           delete parsed.checkIns['evt-principal-01'];
-          globalServerCheckInsStore = { ...globalServerCheckInsStore, ...parsed.checkIns };
+          Object.entries(parsed.checkIns).forEach(([evtId, chks]) => {
+            if (Array.isArray(chks) && chks.length > 0) {
+              globalServerCheckInsStore[evtId] = chks as CheckIn[];
+            } else if (!globalServerCheckInsStore[evtId]) {
+              globalServerCheckInsStore[evtId] = [];
+            }
+          });
         }
-        if (parsed.venueElements) {
+        if (parsed.venueElements && typeof parsed.venueElements === 'object') {
           delete parsed.venueElements['evt-101'];
           delete parsed.venueElements['evt-102'];
           delete parsed.venueElements['evt-principal-01'];
-          globalServerVenueElementsStore = { ...globalServerVenueElementsStore, ...parsed.venueElements };
+          Object.entries(parsed.venueElements).forEach(([evtId, elems]) => {
+            if (Array.isArray(elems) && elems.length > 0) {
+              globalServerVenueElementsStore[evtId] = elems as VenueElement[];
+            } else if (!globalServerVenueElementsStore[evtId]) {
+              globalServerVenueElementsStore[evtId] = [];
+            }
+          });
         }
       }
     }
@@ -214,11 +250,18 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: true, count: existingGroups.length, preserved: true });
       }
 
-      const mergedGroups = groups.map((g: GuestGroup) => {
+      const mergedGroups = [...groups];
+      existingGroups.forEach(exG => {
+        if (!mergedGroups.some(g => g.id === exG.id)) {
+          mergedGroups.push(exG);
+        }
+      });
+
+      mergedGroups.forEach((g: GuestGroup) => {
         const exG = existingGroups.find(e => e.id === g.id);
         const maxCount = Math.max(g.checked_in_count || 0, exG ? (exG.checked_in_count || 0) : 0);
-        const status: 'PENDIENTE' | 'PARCIAL' | 'COMPLETO' = maxCount >= g.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
-        return { ...g, checked_in_count: maxCount, status };
+        g.checked_in_count = maxCount;
+        g.status = maxCount >= g.max_passes ? 'COMPLETO' : maxCount > 0 ? 'PARCIAL' : 'PENDIENTE';
       });
 
       globalServerGroupsStore[targetEvtId] = mergedGroups;

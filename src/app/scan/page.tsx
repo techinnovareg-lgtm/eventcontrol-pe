@@ -133,9 +133,16 @@ export default function MobileScanCheckInPage() {
     const guestList = await getEventGuestGroupsAsync(selectedEventId);
     const tablesList = await getEventTablesAsync(selectedEventId);
     const assignmentsList = await getEventTableAssignmentsAsync(selectedEventId);
-    setGroups(guestList);
-    setTables(tablesList);
-    setAssignments(assignmentsList);
+
+    if (guestList.length > 0 || groups.length === 0) {
+      setGroups(guestList);
+    }
+    if (tablesList.length > 0 || tables.length === 0) {
+      setTables(tablesList);
+    }
+    if (assignmentsList.length > 0 || assignments.length === 0) {
+      setAssignments(assignmentsList);
+    }
     setIsRefreshingList(false);
   };
 

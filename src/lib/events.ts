@@ -349,6 +349,17 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.groups)) {
+        // Anti-Wipe Guard: If server returns empty array but client has local groups, preserve local groups and re-sync
+        if (data.groups.length === 0 && localGroups.length > 0) {
+          const workspaceId = localGroups[0]?.workspace_id || '';
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: localGroups }),
+          }).catch(() => {});
+          return localGroups;
+        }
+
         localStore[eventId] = data.groups;
         saveGroupsToStorage(localStore);
         return data.groups;
