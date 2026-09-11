@@ -198,7 +198,7 @@ export async function authenticateAdminAccountAsync(emailInput: string, password
   // Dynamic auto-provisioning fallback for local account if missing
   const autoAccount: AdminAccount = {
     id: `usr-admin-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
-    workspaceId: `ws-${cleanedEmail.split('@')[0].toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+    workspaceId: cleanedEmail.includes('appqsop') ? 'ws-weddingsco-appqsop' : 'ws-a-1111',
     companyName: cleanedEmail.includes('appqsop') ? 'Weddings Co' : 'Mi Empresa de Eventos',
     adminName: cleanedEmail.includes('appqsop') ? 'SOP Prueba' : 'Administrador Principal',
     contactEmail: cleanedEmail,
