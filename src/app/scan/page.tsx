@@ -47,53 +47,43 @@ export default function MobileScanCheckInPage() {
       }
 
       const operatorEventId = activeSession?.user?.eventId;
-      let events: Event[] = [];
+      let events: Event[] = await getWorkspaceEventsAsync(currentWorkspaceId);
 
-      if (isOperator && operatorEventId) {
-        let opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
-        if (!opEvt) {
-          opEvt = {
-            id: operatorEventId,
-            workspace_id: currentWorkspaceId,
-            name: 'Evento Asignado a Puerta',
-            event_type: 'GENERAL',
-            event_date: new Date().toISOString().split('T')[0],
-            status: 'ACTIVO',
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-        }
-        events = [opEvt];
-        if (isMounted) {
-          setWorkspaceEvents(events);
-          setSelectedEventId(operatorEventId);
-        }
-      } else {
-        events = await getWorkspaceEventsAsync(currentWorkspaceId);
-        if (isMounted) {
-          setWorkspaceEvents(events);
-          if (events.length > 0 && !selectedEventId) {
-            setSelectedEventId(events[0].id);
-          }
+      // If operator event ID is set and not present in workspace events, attempt to fetch it
+      if (operatorEventId && !events.some(e => e.id === operatorEventId)) {
+        const opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
+        if (opEvt) {
+          events = [opEvt, ...events];
         }
       }
 
       if (!isMounted) return;
+      setWorkspaceEvents(events);
 
-      // Check URL params for event or token
+      // Pre-select priority event: 1) URL event param, 2) operator assigned event, 3) first available event
+      let targetId = selectedEventId;
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
         const urlEvt = params.get('event');
         const urlToken = params.get('token');
 
-        if (urlEvt && !isOperator) {
-          setSelectedEventId(urlEvt);
+        if (urlEvt && events.some(e => e.id === urlEvt)) {
+          targetId = urlEvt;
         }
-
         if (urlToken) {
           setScannedInput(urlToken);
         }
       }
+
+      if (!targetId || !events.some(e => e.id === targetId)) {
+        if (operatorEventId && events.some(e => e.id === operatorEventId)) {
+          targetId = operatorEventId;
+        } else if (events.length > 0) {
+          targetId = events[0].id;
+        }
+      }
+
+      setSelectedEventId(targetId);
     }
 
     loadEventsAsync();

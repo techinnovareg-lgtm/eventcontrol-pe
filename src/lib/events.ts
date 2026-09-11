@@ -6,6 +6,33 @@ import { deleteEventQRTokens } from '@/lib/qr-engine';
 
 const EVENTS_STORAGE_KEY = 'eventcontrol_events';
 const GROUPS_STORAGE_KEY = 'eventcontrol_guest_groups';
+const DELETED_EVENTS_STORAGE_KEY = 'eventcontrol_deleted_events';
+
+export function getDeletedEventIdsFromStorage(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(DELETED_EVENTS_STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return [];
+}
+
+export function registerDeletedEventId(eventId?: string, serverDeletedIds?: string[]) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getDeletedEventIdsFromStorage();
+    let updated = [...current];
+    if (eventId && !updated.includes(eventId)) {
+      updated.push(eventId);
+    }
+    if (Array.isArray(serverDeletedIds)) {
+      serverDeletedIds.forEach(id => {
+        if (id && !updated.includes(id)) updated.push(id);
+      });
+    }
+    localStorage.setItem(DELETED_EVENTS_STORAGE_KEY, JSON.stringify(updated));
+  } catch (e) {}
+}
 
 const INITIAL_EVENTS: Event[] = [];
 
@@ -127,17 +154,37 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.events)) {
-        const serverEvents = data.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
-        const localStore = getEventsStore().filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+        if (Array.isArray(data.deletedEventIds)) {
+          registerDeletedEventId(undefined, data.deletedEventIds);
+        }
+        const deletedIds = getDeletedEventIdsFromStorage();
+
+        const serverEvents = data.events.filter((e: Event) => 
+          e.id !== 'evt-101' && 
+          e.id !== 'evt-102' && 
+          e.id !== 'evt-principal-01' &&
+          !deletedIds.includes(e.id)
+        );
+
+        const localStore = getEventsStore().filter(e => 
+          e.id !== 'evt-101' && 
+          e.id !== 'evt-102' && 
+          e.id !== 'evt-principal-01' &&
+          !deletedIds.includes(e.id)
+        );
         
-        // Preserve valid local events that are not yet on the server, and immediately re-sync them
+        // Preserve ONLY valid, recently created (<60s) unsynced local events that are NOT in deletedIds
+        const nowMs = Date.now();
         const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
         const unsyncedLocalEvents = localWorkspaceEvents.filter(le => {
           const isServerMatch = serverEvents.some((se: Event) => se.id === le.id);
-          return !isServerMatch;
+          if (isServerMatch) return false;
+          if (deletedIds.includes(le.id)) return false;
+          const createdTime = new Date(le.created_at || 0).getTime();
+          return (nowMs - createdTime) < 60 * 1000;
         });
         
-        // Immediately sync unsynced local events to the central server
+        // Sync true unsynced local events to the central server
         unsyncedLocalEvents.forEach(evt => {
           fetch('/api/events/sync', {
             method: 'POST',
@@ -146,7 +193,7 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
           }).catch(() => {});
         });
 
-        const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId);
+        const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !deletedIds.includes(e.id));
         const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents].sort(
           (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
         );
@@ -162,7 +209,9 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
   }
 
   // 2. Secondary: Offline Contingency Fallback Cache
-  return getWorkspaceEvents(workspaceId);
+  const deletedIds = getDeletedEventIdsFromStorage();
+  const allWorkspaceEvents = getWorkspaceEvents(workspaceId);
+  return allWorkspaceEvents.filter(e => !deletedIds.includes(e.id));
 }
 
 export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
@@ -297,6 +346,9 @@ export async function updateEventAsync(
 }
 
 export function deleteEvent(eventId: string): void {
+  // Register in local deleted events registry
+  registerDeletedEventId(eventId);
+
   // 1. Remove from local events store
   const store = getEventsStore();
   const idx = store.findIndex(e => e.id === eventId);

@@ -189,26 +189,17 @@ export async function GET(req: Request) {
       cuts,
       checkIns,
       venueElements,
+      deletedEventIds: globalServerDeletedEventsStore,
     });
   }
 
   if (workspaceId) {
-    let events = globalServerEventsStore.filter(e => e.workspace_id === workspaceId && !globalServerDeletedEventsStore.includes(e.id));
-    if (events.length === 0 && globalServerEventsStore.length > 0) {
-      const activeServerEvents = globalServerEventsStore.filter(e => 
-        e.id !== 'evt-101' && 
-        e.id !== 'evt-102' && 
-        e.id !== 'evt-principal-01' &&
-        !globalServerDeletedEventsStore.includes(e.id)
-      );
-      if (activeServerEvents.length > 0) {
-        events = activeServerEvents;
-      }
-    }
+    const events = globalServerEventsStore.filter(e => e.workspace_id === workspaceId && !globalServerDeletedEventsStore.includes(e.id));
     const sorted = [...events].sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
     return NextResponse.json({
       success: true,
       events: sorted,
+      deletedEventIds: globalServerDeletedEventsStore,
     });
   }
 
@@ -217,6 +208,7 @@ export async function GET(req: Request) {
   return NextResponse.json({
     success: true,
     events: sortedAll,
+    deletedEventIds: globalServerDeletedEventsStore,
   });
 }
 
