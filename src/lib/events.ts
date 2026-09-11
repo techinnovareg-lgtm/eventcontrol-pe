@@ -103,6 +103,9 @@ function autoSyncLocalStoresToServer() {
 function getEventsStore(): Event[] {
   if (!eventsMemoryStore) {
     eventsMemoryStore = loadEventsFromStorage();
+    if (typeof window !== 'undefined') {
+      setTimeout(() => autoSyncLocalStoresToServer(), 100);
+    }
   }
   return eventsMemoryStore;
 }
@@ -121,6 +124,7 @@ export function getWorkspaceEvents(workspaceId: string): Event[] {
 }
 
 export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
+  autoSyncLocalStoresToServer();
   // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
