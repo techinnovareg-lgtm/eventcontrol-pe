@@ -101,32 +101,6 @@ function saveGroupsToStorage(groups: Record<string, GuestGroup[]>) {
   }
 }
 
-function autoSyncLocalStoresToServer() {
-  if (typeof window === 'undefined') return;
-  try {
-    const localEvents = eventsMemoryStore || loadEventsFromStorage();
-    localEvents.forEach(evt => {
-      fetch('/api/events/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
-      }).catch(() => {});
-    });
-
-    const localGroups = guestGroupsMemoryStore || loadGroupsFromStorage();
-    Object.entries(localGroups).forEach(([evtId, grps]) => {
-      if (grps && grps.length > 0) {
-        const workspaceId = grps[0]?.workspace_id || '';
-        fetch('/api/events/sync', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'SYNC_GROUPS', eventId: evtId, workspaceId, groups: grps }),
-        }).catch(() => {});
-      }
-    });
-  } catch (err) {}
-}
-
 function getEventsStore(): Event[] {
   if (!eventsMemoryStore) {
     eventsMemoryStore = loadEventsFromStorage();
@@ -143,11 +117,16 @@ function getGroupsStore(): Record<string, GuestGroup[]> {
 
 export function getWorkspaceEvents(workspaceId: string): Event[] {
   const store = getEventsStore();
+  const deletedIds = getDeletedEventIdsFromStorage();
   const res = !workspaceId ? store : store.filter(e => e.workspace_id === workspaceId);
-  return res.sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
+  return res
+    .filter(e => !deletedIds.includes(e.id) && e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01')
+    .sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
 }
 
 export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
+  const deletedIds = getDeletedEventIdsFromStorage();
+
   // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
@@ -157,51 +136,30 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         if (Array.isArray(data.deletedEventIds)) {
           registerDeletedEventId(undefined, data.deletedEventIds);
         }
-        const deletedIds = getDeletedEventIdsFromStorage();
+        const updatedDeletedIds = getDeletedEventIdsFromStorage();
 
         const serverEvents = data.events.filter((e: Event) => 
           e.id !== 'evt-101' && 
           e.id !== 'evt-102' && 
           e.id !== 'evt-principal-01' &&
-          !deletedIds.includes(e.id)
+          !updatedDeletedIds.includes(e.id)
         );
 
         const localStore = getEventsStore().filter(e => 
           e.id !== 'evt-101' && 
           e.id !== 'evt-102' && 
           e.id !== 'evt-principal-01' &&
-          !deletedIds.includes(e.id)
+          !updatedDeletedIds.includes(e.id)
         );
-        
-        // Preserve ONLY valid, recently created (<60s) unsynced local events that are NOT in deletedIds
-        const nowMs = Date.now();
-        const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
-        const unsyncedLocalEvents = localWorkspaceEvents.filter(le => {
-          const isServerMatch = serverEvents.some((se: Event) => se.id === le.id);
-          if (isServerMatch) return false;
-          if (deletedIds.includes(le.id)) return false;
-          const createdTime = new Date(le.created_at || 0).getTime();
-          return (nowMs - createdTime) < 60 * 1000;
-        });
-        
-        // Sync true unsynced local events to the central server
-        unsyncedLocalEvents.forEach(evt => {
-          fetch('/api/events/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
-          }).catch(() => {});
-        });
 
-        const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !deletedIds.includes(e.id));
-        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents].sort(
-          (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
-        );
-        const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
+        // Keep local events from other workspaces
+        const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !updatedDeletedIds.includes(e.id));
         
-        // Save authoritative list to local storage, purging any deleted past events
+        // Final merged list for local storage
+        const finalMerged = [...otherWorkspaceEvents, ...serverEvents];
         saveEventsToStorage(finalMerged);
-        return mergedWorkspaceEvents;
+
+        return serverEvents;
       }
     }
   } catch (err) {
@@ -209,9 +167,7 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
   }
 
   // 2. Secondary: Offline Contingency Fallback Cache
-  const deletedIds = getDeletedEventIdsFromStorage();
-  const allWorkspaceEvents = getWorkspaceEvents(workspaceId);
-  return allWorkspaceEvents.filter(e => !deletedIds.includes(e.id));
+  return getWorkspaceEvents(workspaceId);
 }
 
 export function getEventById(eventId: string, workspaceId?: string): Event | undefined {
