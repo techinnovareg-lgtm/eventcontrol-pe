@@ -152,14 +152,36 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
           !updatedDeletedIds.includes(e.id)
         );
 
+        // Preserve local events for this workspace that are NOT on the server and NOT in updatedDeletedIds
+        const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
+        const unsyncedLocalEvents = localWorkspaceEvents.filter(le => {
+          const isServerMatch = serverEvents.some((se: Event) => se.id === le.id);
+          if (isServerMatch) return false;
+          if (updatedDeletedIds.includes(le.id)) return false;
+          return true;
+        });
+
+        // Re-sync unsynced local events to the server
+        unsyncedLocalEvents.forEach(evt => {
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+          }).catch(() => {});
+        });
+
         // Keep local events from other workspaces
         const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !updatedDeletedIds.includes(e.id));
         
         // Final merged list for local storage
-        const finalMerged = [...otherWorkspaceEvents, ...serverEvents];
+        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents].sort(
+          (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
+        );
+
+        const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
         saveEventsToStorage(finalMerged);
 
-        return serverEvents;
+        return mergedWorkspaceEvents;
       }
     }
   } catch (err) {
