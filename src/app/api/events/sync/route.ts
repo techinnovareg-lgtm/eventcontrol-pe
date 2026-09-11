@@ -6,6 +6,7 @@ import path from 'path';
 
 // Global central server-side memory stores for cross-device synchronization (PC <-> Mobile Phone)
 let globalServerEventsStore: Event[] = [];
+let globalServerDeletedEventsStore: string[] = [];
 let globalServerGroupsStore: Record<string, GuestGroup[]> = {};
 let globalServerTablesStore: Record<string, Table[]> = {};
 let globalServerAssignmentsStore: Record<string, TableAssignment[]> = {};
@@ -25,8 +26,16 @@ function loadDbFromFile() {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       const parsed = JSON.parse(raw);
       if (parsed) {
+        if (Array.isArray(parsed.deletedEventIds)) {
+          globalServerDeletedEventsStore = parsed.deletedEventIds;
+        }
         if (Array.isArray(parsed.events)) {
-          const fileEvents = parsed.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+          const fileEvents = parsed.events.filter((e: Event) => 
+            e.id !== 'evt-101' && 
+            e.id !== 'evt-102' && 
+            e.id !== 'evt-principal-01' &&
+            !globalServerDeletedEventsStore.includes(e.id)
+          );
           fileEvents.forEach((fe: Event) => {
             const idx = globalServerEventsStore.findIndex(e => e.id === fe.id);
             if (idx !== -1) {
@@ -83,6 +92,7 @@ function saveDbToFile() {
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     fs.writeFileSync(DB_FILE, JSON.stringify({
       events: globalServerEventsStore,
+      deletedEventIds: globalServerDeletedEventsStore,
       groups: globalServerGroupsStore,
       tables: globalServerTablesStore,
       assignments: globalServerAssignmentsStore,
@@ -103,6 +113,9 @@ export async function GET(req: Request) {
   const eventId = searchParams.get('eventId');
 
   if (eventId) {
+    if (globalServerDeletedEventsStore.includes(eventId)) {
+      return NextResponse.json({ success: false, message: 'Evento eliminado' }, { status: 404 });
+    }
     const event = globalServerEventsStore.find(e => e.id === eventId) || null;
     const groups = globalServerGroupsStore[eventId] || [];
     const tables = globalServerTablesStore[eventId] || [];
@@ -124,9 +137,14 @@ export async function GET(req: Request) {
   }
 
   if (workspaceId) {
-    let events = globalServerEventsStore.filter(e => e.workspace_id === workspaceId);
+    let events = globalServerEventsStore.filter(e => e.workspace_id === workspaceId && !globalServerDeletedEventsStore.includes(e.id));
     if (events.length === 0 && globalServerEventsStore.length > 0) {
-      const activeServerEvents = globalServerEventsStore.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+      const activeServerEvents = globalServerEventsStore.filter(e => 
+        e.id !== 'evt-101' && 
+        e.id !== 'evt-102' && 
+        e.id !== 'evt-principal-01' &&
+        !globalServerDeletedEventsStore.includes(e.id)
+      );
       if (activeServerEvents.length > 0) {
         events = activeServerEvents;
       }
@@ -138,7 +156,8 @@ export async function GET(req: Request) {
     });
   }
 
-  const sortedAll = [...globalServerEventsStore].sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
+  const activeAll = globalServerEventsStore.filter(e => !globalServerDeletedEventsStore.includes(e.id));
+  const sortedAll = [...activeAll].sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
   return NextResponse.json({
     success: true,
     events: sortedAll,
@@ -152,6 +171,9 @@ export async function POST(req: Request) {
     const { action, event, eventId, workspaceId, groups, tables, assignments, cuts, checkIn, venueElements } = body;
 
     if (action === 'SYNC_EVENT' && event) {
+      if (globalServerDeletedEventsStore.includes(event.id)) {
+        return NextResponse.json({ success: false, message: 'Evento fue eliminado previamente' });
+      }
       const idx = globalServerEventsStore.findIndex(e => e.id === event.id);
       if (idx !== -1) {
         globalServerEventsStore[idx] = { ...globalServerEventsStore[idx], ...event };
@@ -194,6 +216,9 @@ export async function POST(req: Request) {
     }
 
     if (action === 'DELETE_EVENT' && eventId) {
+      if (!globalServerDeletedEventsStore.includes(eventId)) {
+        globalServerDeletedEventsStore.push(eventId);
+      }
       globalServerEventsStore = globalServerEventsStore.filter(e => e.id !== eventId);
       delete globalServerGroupsStore[eventId];
       delete globalServerTablesStore[eventId];

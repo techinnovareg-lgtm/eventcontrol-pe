@@ -124,7 +124,6 @@ export function getWorkspaceEvents(workspaceId: string): Event[] {
 }
 
 export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
-  autoSyncLocalStoresToServer();
   // 1. Primary: Query Central Online Database API first
   try {
     const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
@@ -134,11 +133,16 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         const serverEvents = data.events.filter((e: Event) => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
         const localStore = getEventsStore().filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
         
-        // Preserve local events belonging to this workspace that are not yet on the server
+        // Preserve ONLY newly created offline local events (created < 15 seconds ago) that are not yet on the server
+        const now = Date.now();
         const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
-        const unsyncedLocalEvents = localWorkspaceEvents.filter(le => !serverEvents.some((se: Event) => se.id === le.id));
+        const unsyncedLocalEvents = localWorkspaceEvents.filter(le => {
+          const isServerMatch = serverEvents.some((se: Event) => se.id === le.id);
+          const isNewlyCreated = le.created_at ? (now - new Date(le.created_at).getTime() < 15000) : false;
+          return !isServerMatch && isNewlyCreated;
+        });
         
-        // Immediately sync unsynced local events to the central server
+        // Immediately sync unsynced newly created local events to the central server
         unsyncedLocalEvents.forEach(evt => {
           fetch('/api/events/sync', {
             method: 'POST',
@@ -153,6 +157,7 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         );
         const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
         
+        // Save authoritative list to local storage, purging any deleted past events
         saveEventsToStorage(finalMerged);
         return mergedWorkspaceEvents;
       }
