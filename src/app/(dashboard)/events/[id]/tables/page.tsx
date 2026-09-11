@@ -50,7 +50,6 @@ export default function TablesManagementPage() {
       setCurrentWorkspaceId(wsId);
 
       if (eventId) {
-        autoSyncTablesToServerAsync(eventId);
         try {
           const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
           if (res.ok) {
@@ -58,36 +57,14 @@ export default function TablesManagementPage() {
             if (data.success) {
               if (data.event) setCurrentEvent(data.event);
               if (Array.isArray(data.groups)) {
-                if (data.groups.length > 0) {
-                  setGroups(data.groups);
-                } else {
-                  const localGrps = getEventGuestGroups(eventId);
-                  if (localGrps.length > 0) {
-                    setGroups(localGrps);
-                    saveEventGuestGroupsAsync(eventId, wsId, localGrps);
-                  } else {
-                    setGroups([]);
-                  }
-                }
+                setGroups(data.groups);
               }
               if (Array.isArray(data.tables)) {
-                if (data.tables.length > 0) {
-                  setTables(data.tables);
-                  saveEventTablesLocally(eventId, data.tables);
-                } else {
-                  const localTbls = getEventTables(eventId);
-                  if (localTbls.length > 0) {
-                    setTables(localTbls);
-                    syncTablesToServerAsync(eventId, localTbls);
-                  } else {
-                    setTables([]);
-                  }
-                }
-
+                setTables(data.tables);
+                saveEventTablesLocally(eventId, data.tables);
                 setTablePositions(prev => {
                   const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-                  const targetTables = data.tables.length > 0 ? data.tables : getEventTables(eventId);
-                  targetTables.forEach((t: Table, i: number) => {
+                  data.tables.forEach((t: Table, i: number) => {
                     updatedPos[t.id] = {
                       x: t.pos_x || (140 + (i % 4) * 280),
                       y: t.pos_y || (140 + Math.floor(i / 4) * 200),
@@ -97,35 +74,13 @@ export default function TablesManagementPage() {
                   return updatedPos;
                 });
               }
-
               if (Array.isArray(data.assignments)) {
-                if (data.assignments.length > 0) {
-                  setAssignments(data.assignments);
-                  saveEventAssignmentsLocally(eventId, data.assignments);
-                } else {
-                  const localAsgns = getEventTableAssignments(eventId);
-                  if (localAsgns.length > 0) {
-                    setAssignments(localAsgns);
-                    syncTablesToServerAsync(eventId, undefined, localAsgns);
-                  } else {
-                    setAssignments([]);
-                  }
-                }
+                setAssignments(data.assignments);
+                saveEventAssignmentsLocally(eventId, data.assignments);
               }
-
               if (Array.isArray(data.venueElements)) {
-                if (data.venueElements.length > 0) {
-                  setVenueElements(data.venueElements);
-                  saveEventVenueElementsLocally(eventId, data.venueElements);
-                } else {
-                  const localElems = getEventVenueElements(eventId);
-                  if (localElems.length > 0) {
-                    setVenueElements(localElems);
-                    syncVenueElementsToServerAsync(eventId, localElems);
-                  } else {
-                    setVenueElements([]);
-                  }
-                }
+                setVenueElements(data.venueElements);
+                saveEventVenueElementsLocally(eventId, data.venueElements);
               }
             }
           }
@@ -225,73 +180,35 @@ export default function TablesManagementPage() {
         return;
       }
 
-      const updatedTables: Table[] = Array.isArray(data.tables) ? data.tables : [];
-      const updatedAssignments: TableAssignment[] = Array.isArray(data.assignments) ? data.assignments : [];
-      const updatedGroups: GuestGroup[] = Array.isArray(data.groups) ? data.groups : [];
-      const updatedVenueElements: VenueElement[] = Array.isArray(data.venueElements) ? data.venueElements : [];
-
-      if (updatedTables.length > 0) {
-        setTables(updatedTables);
-        saveEventTablesLocally(eventId, updatedTables);
-      } else {
-        const localTbls = getEventTables(eventId);
-        if (localTbls.length > 0) {
-          setTables(localTbls);
-          syncTablesToServerAsync(eventId, localTbls);
-        } else {
-          setTables([]);
-        }
-      }
-
-      if (updatedAssignments.length > 0) {
-        setAssignments(updatedAssignments);
-        saveEventAssignmentsLocally(eventId, updatedAssignments);
-      } else {
-        const localAsgns = getEventTableAssignments(eventId);
-        if (localAsgns.length > 0) {
-          setAssignments(localAsgns);
-          syncTablesToServerAsync(eventId, undefined, localAsgns);
-        } else {
-          setAssignments([]);
-        }
-      }
-
-      if (updatedGroups.length > 0) {
-        setGroups(updatedGroups);
-      } else {
-        const localGrps = getEventGuestGroups(eventId);
-        if (localGrps.length > 0) {
-          setGroups(localGrps);
-          saveEventGuestGroupsAsync(eventId, currentWorkspaceId, localGrps);
-        } else {
-          setGroups([]);
-        }
-      }
-
-      if (updatedVenueElements.length > 0) {
-        setVenueElements(updatedVenueElements);
-        saveEventVenueElementsLocally(eventId, updatedVenueElements);
-      } else {
-        const localElems = getEventVenueElements(eventId);
-        if (localElems.length > 0) {
-          setVenueElements(localElems);
-          syncVenueElementsToServerAsync(eventId, localElems);
-        } else {
-          setVenueElements([]);
-        }
-      }
-
-      setTablePositions(prev => {
-        const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-        updatedTables.forEach((t, i) => {
-          updatedPos[t.id] = {
-            x: t.pos_x || (140 + (i % 4) * 280),
-            y: t.pos_y || (140 + Math.floor(i / 4) * 200),
-            shape: updatedPos[t.id]?.shape || 'ROUND',
-          };
+      if (Array.isArray(data.tables)) {
+        setTables(data.tables);
+        saveEventTablesLocally(eventId, data.tables);
+        setTablePositions(prev => {
+          const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+          data.tables.forEach((t: Table, i: number) => {
+            updatedPos[t.id] = {
+              x: t.pos_x || (140 + (i % 4) * 280),
+              y: t.pos_y || (140 + Math.floor(i / 4) * 200),
+              shape: updatedPos[t.id]?.shape || 'ROUND',
+            };
+          });
+          return updatedPos;
         });
-        return updatedPos;
-      });
+      }
+
+      if (Array.isArray(data.assignments)) {
+        setAssignments(data.assignments);
+        saveEventAssignmentsLocally(eventId, data.assignments);
+      }
+
+      if (Array.isArray(data.groups)) {
+        setGroups(data.groups);
+      }
+
+      if (Array.isArray(data.venueElements)) {
+        setVenueElements(data.venueElements);
+        saveEventVenueElementsLocally(eventId, data.venueElements);
+      }
     } catch (err) {}
   };
 

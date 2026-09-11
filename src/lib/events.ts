@@ -103,9 +103,6 @@ function autoSyncLocalStoresToServer() {
 function getEventsStore(): Event[] {
   if (!eventsMemoryStore) {
     eventsMemoryStore = loadEventsFromStorage();
-    if (typeof window !== 'undefined') {
-      setTimeout(() => autoSyncLocalStoresToServer(), 100);
-    }
   }
   return eventsMemoryStore;
 }
