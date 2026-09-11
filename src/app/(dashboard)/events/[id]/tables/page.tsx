@@ -163,10 +163,19 @@ export default function TablesManagementPage() {
   const [elementShape, setElementShape] = useState<'rect' | 'round_rect' | 'circle' | 'oval'>('circle');
 
   const lastMutationTimeRef = useRef<number>(0);
+  const activeDragRef = useRef<{
+    id: string;
+    type: 'table' | 'venue_element';
+    nodeEl: HTMLElement;
+    grabOffsetX: number;
+    grabOffsetY: number;
+    currentX: number;
+    currentY: number;
+  } | null>(null);
 
   const refreshDataAsync = async () => {
-    // Prevent stale GET responses from overwriting local state during active dragging or within 2.5s of local mutation
-    if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 2500) {
+    // Prevent stale GET responses from overwriting local state during active dragging or within 5.0s of local mutation
+    if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 5000) {
       return;
     }
 
@@ -176,7 +185,7 @@ export default function TablesManagementPage() {
       const data = await res.json();
       if (!data.success) return;
 
-      if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 2500) {
+      if (activeDragRef.current !== null || Date.now() - lastMutationTimeRef.current < 5000) {
         return;
       }
 
@@ -232,6 +241,7 @@ export default function TablesManagementPage() {
     e.preventDefault();
     lastMutationTimeRef.current = Date.now();
     const newTbl = await createTableAsync(eventId, currentWorkspaceId, tableName || 'Nueva Mesa', tableCapacity, 500, 250);
+    lastMutationTimeRef.current = Date.now();
     setTables(prev => [...prev.filter(t => t.id !== newTbl.id), newTbl]);
     setTablePositions(prev => ({
       ...prev,
@@ -268,6 +278,7 @@ export default function TablesManagementPage() {
       750,
       320
     );
+    lastMutationTimeRef.current = Date.now();
 
     setVenueElements(prev => [...prev.filter(ve => ve.id !== newElem.id), newElem]);
     setElementLabel('');
@@ -279,6 +290,7 @@ export default function TablesManagementPage() {
     if (!editingTableObj) return;
     lastMutationTimeRef.current = Date.now();
     await updateTableAsync(eventId, editingTableObj.id, editingTableObj.name, editingTableObj.capacity);
+    lastMutationTimeRef.current = Date.now();
     setEditingTableObj(null);
   };
 
@@ -292,6 +304,7 @@ export default function TablesManagementPage() {
       orientation: editingVenueElementObj.orientation,
       shape: editingVenueElementObj.shape,
     });
+    lastMutationTimeRef.current = Date.now();
     setEditingVenueElementObj(null);
   };
 
@@ -307,6 +320,7 @@ export default function TablesManagementPage() {
       if (selectedTableId === tableId) setSelectedTableId(null);
       setEditingTableObj(null);
       await deleteTableAsync(eventId, tableId);
+      lastMutationTimeRef.current = Date.now();
     }
   };
 
@@ -316,6 +330,7 @@ export default function TablesManagementPage() {
       setVenueElements(prev => prev.filter(ve => ve.id !== elemId));
       setEditingVenueElementObj(null);
       await deleteVenueElementAsync(eventId, elemId);
+      lastMutationTimeRef.current = Date.now();
     }
   };
 
@@ -336,6 +351,7 @@ export default function TablesManagementPage() {
       return next;
     });
     await assignGroupToTableAsync(eventId, currentWorkspaceId, tableId, groupId, passes);
+    lastMutationTimeRef.current = Date.now();
   };
 
   const handleUnassign = async (groupId: string) => {
@@ -346,6 +362,7 @@ export default function TablesManagementPage() {
       return next;
     });
     await unassignGroupFromTableAsync(eventId, groupId);
+    lastMutationTimeRef.current = Date.now();
   };
 
   // Drag and Drop Handlers for Guest Groups -> Table Nodes
@@ -633,15 +650,6 @@ export default function TablesManagementPage() {
 
   // POINTER & TOUCH DRAGGING FOR TABLES & VENUE ELEMENTS (UNTRAPPABLE 60FPS)
   const canvasWorldRef = useRef<HTMLDivElement>(null);
-  const activeDragRef = useRef<{
-    id: string;
-    type: 'table' | 'venue_element';
-    nodeEl: HTMLElement;
-    grabOffsetX: number;
-    grabOffsetY: number;
-    currentX: number;
-    currentY: number;
-  } | null>(null);
 
   const handlePointerDownItemGrip = (e: React.PointerEvent, id: string, type: 'table' | 'venue_element', initialX: number, initialY: number) => {
     e.preventDefault();
