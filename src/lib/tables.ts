@@ -199,6 +199,9 @@ export function saveEventTablesLocally(eventId: string, tables: Table[]) {
   const store = loadTablesFromStorage();
   store[eventId] = tables;
   saveTablesToStorage(store);
+  if (tables.length > 0) {
+    syncTablesToServerAsync(eventId, tables);
+  }
 }
 
 export function saveEventAssignmentsLocally(eventId: string, assignments: TableAssignment[]) {
@@ -206,6 +209,9 @@ export function saveEventAssignmentsLocally(eventId: string, assignments: TableA
   const store = loadAssignmentsFromStorage();
   store[eventId] = assignments;
   saveAssignmentsToStorage(store);
+  if (assignments.length > 0) {
+    syncTablesToServerAsync(eventId, undefined, assignments);
+  }
 }
 
 export function saveEventVenueElementsLocally(eventId: string, venueElements: VenueElement[]) {
@@ -213,6 +219,9 @@ export function saveEventVenueElementsLocally(eventId: string, venueElements: Ve
   const store = loadVenueElementsFromStorage();
   store[eventId] = venueElements;
   saveVenueElementsToStorage(store);
+  if (venueElements.length > 0) {
+    syncVenueElementsToServerAsync(eventId, venueElements);
+  }
 }
 
 export function computeElementDimensions(

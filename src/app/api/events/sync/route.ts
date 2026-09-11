@@ -131,15 +131,17 @@ export async function GET(req: Request) {
         events = activeServerEvents;
       }
     }
+    const sorted = [...events].sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
     return NextResponse.json({
       success: true,
-      events,
+      events: sorted,
     });
   }
 
+  const sortedAll = [...globalServerEventsStore].sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
   return NextResponse.json({
     success: true,
-    events: globalServerEventsStore,
+    events: sortedAll,
   });
 }
 

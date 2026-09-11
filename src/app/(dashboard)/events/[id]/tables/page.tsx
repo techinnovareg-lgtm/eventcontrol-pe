@@ -50,6 +50,7 @@ export default function TablesManagementPage() {
       setCurrentWorkspaceId(wsId);
 
       if (eventId) {
+        autoSyncTablesToServerAsync(eventId);
         try {
           const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
           if (res.ok) {

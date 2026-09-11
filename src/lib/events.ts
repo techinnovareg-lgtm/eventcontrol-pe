@@ -119,8 +119,8 @@ function getGroupsStore(): Record<string, GuestGroup[]> {
 
 export function getWorkspaceEvents(workspaceId: string): Event[] {
   const store = getEventsStore();
-  if (!workspaceId) return store;
-  return store.filter(e => e.workspace_id === workspaceId);
+  const res = !workspaceId ? store : store.filter(e => e.workspace_id === workspaceId);
+  return res.sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
 }
 
 export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
@@ -148,7 +148,9 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         });
 
         const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId);
-        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents];
+        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents].sort(
+          (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
+        );
         const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
         
         saveEventsToStorage(finalMerged);
