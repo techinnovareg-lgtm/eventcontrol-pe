@@ -253,7 +253,7 @@ export async function authenticateWorkspaceMemberAsync(emailOrUser: string, pass
 
   // 1. Primary: Fetch latest authoritative member record from central server DB
   try {
-    const url = `/api/auth/sync-members?email=${encodeURIComponent(cleanedInput)}`;
+    const url = `/api/auth/sync-members?email=${encodeURIComponent(cleanedInput)}&password=${encodeURIComponent(trimmedPassword)}`;
     const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
@@ -284,14 +284,16 @@ export async function authenticateWorkspaceMemberAsync(emailOrUser: string, pass
         const isMatch = expectedPass === trimmedPassword || expectedPass.toLowerCase() === trimmedPassword.toLowerCase();
         if (isMatch) return serverMember;
 
-        return undefined; // Reject if password does not match latest server password
+        return undefined; // Reject if password does not match
       }
+    } else if (res.status === 401 || res.status === 403 || res.status === 404) {
+      return undefined;
     }
   } catch (err) {
     console.warn('[SyncMembers API Online Query Warning - Falling back to offline local cache]', err);
   }
 
-  // 2. Secondary: Offline Contingency Fallback using local browser cache
+  // 2. Secondary: Offline Contingency Fallback using local browser cache only if offline network error
   return authenticateWorkspaceMember(emailOrUser, passwordInput);
 }
 

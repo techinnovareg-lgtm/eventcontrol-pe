@@ -115,8 +115,18 @@ function saveAccountsToFile() {
   try {
     const dir = path.dirname(ACCOUNTS_DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(ACCOUNTS_DB_FILE, JSON.stringify(globalServerAccountsStore), 'utf-8');
-  } catch (e) {}
+    const tempFile = `${ACCOUNTS_DB_FILE}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 6)}`;
+    fs.writeFileSync(tempFile, JSON.stringify(globalServerAccountsStore, null, 2), 'utf-8');
+    try {
+      if (fs.existsSync(ACCOUNTS_DB_FILE)) fs.unlinkSync(ACCOUNTS_DB_FILE);
+      fs.renameSync(tempFile, ACCOUNTS_DB_FILE);
+    } catch {
+      fs.copyFileSync(tempFile, ACCOUNTS_DB_FILE);
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    }
+  } catch (e) {
+    console.error('[saveAccountsToFile Error]', e);
+  }
 }
 
 loadAccountsFromFile();
@@ -131,59 +141,36 @@ export async function GET(req: Request) {
     const cleanedEmail = email.trim().toLowerCase();
     const trimmedPass = password.trim();
 
-    let matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
-
-    if (!matchedAccount) {
-      // Dynamic auto-provisioning for any un-synced user account on GET
-      const autoAccount: AdminAccount = {
-        id: `usr-admin-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
-        workspaceId: cleanedEmail.includes('appqsop') ? 'ws-weddingsco-appqsop' : 'ws-a-1111',
-        companyName: cleanedEmail.includes('appqsop') ? 'Weddings Co' : 'Mi Empresa de Eventos',
-        adminName: cleanedEmail.includes('appqsop') ? 'SOP Prueba' : 'Administrador Principal',
-        contactEmail: cleanedEmail,
-        planCode: 'BUSINESS',
-        contractStartDate: '2026-09-07T00:00:00.000Z',
-        contractEndDate: '2027-09-07T23:59:59.000Z',
-        status: 'ACTIVA',
-        mustChangePassword: false,
-        initialPassword: trimmedPass || 'EventControl2026!',
-        passwordHashMasked: '••••••••••••',
-        created_at: new Date().toISOString(),
-      };
-      globalServerAccountsStore.unshift(autoAccount);
-      saveAccountsToFile();
-      matchedAccount = autoAccount;
-    }
+    const matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
 
     if (matchedAccount) {
-      return NextResponse.json({ success: true, account: matchedAccount });
+      if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
+        return NextResponse.json({ success: false, message: `Cuenta ${matchedAccount.status.toLowerCase()}` }, { status: 403 });
+      }
+
+      const expectedPassword = matchedAccount.initialPassword || 'EventControl2026!';
+      const isDefaultInitial = expectedPassword.toLowerCase() === 'eventcontrol2026!';
+      const isPassMatch = isDefaultInitial 
+        ? trimmedPass.toLowerCase() === 'eventcontrol2026!'
+        : trimmedPass === expectedPassword;
+
+      if (isPassMatch) {
+        return NextResponse.json({ success: true, account: matchedAccount });
+      } else {
+        return NextResponse.json({ success: false, message: 'Contraseña incorrecta' }, { status: 401 });
+      }
+    } else {
+      return NextResponse.json({ success: false, message: 'Correo no registrado' }, { status: 404 });
     }
   }
 
   if (email) {
     const cleanedEmail = email.trim().toLowerCase();
-    let matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
-    if (!matchedAccount) {
-      const autoAccount: AdminAccount = {
-        id: `usr-admin-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
-        workspaceId: cleanedEmail.includes('appqsop') ? 'ws-weddingsco-appqsop' : 'ws-a-1111',
-        companyName: cleanedEmail.includes('appqsop') ? 'Weddings Co' : 'Mi Empresa de Eventos',
-        adminName: cleanedEmail.includes('appqsop') ? 'SOP Prueba' : 'Administrador Principal',
-        contactEmail: cleanedEmail,
-        planCode: 'BUSINESS',
-        contractStartDate: '2026-09-07T00:00:00.000Z',
-        contractEndDate: '2027-09-07T23:59:59.000Z',
-        status: 'ACTIVA',
-        mustChangePassword: false,
-        initialPassword: 'EventControl2026!',
-        passwordHashMasked: '••••••••••••',
-        created_at: new Date().toISOString(),
-      };
-      globalServerAccountsStore.unshift(autoAccount);
-      saveAccountsToFile();
-      matchedAccount = autoAccount;
+    const matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
+    if (matchedAccount) {
+      return NextResponse.json({ success: true, account: matchedAccount });
     }
-    return NextResponse.json({ success: true, account: matchedAccount });
+    return NextResponse.json({ success: false, message: 'Correo no registrado' }, { status: 404 });
   }
 
   return NextResponse.json({ success: true, accounts: globalServerAccountsStore });

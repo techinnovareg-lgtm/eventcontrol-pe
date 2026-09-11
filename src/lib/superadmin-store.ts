@@ -177,6 +177,8 @@ export async function authenticateAdminAccountAsync(emailInput: string, password
         saveAccountsToStorage(store);
         return serverAccount;
       }
+    } else if (res.status === 401 || res.status === 403 || res.status === 404) {
+      return null;
     }
   } catch (err) {
     console.warn('[Sync Accounts API Auth Warning]', err);
@@ -195,25 +197,7 @@ export async function authenticateAdminAccountAsync(emailInput: string, password
     if (isMatch) return matched;
   }
 
-  // Dynamic auto-provisioning fallback for local account if missing
-  const autoAccount: AdminAccount = {
-    id: `usr-admin-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
-    workspaceId: cleanedEmail.includes('appqsop') ? 'ws-weddingsco-appqsop' : 'ws-a-1111',
-    companyName: cleanedEmail.includes('appqsop') ? 'Weddings Co' : 'Mi Empresa de Eventos',
-    adminName: cleanedEmail.includes('appqsop') ? 'SOP Prueba' : 'Administrador Principal',
-    contactEmail: cleanedEmail,
-    planCode: 'BUSINESS',
-    contractStartDate: '2026-09-07T00:00:00.000Z',
-    contractEndDate: '2027-09-07T23:59:59.000Z',
-    status: 'ACTIVA',
-    mustChangePassword: false,
-    initialPassword: trimmedPass || 'EventControl2026!',
-    passwordHashMasked: '••••••••••••',
-    created_at: '2026-09-07T00:00:00.000Z',
-  };
-  accounts.unshift(autoAccount);
-  saveAccountsToStorage(accounts);
-  return autoAccount;
+  return null;
 }
 
 // Current active session state

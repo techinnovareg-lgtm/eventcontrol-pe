@@ -38,8 +38,18 @@ function saveMembersToFile() {
   try {
     const dir = path.dirname(MEMBERS_DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFileSync(MEMBERS_DB_FILE, JSON.stringify(globalServerMembersStore), 'utf-8');
-  } catch (e) {}
+    const tempFile = `${MEMBERS_DB_FILE}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 6)}`;
+    fs.writeFileSync(tempFile, JSON.stringify(globalServerMembersStore, null, 2), 'utf-8');
+    try {
+      if (fs.existsSync(MEMBERS_DB_FILE)) fs.unlinkSync(MEMBERS_DB_FILE);
+      fs.renameSync(tempFile, MEMBERS_DB_FILE);
+    } catch {
+      fs.copyFileSync(tempFile, MEMBERS_DB_FILE);
+      if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
+    }
+  } catch (e) {
+    console.error('[saveMembersToFile Error]', e);
+  }
 }
 
 loadMembersFromFile();
