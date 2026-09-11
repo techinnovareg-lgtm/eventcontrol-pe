@@ -273,21 +273,23 @@ export async function createTableAsync(eventId: string, workspaceId: string, nam
 }
 
 export function deleteTable(eventId: string, tableId: string): void {
-  let updatedTbls: Table[] | undefined;
   const store = loadTablesFromStorage();
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(t => t.id !== tableId);
     saveTablesToStorage(store);
-    updatedTbls = store[eventId];
   }
   const asgnStore = loadAssignmentsFromStorage();
-  let updatedAsgns: TableAssignment[] | undefined;
   if (asgnStore[eventId]) {
     asgnStore[eventId] = asgnStore[eventId].filter(a => a.table_id !== tableId);
     saveAssignmentsToStorage(asgnStore);
-    updatedAsgns = asgnStore[eventId];
   }
-  syncTablesToServerAsync(eventId, updatedTbls, updatedAsgns);
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'DELETE_TABLE', eventId, tableId }),
+    }).catch(() => {});
+  }
 }
 
 export async function deleteTableAsync(eventId: string, tableId: string): Promise<void> {
@@ -427,7 +429,13 @@ export function unassignGroupFromTable(eventId: string, groupId: string): void {
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
     saveAssignmentsToStorage(store);
-    syncTablesToServerAsync(eventId, undefined, store[eventId]);
+  }
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UNASSIGN_GROUP', eventId, groupId }),
+    }).catch(() => {});
   }
 }
 
@@ -591,7 +599,13 @@ export function deleteVenueElement(eventId: string, elementId: string): void {
   if (store[eventId]) {
     store[eventId] = store[eventId].filter(e => e.id !== elementId);
     saveVenueElementsToStorage(store);
-    syncVenueElementsToServerAsync(eventId);
+  }
+  if (typeof window !== 'undefined') {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'DELETE_VENUE_ELEMENT', eventId, elementId }),
+    }).catch(() => {});
   }
 }
 

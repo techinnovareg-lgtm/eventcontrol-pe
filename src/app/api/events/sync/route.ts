@@ -230,22 +230,58 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, deletedEventId: eventId });
     }
 
-    if (action === 'SYNC_TABLES' && eventId) {
-      if (Array.isArray(tables)) {
-        const existingTables = globalServerTablesStore[eventId] || [];
-        if (tables.length === 0 && existingTables.length > 0) {
-          // Preserve existing server tables if payload is empty
-        } else {
-          globalServerTablesStore[eventId] = tables;
-        }
+    if (action === 'DELETE_TABLE' && eventId && body.tableId) {
+      if (globalServerTablesStore[eventId]) {
+        globalServerTablesStore[eventId] = globalServerTablesStore[eventId].filter(t => t.id !== body.tableId);
       }
-      if (Array.isArray(assignments)) {
-        const existingAsgns = globalServerAssignmentsStore[eventId] || [];
-        if (assignments.length === 0 && existingAsgns.length > 0) {
-          // Preserve existing server assignments if payload is empty
-        } else {
-          globalServerAssignmentsStore[eventId] = assignments;
-        }
+      if (globalServerAssignmentsStore[eventId]) {
+        globalServerAssignmentsStore[eventId] = globalServerAssignmentsStore[eventId].filter(a => a.table_id !== body.tableId);
+      }
+      saveDbToFile();
+      return NextResponse.json({ success: true, tableId: body.tableId });
+    }
+
+    if (action === 'DELETE_VENUE_ELEMENT' && eventId && body.elementId) {
+      if (globalServerVenueElementsStore[eventId]) {
+        globalServerVenueElementsStore[eventId] = globalServerVenueElementsStore[eventId].filter(ve => ve.id !== body.elementId);
+      }
+      saveDbToFile();
+      return NextResponse.json({ success: true, elementId: body.elementId });
+    }
+
+    if (action === 'UNASSIGN_GROUP' && eventId && body.groupId) {
+      if (globalServerAssignmentsStore[eventId]) {
+        globalServerAssignmentsStore[eventId] = globalServerAssignmentsStore[eventId].filter(a => a.group_id !== body.groupId);
+      }
+      saveDbToFile();
+      return NextResponse.json({ success: true, groupId: body.groupId });
+    }
+
+    if (action === 'SYNC_TABLES' && eventId) {
+      if (Array.isArray(tables) && tables.length > 0) {
+        if (!globalServerTablesStore[eventId]) globalServerTablesStore[eventId] = [];
+        const currentTables = globalServerTablesStore[eventId];
+        tables.forEach((t: Table) => {
+          const idx = currentTables.findIndex(x => x.id === t.id);
+          if (idx !== -1) {
+            currentTables[idx] = { ...currentTables[idx], ...t };
+          } else {
+            currentTables.push(t);
+          }
+        });
+      }
+
+      if (Array.isArray(assignments) && assignments.length > 0) {
+        if (!globalServerAssignmentsStore[eventId]) globalServerAssignmentsStore[eventId] = [];
+        const currentAsgns = globalServerAssignmentsStore[eventId];
+        assignments.forEach((a: TableAssignment) => {
+          const idx = currentAsgns.findIndex(x => x.group_id === a.group_id);
+          if (idx !== -1) {
+            currentAsgns[idx] = { ...currentAsgns[idx], ...a };
+          } else {
+            currentAsgns.push(a);
+          }
+        });
       }
       saveDbToFile();
       return NextResponse.json({ success: true });
@@ -268,11 +304,17 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_VENUE_ELEMENTS' && eventId && Array.isArray(venueElements)) {
-      const existingVenueElems = globalServerVenueElementsStore[eventId] || [];
-      if (venueElements.length === 0 && existingVenueElems.length > 0) {
-        // Preserve existing server venue elements if payload is empty
-      } else {
-        globalServerVenueElementsStore[eventId] = venueElements;
+      if (venueElements.length > 0) {
+        if (!globalServerVenueElementsStore[eventId]) globalServerVenueElementsStore[eventId] = [];
+        const currentElems = globalServerVenueElementsStore[eventId];
+        venueElements.forEach((ve: VenueElement) => {
+          const idx = currentElems.findIndex(x => x.id === ve.id);
+          if (idx !== -1) {
+            currentElems[idx] = { ...currentElems[idx], ...ve };
+          } else {
+            currentElems.push(ve);
+          }
+        });
       }
       saveDbToFile();
       return NextResponse.json({ success: true });
