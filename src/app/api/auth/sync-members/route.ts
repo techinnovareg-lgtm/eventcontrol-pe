@@ -54,6 +54,25 @@ function saveMembersToFile() {
 
 loadMembersFromFile();
 
+function isCredentialsExpired(expiresAtIso?: string): boolean {
+  if (!expiresAtIso || !expiresAtIso.trim()) return false;
+  try {
+    const cleanStr = expiresAtIso.trim();
+    const datePart = cleanStr.split('T')[0];
+    const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+      const endOfDayLocal = new Date(year, month, day, 23, 59, 59, 999).getTime();
+      return Date.now() > endOfDayLocal;
+    }
+    const expTime = new Date(cleanStr).getTime();
+    if (!isNaN(expTime)) return Date.now() > expTime;
+  } catch (e) {}
+  return false;
+}
+
 export async function GET(req: Request) {
   loadMembersFromFile();
   const { searchParams } = new URL(req.url);
@@ -71,9 +90,8 @@ export async function GET(req: Request) {
       const isMatch = emailClean === cleanedInput || nameClean === cleanedInput;
       if (!isMatch || m.status !== 'ACTIVO') return false;
 
-      if (m.credentialsExpiresAt) {
-        const expiry = new Date(m.credentialsExpiresAt).getTime();
-        if (Date.now() > expiry) return false;
+      if (m.credentialsExpiresAt && isCredentialsExpired(m.credentialsExpiresAt)) {
+        return false;
       }
 
       const expectedPass = (m.initialPassword || 'puerta2026').trim();

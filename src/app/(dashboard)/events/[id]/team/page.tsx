@@ -84,7 +84,7 @@ export default function EventTeamPage() {
       email: newMemberEmail,
       password: pass,
       role: newMemberRole,
-      credentialsExpiresAt: newMemberExpiresAt ? `${newMemberExpiresAt}T23:59:59.000Z` : undefined,
+      credentialsExpiresAt: newMemberExpiresAt ? newMemberExpiresAt.trim() : undefined,
     });
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
@@ -112,7 +112,7 @@ export default function EventTeamPage() {
       initialPassword: editPassword,
       role: editRole,
       status: editStatus,
-      credentialsExpiresAt: editExpiresAt ? `${editExpiresAt}T23:59:59.000Z` : '',
+      credentialsExpiresAt: editExpiresAt ? editExpiresAt.trim() : '',
     });
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));

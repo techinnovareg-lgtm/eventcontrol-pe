@@ -219,6 +219,33 @@ export function deleteWorkspaceMember(memberId: string): boolean {
   return false;
 }
 
+export function isCredentialsExpired(expiresAtIso?: string): boolean {
+  if (!expiresAtIso || !expiresAtIso.trim()) return false;
+  
+  try {
+    const cleanStr = expiresAtIso.trim();
+    const datePart = cleanStr.split('T')[0];
+    const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+
+    if (match) {
+      const year = parseInt(match[1], 10);
+      const month = parseInt(match[2], 10) - 1;
+      const day = parseInt(match[3], 10);
+
+      // Expiration is at the END OF THE SPECIFIED DAY in LOCAL timezone (23:59:59.999)
+      const endOfDayLocal = new Date(year, month, day, 23, 59, 59, 999).getTime();
+      return Date.now() > endOfDayLocal;
+    }
+
+    const expTime = new Date(cleanStr).getTime();
+    if (!isNaN(expTime)) {
+      return Date.now() > expTime;
+    }
+  } catch (e) {}
+
+  return false;
+}
+
 export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: string): WorkspaceMemberUser | undefined {
   const store = getStore();
   const cleanedInput = emailOrUser.trim().toLowerCase();
@@ -233,10 +260,9 @@ export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: 
     if (!isMatch) return false;
     if (m.status !== 'ACTIVO') return false;
 
-    // Enforce credentials expiration
-    if (m.credentialsExpiresAt) {
-      const expiry = new Date(m.credentialsExpiresAt).getTime();
-      if (Date.now() > expiry) return false;
+    // Enforce credentials expiration (until 23:59:59 of expiration date in local time)
+    if (m.credentialsExpiresAt && isCredentialsExpired(m.credentialsExpiresAt)) {
+      return false;
     }
 
     const expectedPass = (m.initialPassword || 'puerta2026').trim();
@@ -273,10 +299,9 @@ export async function authenticateWorkspaceMemberAsync(emailOrUser: string, pass
         // Check active status
         if (serverMember.status !== 'ACTIVO') return undefined;
 
-        // Check credentials expiration
-        if (serverMember.credentialsExpiresAt) {
-          const expiry = new Date(serverMember.credentialsExpiresAt).getTime();
-          if (Date.now() > expiry) return undefined;
+        // Check credentials expiration (until 23:59:59 of expiration date in local time)
+        if (serverMember.credentialsExpiresAt && isCredentialsExpired(serverMember.credentialsExpiresAt)) {
+          return undefined;
         }
 
         // Verify password strictly against the latest initialPassword from central server

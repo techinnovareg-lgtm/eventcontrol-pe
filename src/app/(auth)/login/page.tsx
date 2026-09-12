@@ -11,7 +11,7 @@ import {
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts,
   verifySuperAdminPassword, authenticateAdminAccountAsync 
 } from '@/lib/superadmin-store';
-import { authenticateWorkspaceMemberAsync, findMemberByEmail } from '@/lib/workspace-users';
+import { authenticateWorkspaceMemberAsync, findMemberByEmail, isCredentialsExpired } from '@/lib/workspace-users';
 import { getWorkspaceEvents, getWorkspaceEventsAsync } from '@/lib/events';
 
 export default function LoginPage() {
@@ -172,7 +172,7 @@ export default function LoginPage() {
         setLoading(false);
         return;
       }
-      if (existingMember.credentialsExpiresAt && new Date().getTime() > new Date(existingMember.credentialsExpiresAt).getTime()) {
+      if (existingMember.credentialsExpiresAt && isCredentialsExpired(existingMember.credentialsExpiresAt)) {
         const expFormatted = new Date(existingMember.credentialsExpiresAt).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
         setErrorMsg(`✕ CREDENCIALES VENCIDAS: Sus credenciales expiraron el ${expFormatted}. Contacte al usuario principal para renovar su acceso.`);
         setLoading(false);

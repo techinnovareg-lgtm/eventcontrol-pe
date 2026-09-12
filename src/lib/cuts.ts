@@ -63,18 +63,54 @@ export function getEventCuts(eventId: string): Cut[] {
 }
 
 export async function getEventCutsAsync(eventId: string): Promise<Cut[]> {
+  const localStore = loadCutsFromStorage();
+  const localCuts = localStore[eventId] || [];
+
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.cuts)) {
-        const store = loadCutsFromStorage();
-        store[eventId] = data.cuts;
-        saveCutsToStorage(store);
-        return data.cuts;
+        // Anti-Wipe Guard: If server returns empty cuts but local store has cuts, preserve local cuts and re-sync
+        if (data.cuts.length === 0 && localCuts.length > 0) {
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_CUTS', eventId, cuts: localCuts }),
+          }).catch(() => {});
+          return localCuts;
+        }
+
+        // Union Merge: Combine server cuts and local cuts by ID
+        let requiresResync = false;
+        const merged: Cut[] = [...data.cuts];
+        localCuts.forEach(lc => {
+          if (!merged.some(mc => mc.id === lc.id)) {
+            merged.push(lc);
+            requiresResync = true;
+          }
+        });
+
+        merged.sort((a, b) => new Date(b.cut_timestamp || b.created_at || 0).getTime() - new Date(a.cut_timestamp || a.created_at || 0).getTime());
+
+        localStore[eventId] = merged;
+        saveCutsToStorage(localStore);
+
+        if (requiresResync && merged.length > 0) {
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_CUTS', eventId, cuts: merged }),
+          }).catch(() => {});
+        }
+
+        return merged;
       }
     }
-  } catch (err) {}
+  } catch (err) {
+    console.warn('[Sync Cuts API Online Fetch Warning - Switching to Offline Cache]', err);
+  }
+
   return getEventCuts(eventId);
 }
 

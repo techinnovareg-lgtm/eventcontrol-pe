@@ -343,9 +343,17 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_CUTS' && eventId && Array.isArray(cuts)) {
-      globalServerCutsStore[eventId] = cuts;
+      const existingCuts = globalServerCutsStore[eventId] || [];
+      const mergedCuts = [...cuts];
+      existingCuts.forEach((exC: Cut) => {
+        if (!mergedCuts.some(c => c.id === exC.id)) {
+          mergedCuts.push(exC);
+        }
+      });
+      mergedCuts.sort((a, b) => new Date(b.cut_timestamp || b.created_at || 0).getTime() - new Date(a.cut_timestamp || a.created_at || 0).getTime());
+      globalServerCutsStore[eventId] = mergedCuts;
       saveDbToFile();
-      return NextResponse.json({ success: true, count: cuts.length });
+      return NextResponse.json({ success: true, count: mergedCuts.length });
     }
 
     if (action === 'SYNC_CHECKINS' && eventId && checkIn) {
