@@ -13,7 +13,7 @@ import { getEventById, updateEvent, updateEventAsync } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { 
   getEventMembers, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
-  WorkspaceMemberUser, WorkspaceUserRole 
+  WorkspaceMemberUser, WorkspaceUserRole, isCredentialsExpired, formatExpirationDate
 } from '@/lib/workspace-users';
 
 export default function EventTeamPage() {
@@ -319,9 +319,8 @@ export default function EventTeamPage() {
                         {(() => {
                           const expStr = m.credentialsExpiresAt || contractInfo?.contractEndDate;
                           if (!expStr) return <span className="text-slate-400 font-mono text-[10px]">Sin límite</span>;
-                          const expDate = new Date(expStr);
-                          const isExpired = Date.now() > expDate.getTime();
-                          const formatted = expDate.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+                          const isExpired = isCredentialsExpired(expStr);
+                          const formatted = formatExpirationDate(expStr);
                           return (
                             <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] border inline-block ${
                               isExpired 

@@ -219,6 +219,25 @@ export function deleteWorkspaceMember(memberId: string): boolean {
   return false;
 }
 
+export function formatExpirationDate(dateStr?: string): string {
+  if (!dateStr || !dateStr.trim()) return '';
+  const clean = dateStr.trim();
+  const datePart = clean.split('T')[0];
+  const match = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (match) {
+    const year = match[1];
+    const month = match[2];
+    const day = match[3];
+    return `${day}/${month}/${year}`;
+  }
+
+  try {
+    return new Date(clean).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  } catch (e) {
+    return clean;
+  }
+}
+
 export function isCredentialsExpired(expiresAtIso?: string): boolean {
   if (!expiresAtIso || !expiresAtIso.trim()) return false;
   
