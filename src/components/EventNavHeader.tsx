@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { 
@@ -19,6 +20,18 @@ export default function EventNavHeader({
   eventId = '',
   eventName = 'Evento Activo',
 }: EventNavHeaderProps) {
+
+  const activeTabRef = useRef<HTMLAnchorElement | null>(null);
+
+  useEffect(() => {
+    if (activeTabRef.current) {
+      activeTabRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      });
+    }
+  }, [currentTab]);
 
   const safeEventId = (eventId && eventId.trim() !== '' && eventId !== 'undefined' && eventId !== 'null') ? eventId : '';
 
@@ -153,6 +166,7 @@ export default function EventNavHeader({
             return (
               <Link
                 key={tab.id}
+                ref={isActive ? activeTabRef : null}
                 href={tab.href}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 whitespace-nowrap ${
                   isActive

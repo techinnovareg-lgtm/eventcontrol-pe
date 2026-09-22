@@ -24,7 +24,8 @@ function loadCutsFromStorage(): Record<string, Cut[]> {
   } catch (err) {
     console.warn('[CutsStore] Failed to load cuts from storage', err);
   }
-  return {};
+  cutsMemoryStore = {};
+  return cutsMemoryStore;
 }
 
 function saveCutsToStorage(data: Record<string, Cut[]>) {

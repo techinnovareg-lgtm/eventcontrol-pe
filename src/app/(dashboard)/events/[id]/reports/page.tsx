@@ -117,9 +117,9 @@ export default function EventReportsPage() {
         </div>
 
         {/* EXECUTIVE REPORT PRINT CONTAINER */}
-        <div className="print-area bg-white rounded-2xl p-8 border border-slate-200 shadow-lg space-y-8">
+        <div className="print-area bg-white rounded-2xl p-4 sm:p-8 border border-slate-200 shadow-lg space-y-8 overflow-hidden max-w-full">
           {/* Document Cover Header */}
-          <div className="flex items-start justify-between border-b-2 border-slate-900 pb-6">
+          <div className="flex flex-col sm:flex-row sm:items-start justify-between border-b-2 border-slate-900 pb-6 gap-4">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center font-bold text-white text-lg">
@@ -127,13 +127,13 @@ export default function EventReportsPage() {
                 </div>
                 <span className="text-xl font-bold tracking-tight text-slate-900">EventControl<span className="text-brand-600">.pe</span></span>
               </div>
-              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">{event?.name || 'Boda / Evento Social'}</h1>
-              <p className="text-sm text-slate-600 mt-1">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">{event?.name || 'Boda / Evento Social'}</h1>
+              <p className="text-xs sm:text-sm text-slate-600 mt-1">
                 {event?.event_type} • {event?.event_date} {event?.event_time && `(${event.event_time} hs)`} • {event?.venue_name}
               </p>
             </div>
 
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest block">REPORTE EJECUTIVO DE EVENTO</span>
               <strong className="text-sm font-bold text-slate-800">AMG Wedding Planners</strong>
               <span className="text-xs text-slate-500 block">Emitido: {new Date().toLocaleDateString()}</span>
@@ -186,7 +186,7 @@ export default function EventReportsPage() {
                 <Utensils className="w-4 h-4 text-amber-600" /> 2. Control de Catering y Platos Requeridos
               </h2>
 
-              <div className="p-5 bg-amber-50/50 rounded-2xl border border-amber-200 flex items-center justify-between">
+              <div className="p-4 sm:p-5 bg-amber-50/50 rounded-2xl border border-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
                   <h3 className="text-base font-bold text-amber-900">{cateringDiff.foodCutName}</h3>
                   <p className="text-xs text-amber-800">
@@ -194,7 +194,7 @@ export default function EventReportsPage() {
                   </p>
                 </div>
 
-                <div className="flex gap-6 text-center">
+                <div className="flex gap-6 text-center self-stretch sm:self-auto justify-around">
                   <div>
                     <span className="text-xs text-amber-800 font-semibold block uppercase">Platos Requeridos al Corte</span>
                     <strong className="text-2xl font-black text-amber-600">{cateringDiff.platesRequiredAtCut}</strong>
@@ -214,28 +214,30 @@ export default function EventReportsPage() {
               <Grid className="w-4 h-4 text-purple-600" /> 3. Distribución y Asistencia por Mesas
             </h2>
 
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4">Mesa</th>
-                  <th className="py-2.5 px-4">Capacidad</th>
-                  <th className="py-2.5 px-4">Pases Asignados</th>
-                  <th className="py-2.5 px-4">Presentes en Mesa</th>
-                  <th className="py-2.5 px-4">% Ocupación</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {tablesStats.map((t) => (
-                  <tr key={t.tableId}>
-                    <td className="py-2.5 px-4 font-bold text-slate-900">{t.tableName}</td>
-                    <td className="py-2.5 px-4 text-slate-600">{t.capacity}</td>
-                    <td className="py-2.5 px-4 font-semibold text-purple-700">{t.assignedPasses}</td>
-                    <td className="py-2.5 px-4 font-bold text-emerald-700">{t.presentPasses}</td>
-                    <td className="py-2.5 px-4 font-bold text-slate-800">{t.occupancyPercentage}%</td>
+            <div className="overflow-x-auto w-full border border-slate-200 rounded-xl shadow-2xs">
+              <table className="w-full text-left border-collapse text-xs min-w-[500px]">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
+                    <th className="py-2.5 px-4">Mesa</th>
+                    <th className="py-2.5 px-4">Capacidad</th>
+                    <th className="py-2.5 px-4">Pases Asignados</th>
+                    <th className="py-2.5 px-4">Presentes en Mesa</th>
+                    <th className="py-2.5 px-4">% Ocupación</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {tablesStats.map((t) => (
+                    <tr key={t.tableId}>
+                      <td className="py-2.5 px-4 font-bold text-slate-900">{t.tableName}</td>
+                      <td className="py-2.5 px-4 text-slate-600">{t.capacity}</td>
+                      <td className="py-2.5 px-4 font-semibold text-purple-700">{t.assignedPasses}</td>
+                      <td className="py-2.5 px-4 font-bold text-emerald-700">{t.presentPasses}</td>
+                      <td className="py-2.5 px-4 font-bold text-slate-800">{t.occupancyPercentage}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Section 4: Guest Groups List */}
@@ -244,38 +246,40 @@ export default function EventReportsPage() {
               <Users className="w-4 h-4 text-brand-600" /> 4. Detalle de Grupos de Invitados ({groups.length})
             </h2>
 
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
-                  <th className="py-2.5 px-4">#</th>
-                  <th className="py-2.5 px-4">Grupo / Responsable</th>
-                  <th className="py-2.5 px-4">Invitados Permitidos (Máx)</th>
-                  <th className="py-2.5 px-4">Ingresados</th>
-                  <th className="py-2.5 px-4">Pendientes</th>
-                  <th className="py-2.5 px-4">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200">
-                {groups.map((g, idx) => (
-                  <tr key={g.id}>
-                    <td className="py-2 px-4 text-slate-400 font-mono">{idx + 1}</td>
-                    <td className="py-2 px-4 font-semibold text-slate-900">{g.group_name}</td>
-                    <td className="py-2 px-4 font-bold text-slate-700">{g.max_passes}</td>
-                    <td className="py-2 px-4 font-bold text-emerald-600">{g.checked_in_count || 0}</td>
-                    <td className="py-2 px-4 text-amber-700 font-semibold">{Math.max(0, g.max_passes - (g.checked_in_count || 0))}</td>
-                    <td className="py-2 px-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        g.status === 'COMPLETO' ? 'bg-emerald-100 text-emerald-800' :
-                        g.status === 'PARCIAL' ? 'bg-amber-100 text-amber-800' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>
-                        {g.status}
-                      </span>
-                    </td>
+            <div className="overflow-x-auto w-full border border-slate-200 rounded-xl shadow-2xs">
+              <table className="w-full text-left border-collapse text-xs min-w-[600px]">
+                <thead>
+                  <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
+                    <th className="py-2.5 px-4">#</th>
+                    <th className="py-2.5 px-4">Grupo / Responsable</th>
+                    <th className="py-2.5 px-4">Invitados Permitidos (Máx)</th>
+                    <th className="py-2.5 px-4">Ingresados</th>
+                    <th className="py-2.5 px-4">Pendientes</th>
+                    <th className="py-2.5 px-4">Estado</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {groups.map((g, idx) => (
+                    <tr key={g.id}>
+                      <td className="py-2 px-4 text-slate-400 font-mono">{idx + 1}</td>
+                      <td className="py-2 px-4 font-semibold text-slate-900">{g.group_name}</td>
+                      <td className="py-2 px-4 font-bold text-slate-700">{g.max_passes}</td>
+                      <td className="py-2 px-4 font-bold text-emerald-600">{g.checked_in_count || 0}</td>
+                      <td className="py-2 px-4 text-amber-700 font-semibold">{Math.max(0, g.max_passes - (g.checked_in_count || 0))}</td>
+                      <td className="py-2 px-4">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          g.status === 'COMPLETO' ? 'bg-emerald-100 text-emerald-800' :
+                          g.status === 'PARCIAL' ? 'bg-amber-100 text-amber-800' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>
+                          {g.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
 
           {/* Document Sign-off Footer */}

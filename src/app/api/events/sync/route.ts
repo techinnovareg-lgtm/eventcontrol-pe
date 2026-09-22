@@ -1,8 +1,16 @@
 import { NextResponse } from 'next/server';
 import { Event, GuestGroup, Table, TableAssignment, Cut, CheckIn } from '@/lib/supabase/types';
 import { VenueElement } from '@/lib/tables';
+import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
+
+function getSupabaseServerClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  return createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
+}
 
 // Global central server-side memory stores for cross-device synchronization (PC <-> Mobile Phone)
 let globalServerEventsStore: Event[] = [];
@@ -176,9 +184,30 @@ export async function GET(req: Request) {
     const groups = globalServerGroupsStore[eventId] || [];
     const tables = globalServerTablesStore[eventId] || [];
     const assignments = globalServerAssignmentsStore[eventId] || [];
-    const cuts = globalServerCutsStore[eventId] || [];
+    const localCuts = globalServerCutsStore[eventId] || [];
     const checkIns = globalServerCheckInsStore[eventId] || [];
     const venueElements = globalServerVenueElementsStore[eventId] || [];
+
+    // Fetch cuts from Supabase if available and merge
+    let supabaseCuts: Cut[] = [];
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('cuts').select('*').eq('event_id', eventId);
+        if (!error && Array.isArray(data)) {
+          supabaseCuts = data as Cut[];
+        }
+      } catch (err) {
+        console.warn('[Sync Route] Supabase cuts fetch warning', err);
+      }
+    }
+
+    const mergedCutsMap = new Map<string, Cut>();
+    supabaseCuts.forEach(c => mergedCutsMap.set(c.id, c));
+    localCuts.forEach(c => mergedCutsMap.set(c.id, c));
+    const cuts = Array.from(mergedCutsMap.values());
+    cuts.sort((a, b) => new Date(b.cut_timestamp || b.created_at || 0).getTime() - new Date(a.cut_timestamp || a.created_at || 0).getTime());
+    globalServerCutsStore[eventId] = cuts;
 
     return NextResponse.json({
       success: true,
@@ -353,6 +382,17 @@ export async function POST(req: Request) {
       mergedCuts.sort((a, b) => new Date(b.cut_timestamp || b.created_at || 0).getTime() - new Date(a.cut_timestamp || a.created_at || 0).getTime());
       globalServerCutsStore[eventId] = mergedCuts;
       saveDbToFile();
+
+      // Async upsert to Supabase cuts table
+      const supabase = getSupabaseServerClient();
+      if (supabase && mergedCuts.length > 0) {
+        try {
+          await supabase.from('cuts').upsert(mergedCuts, { onConflict: 'id' });
+        } catch (err) {
+          console.warn('[Sync Route] Supabase cuts upsert warning', err);
+        }
+      }
+
       return NextResponse.json({ success: true, count: mergedCuts.length });
     }
 
