@@ -9,10 +9,11 @@ import {
   Pencil, Trash2
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById, updateEvent, updateEventAsync } from '@/lib/events';
+import { getEventById, getEventByIdAsync, updateEvent, updateEventAsync } from '@/lib/events';
+import { checkInRealtimeChannel } from '@/lib/realtime';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { 
-  getEventMembers, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
+  getEventMembers, getEventMembersAsync, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
   WorkspaceMemberUser, WorkspaceUserRole, isCredentialsExpired, formatExpirationDate
 } from '@/lib/workspace-users';
 
@@ -23,23 +24,41 @@ export default function EventTeamPage() {
   const contractInfo = getAccountForSession();
   const currentWorkspaceId = session?.user?.workspaceId || contractInfo.workspaceId || 'ws-a-1111';
 
-  const event = getEventById(eventId, currentWorkspaceId);
+  const [event, setEvent] = useState(() => getEventById(eventId, currentWorkspaceId));
 
   // Dynamic Team Members State for this Event
-  const [teamMembers, setTeamMembers] = useState<WorkspaceMemberUser[]>([]);
+  const [teamMembers, setTeamMembers] = useState<WorkspaceMemberUser[]>(() => getEventMembers(eventId, currentWorkspaceId));
 
   // Contingency PIN State for Door Security Policy
   const [contingencyPin, setContingencyPin] = useState<string>(event?.contingency_pin || '1234');
   const [allowFreeManual, setAllowFreeManual] = useState<boolean>(!!event?.allow_free_manual_checkin);
   const [pinSavedSuccess, setPinSavedSuccess] = useState<string | null>(null);
 
-  useEffect(() => {
-    setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
-    if (event) {
-      setContingencyPin(event.contingency_pin || '1234');
-      setAllowFreeManual(!!event.allow_free_manual_checkin);
+  const refreshMembers = async () => {
+    const freshEvt = await getEventByIdAsync(eventId, currentWorkspaceId);
+    if (freshEvt) {
+      setEvent(freshEvt);
+      setContingencyPin(freshEvt.contingency_pin || '1234');
+      setAllowFreeManual(!!freshEvt.allow_free_manual_checkin);
     }
-  }, [eventId, currentWorkspaceId, event]);
+    const members = await getEventMembersAsync(eventId, currentWorkspaceId);
+    setTeamMembers(members);
+  };
+
+  useEffect(() => {
+    refreshMembers();
+
+    const unsub = checkInRealtimeChannel.subscribe(() => {
+      refreshMembers();
+    });
+
+    const interval = setInterval(refreshMembers, 3000);
+
+    return () => {
+      clearInterval(interval);
+      if (typeof unsub === 'function') unsub();
+    };
+  }, [eventId, currentWorkspaceId]);
 
   const handleSaveContingencyPin = async (e: React.FormEvent) => {
     e.preventDefault();

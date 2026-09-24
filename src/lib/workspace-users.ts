@@ -51,7 +51,7 @@ function saveMembersToStorage(members: WorkspaceMemberUser[]) {
   }
 }
 
-function autoSyncMembersToServer() {
+export function autoSyncMembersToServer() {
   if (typeof window === 'undefined') return;
   try {
     const members = membersMemoryStore || loadMembersFromStorage();
@@ -78,12 +78,66 @@ export function getWorkspaceMembers(workspaceId: string): WorkspaceMemberUser[] 
   return store.filter(m => m.workspaceId === workspaceId);
 }
 
+export async function getWorkspaceMembersAsync(workspaceId: string): Promise<WorkspaceMemberUser[]> {
+  const localStore = getStore();
+  const localWorkspaceMembers = localStore.filter(m => m.workspaceId === workspaceId);
+
+  try {
+    const res = await fetch('/api/auth/sync-members');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.members)) {
+        let requiresResync = false;
+        const serverMembers: WorkspaceMemberUser[] = data.members;
+        const mergedMap = new Map<string, WorkspaceMemberUser>();
+
+        serverMembers.forEach(sm => {
+          if (!workspaceId || sm.workspaceId === workspaceId) {
+            mergedMap.set(sm.id, sm);
+          }
+        });
+
+        localWorkspaceMembers.forEach(lm => {
+          if (!mergedMap.has(lm.id)) {
+            mergedMap.set(lm.id, lm);
+            requiresResync = true;
+          }
+        });
+
+        const mergedList = Array.from(mergedMap.values());
+        const otherMembers = localStore.filter(m => m.workspaceId !== workspaceId);
+        const finalStore = [...otherMembers, ...mergedList];
+
+        saveMembersToStorage(finalStore);
+
+        if (requiresResync && mergedList.length > 0) {
+          autoSyncMembersToServer();
+        }
+
+        return mergedList;
+      }
+    }
+  } catch (err) {
+    console.warn('[SyncMembers API Online Query Warning - Falling back to local cache]', err);
+  }
+
+  return getWorkspaceMembers(workspaceId);
+}
+
 export function getEventMembers(eventId: string, workspaceId?: string): WorkspaceMemberUser[] {
   const store = getStore();
   if (workspaceId) {
     return store.filter(m => m.eventId === eventId || (m.workspaceId === workspaceId && !m.eventId));
   }
   return store.filter(m => m.eventId === eventId);
+}
+
+export async function getEventMembersAsync(eventId: string, workspaceId?: string): Promise<WorkspaceMemberUser[]> {
+  const allMembers = await getWorkspaceMembersAsync(workspaceId || '');
+  if (workspaceId) {
+    return allMembers.filter(m => m.eventId === eventId || (m.workspaceId === workspaceId && !m.eventId));
+  }
+  return allMembers.filter(m => m.eventId === eventId);
 }
 
 export function createWorkspaceMember(data: {
