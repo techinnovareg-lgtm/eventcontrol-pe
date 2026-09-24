@@ -223,11 +223,48 @@ export async function GET(req: Request) {
   }
 
   if (workspaceId) {
-    const events = globalServerEventsStore.filter(e => e.workspace_id === workspaceId && !globalServerDeletedEventsStore.includes(e.id));
-    const sorted = [...events].sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
+    let supabaseEvents: Event[] = [];
+    const supabase = getSupabaseServerClient();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.from('events').select('*').eq('workspace_id', workspaceId);
+        if (!error && Array.isArray(data)) {
+          supabaseEvents = data as Event[];
+        }
+      } catch (err) {
+        console.warn('[Sync Route] Supabase events fetch warning', err);
+      }
+    }
+
+    const localEvents = globalServerEventsStore.filter(e => e.workspace_id === workspaceId && !globalServerDeletedEventsStore.includes(e.id));
+    const mergedEventsMap = new Map<string, Event>();
+    supabaseEvents.forEach(e => {
+      if (!globalServerDeletedEventsStore.includes(e.id)) {
+        mergedEventsMap.set(e.id, e);
+      }
+    });
+    localEvents.forEach(e => {
+      if (!globalServerDeletedEventsStore.includes(e.id)) {
+        mergedEventsMap.set(e.id, e);
+      }
+    });
+
+    const events = Array.from(mergedEventsMap.values());
+    events.sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
+
+    // Update global server store with merged events
+    events.forEach(evt => {
+      const idx = globalServerEventsStore.findIndex(x => x.id === evt.id);
+      if (idx !== -1) {
+        globalServerEventsStore[idx] = { ...globalServerEventsStore[idx], ...evt };
+      } else {
+        globalServerEventsStore.unshift(evt);
+      }
+    });
+
     return NextResponse.json({
       success: true,
-      events: sorted,
+      events,
       deletedEventIds: globalServerDeletedEventsStore,
     });
   }

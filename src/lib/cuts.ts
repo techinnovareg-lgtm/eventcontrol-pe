@@ -39,7 +39,7 @@ function saveCutsToStorage(data: Record<string, Cut[]>) {
   }
 }
 
-function autoSyncCutsToServer(eventId?: string) {
+export function autoSyncCutsToServer(eventId?: string) {
   if (typeof window === 'undefined') return;
   try {
     const store = loadCutsFromStorage();

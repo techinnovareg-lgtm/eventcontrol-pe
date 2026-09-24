@@ -347,13 +347,23 @@ export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.tables)) {
-        if (data.tables.length === 0 && localTables.length > 0) {
-          syncTablesToServerAsync(eventId, localTables);
-          return localTables;
-        }
-        store[eventId] = data.tables;
+        let requiresResync = false;
+        const merged: Table[] = [...data.tables];
+        localTables.forEach(lt => {
+          if (!merged.some(mt => mt.id === lt.id)) {
+            merged.push(lt);
+            requiresResync = true;
+          }
+        });
+
+        store[eventId] = merged;
         saveTablesToStorage(store);
-        return data.tables;
+
+        if (requiresResync && merged.length > 0) {
+          syncTablesToServerAsync(eventId, merged);
+        }
+
+        return merged;
       }
     }
   } catch (err) {}
@@ -374,13 +384,23 @@ export async function getEventTableAssignmentsAsync(eventId: string): Promise<Ta
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.assignments)) {
-        if (data.assignments.length === 0 && localAssignments.length > 0) {
-          syncTablesToServerAsync(eventId, undefined, localAssignments);
-          return localAssignments;
-        }
-        store[eventId] = data.assignments;
+        let requiresResync = false;
+        const merged: TableAssignment[] = [...data.assignments];
+        localAssignments.forEach(la => {
+          if (!merged.some(ma => ma.id === la.id)) {
+            merged.push(la);
+            requiresResync = true;
+          }
+        });
+
+        store[eventId] = merged;
         saveAssignmentsToStorage(store);
-        return data.assignments;
+
+        if (requiresResync && merged.length > 0) {
+          syncTablesToServerAsync(eventId, undefined, merged);
+        }
+
+        return merged;
       }
     }
   } catch (err) {}
@@ -487,13 +507,23 @@ export async function getEventVenueElementsAsync(eventId: string): Promise<Venue
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.venueElements)) {
-        if (data.venueElements.length === 0 && localElements.length > 0) {
-          syncVenueElementsToServerAsync(eventId, localElements);
-          return localElements;
-        }
-        store[eventId] = data.venueElements;
+        let requiresResync = false;
+        const merged: VenueElement[] = [...data.venueElements];
+        localElements.forEach(le => {
+          if (!merged.some(me => me.id === le.id)) {
+            merged.push(le);
+            requiresResync = true;
+          }
+        });
+
+        store[eventId] = merged;
         saveVenueElementsToStorage(store);
-        return data.venueElements;
+
+        if (requiresResync && merged.length > 0) {
+          syncVenueElementsToServerAsync(eventId, merged);
+        }
+
+        return merged;
       }
     }
   } catch (err) {}

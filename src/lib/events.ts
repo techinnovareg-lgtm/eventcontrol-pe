@@ -1,7 +1,7 @@
 import { Event, EventStatus, GuestGroup } from '@/lib/supabase/types';
 import { checkInRealtimeChannel } from '@/lib/realtime';
-import { deleteEventTables, deleteEventAssignments, deleteEventVenueElements } from '@/lib/tables';
-import { deleteEventCuts } from '@/lib/cuts';
+import { deleteEventTables, deleteEventAssignments, deleteEventVenueElements, autoSyncTablesToServer } from '@/lib/tables';
+import { deleteEventCuts, getEventCutsAsync } from '@/lib/cuts';
 import { deleteEventQRTokens } from '@/lib/qr-engine';
 
 const EVENTS_STORAGE_KEY = 'eventcontrol_events';
@@ -181,6 +181,16 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
         saveEventsToStorage(finalMerged);
 
+        // Trigger deep background auto-sync for all local events in this workspace (tables, venue elements, cuts)
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            mergedWorkspaceEvents.forEach(evt => {
+              autoSyncTablesToServer(evt.id);
+              getEventCutsAsync(evt.id).catch(() => {});
+            });
+          }, 150);
+        }
+
         return mergedWorkspaceEvents;
       }
     }
@@ -231,6 +241,14 @@ export async function getEventByIdAsync(eventId: string, workspaceId?: string): 
           });
           gStore[eventId] = merged;
           saveGroupsToStorage(gStore);
+        }
+
+        // Trigger deep background auto-sync for tables, venue elements, and cuts
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            autoSyncTablesToServer(eventId);
+            getEventCutsAsync(eventId).catch(() => {});
+          }, 150);
         }
 
         return data.event;
