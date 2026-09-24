@@ -53,44 +53,84 @@ export default function QRManagementPage() {
     }
   };
 
-  const handleToggleCompanionApproval = async (groupId: string, companionId: string, isApproved: boolean) => {
+  const [activeEditId, setActiveEditId] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState<string>('');
+
+  const handleToggleCompanionApproval = (groupId: string, companionId: string, isApproved: boolean) => {
+    // 1. Optimistic React State Update (Instant 0ms latency)
+    setGroups(prevGroups => {
+      return prevGroups.map(g => {
+        if (g.id !== groupId) return g;
+        const companions = (g.companions || []).map(c => {
+          if (c.id === companionId) return { ...c, isApproved };
+          return c;
+        });
+        return { ...g, companions };
+      });
+    });
+
+    // 2. Background async save & sync
     const targetGroup = groups.find(g => g.id === groupId);
     if (!targetGroup) return;
-
-    const companions = targetGroup.companions ? [...targetGroup.companions] : [];
-    const compIdx = companions.findIndex(c => c.id === companionId);
-    if (compIdx !== -1) {
-      companions[compIdx] = { ...companions[compIdx], isApproved };
-      await updateGuestGroupCompanionsAsync(eventId, groupId, companions);
-      const updatedGrps = await getEventGuestGroupsAsync(eventId);
-      setGroups(updatedGrps);
-    }
+    const updatedCompanions = (targetGroup.companions || []).map(c => c.id === companionId ? { ...c, isApproved } : c);
+    updateGuestGroupCompanionsAsync(eventId, groupId, updatedCompanions).catch(err => console.warn('[Async companion update warning]', err));
   };
 
-  const handleVerifyUnnamedCompanion = async (groupId: string, companionId: string) => {
+  const handleSaveCompanionName = (groupId: string, companionId: string) => {
+    const trimmed = editNameValue.trim();
+    if (!trimmed) {
+      alert('Por favor ingrese un nombre válido.');
+      return;
+    }
+
+    // Optimistic React State Update (Instant 0ms latency)
+    setGroups(prevGroups => {
+      return prevGroups.map(g => {
+        if (g.id !== groupId) return g;
+        const companions = (g.companions || []).map(c => {
+          if (c.id === companionId) {
+            return { ...c, name: trimmed, isNamed: true, isApproved: true };
+          }
+          return c;
+        });
+        return { ...g, companions };
+      });
+    });
+
+    setActiveEditId(null);
+
+    const targetGroup = groups.find(g => g.id === groupId);
+    if (!targetGroup) return;
+    const updatedCompanions = (targetGroup.companions || []).map(c => c.id === companionId ? { ...c, name: trimmed, isNamed: true, isApproved: true } : c);
+    updateGuestGroupCompanionsAsync(eventId, groupId, updatedCompanions).catch(err => console.warn('[Async companion update warning]', err));
+  };
+
+  const handleVerifyUnnamedCompanion = (groupId: string, companionId: string) => {
     const nameInput = (editingCompanionName[companionId] || '').trim();
     if (!nameInput) {
       alert('Por favor ingrese el nombre completo del acompañante para verificarlo y autorizar su acceso.');
       return;
     }
 
+    setGroups(prevGroups => {
+      return prevGroups.map(g => {
+        if (g.id !== groupId) return g;
+        const companions = (g.companions || []).map(c => {
+          if (c.id === companionId) {
+            return { ...c, name: nameInput, isNamed: true, isApproved: true };
+          }
+          return c;
+        });
+        return { ...g, companions };
+      });
+    });
+
+    setEditingCompanionName(prev => ({ ...prev, [companionId]: '' }));
+
     const targetGroup = groups.find(g => g.id === groupId);
     if (!targetGroup) return;
-
-    const companions = targetGroup.companions ? [...targetGroup.companions] : [];
-    const compIdx = companions.findIndex(c => c.id === companionId);
-    if (compIdx !== -1) {
-      companions[compIdx] = {
-        ...companions[compIdx],
-        name: nameInput,
-        isNamed: true,
-        isApproved: true,
-      };
-      await updateGuestGroupCompanionsAsync(eventId, groupId, companions);
-      const updatedGrps = await getEventGuestGroupsAsync(eventId);
-      setGroups(updatedGrps);
-      setEditingCompanionName(prev => ({ ...prev, [companionId]: '' }));
-    }
+    const updatedCompanions = (targetGroup.companions || []).map(c => c.id === companionId ? { ...c, name: nameInput, isNamed: true, isApproved: true } : c);
+    updateGuestGroupCompanionsAsync(eventId, groupId, updatedCompanions).catch(err => console.warn('[Async companion verify warning]', err));
   };
 
   return (
@@ -199,61 +239,101 @@ export default function QRManagementPage() {
                       </div>
 
                       <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {companionsList.map((comp, idx) => (
-                          <div key={comp.id || idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
-                            {/* Protocol 1: Named Companion */}
-                            {comp.isNamed ? (
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 overflow-hidden">
-                                  <label className="flex items-center gap-2 cursor-pointer">
+                        {companionsList.map((comp, idx) => {
+                          const isEditingThis = activeEditId === comp.id;
+
+                          return (
+                            <div key={comp.id || idx} className="p-2.5 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1.5">
+                              {isEditingThis ? (
+                                /* Inline Name Editor */
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-bold text-slate-500 uppercase block">Editar Nombre de Acompañante</label>
+                                  <div className="flex gap-1.5">
                                     <input
-                                      type="checkbox"
-                                      checked={comp.isApproved}
-                                      onChange={(e) => handleToggleCompanionApproval(group.id, comp.id, e.target.checked)}
-                                      className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer"
+                                      type="text"
+                                      value={editNameValue}
+                                      onChange={(e) => setEditNameValue(e.target.value)}
+                                      placeholder="Nombre y Apellido completo..."
+                                      className="flex-1 text-xs px-2.5 py-1 rounded-lg border border-indigo-400 focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white font-semibold"
+                                      autoFocus
                                     />
-                                    <span className={`font-semibold truncate ${comp.isApproved ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
-                                      {comp.name}
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSaveCompanionName(group.id, comp.id)}
+                                      className="bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-[11px] px-2.5 py-1 rounded-lg transition"
+                                    >
+                                      Guardar
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveEditId(null)}
+                                      className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-[11px] px-2 py-1 rounded-lg transition"
+                                    >
+                                      Cancelar
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Standard Companion View with Edit Button & Checkbox */
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 overflow-hidden flex-1">
+                                      <input
+                                        type="checkbox"
+                                        checked={comp.isApproved}
+                                        onChange={(e) => handleToggleCompanionApproval(group.id, comp.id, e.target.checked)}
+                                        className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 accent-emerald-600 cursor-pointer shrink-0"
+                                      />
+                                      <span className={`font-semibold truncate ${comp.isApproved ? 'text-slate-900' : 'text-slate-400 line-through'}`}>
+                                        {comp.name}
+                                      </span>
+
+                                      {/* Edit Icon Button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setActiveEditId(comp.id);
+                                          setEditNameValue(comp.name || '');
+                                        }}
+                                        title="Editar nombre de acompañante"
+                                        className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition shrink-0"
+                                      >
+                                        <Edit3 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+
+                                    <span className={`text-[10px] px-2 py-0.5 rounded font-bold shrink-0 ${
+                                      comp.isApproved ? 'bg-emerald-100 text-emerald-800' :
+                                      comp.isNamed ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-900'
+                                    }`}>
+                                      {comp.isApproved ? 'Autorizado' : comp.isNamed ? 'Sin Acceso' : 'Por Verificar'}
                                     </span>
-                                  </label>
-                                </div>
+                                  </div>
 
-                                <span className={`text-[10px] px-2 py-0.5 rounded font-bold shrink-0 ${comp.isApproved ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
-                                  {comp.isApproved ? 'Autorizado' : 'Sin Acceso'}
-                                </span>
-                              </div>
-                            ) : (
-                              /* Protocol 2: Unnamed / Generic Companion */
-                              <div className="space-y-1.5">
-                                <div className="flex items-center justify-between gap-1">
-                                  <span className="text-[11px] font-semibold text-amber-900 flex items-center gap-1">
-                                    <AlertTriangle className="w-3 h-3 text-amber-600" /> {comp.name || `Acompañante ${idx + 1}`}
-                                  </span>
-                                  <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-1.5 py-0.5 rounded">
-                                    Por Verificar
-                                  </span>
+                                  {/* Quick verify form for generic companions */}
+                                  {!comp.isNamed && (
+                                    <div className="flex gap-1.5 pt-1">
+                                      <input
+                                        type="text"
+                                        placeholder="Nombre y Apellido..."
+                                        value={editingCompanionName[comp.id] || ''}
+                                        onChange={(e) => setEditingCompanionName({ ...editingCompanionName, [comp.id]: e.target.value })}
+                                        className="flex-1 text-xs px-2 py-1 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-500 bg-white"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleVerifyUnnamedCompanion(group.id, comp.id)}
+                                        className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition shrink-0"
+                                      >
+                                        Verificar
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
-
-                                <div className="flex gap-1.5 pt-0.5">
-                                  <input
-                                    type="text"
-                                    placeholder="Nombre y Apellido..."
-                                    value={editingCompanionName[comp.id] || ''}
-                                    onChange={(e) => setEditingCompanionName({ ...editingCompanionName, [comp.id]: e.target.value })}
-                                    className="flex-1 text-xs px-2 py-1 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-500 bg-white"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => handleVerifyUnnamedCompanion(group.id, comp.id)}
-                                    className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[11px] px-2.5 py-1 rounded-lg transition shrink-0"
-                                  >
-                                    Verificar
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

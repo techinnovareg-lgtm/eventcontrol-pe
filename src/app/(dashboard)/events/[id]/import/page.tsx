@@ -9,8 +9,8 @@ import {
   Trash2, Edit3, UserCheck, Users, RefreshCw
 } from 'lucide-react';
 import { 
-  parseExcelFile, validateMappedRows, generateErrorReportExcel, generateTemplateExcel,
-  RawExcelSheet, ColumnMapping, ImportValidationResult 
+  parseExcelFile, validateMappedRows, generateErrorReportExcel, generateTemplateExcel, extractCompanionsForGroup,
+  RawExcelSheet, ColumnMapping, ImportValidationResult, ValidatedGuestRow
 } from '@/lib/excel-parser';
 import { getEventById, getEventByIdAsync, saveEventGuestGroups, saveEventGuestGroupsAsync, getEventGuestGroups, getEventGuestGroupsAsync, deleteEventGuestGroups, deleteEventGuestGroupsAsync } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
@@ -226,6 +226,64 @@ export default function ExcelImportWizardPage() {
       refreshGuestGroups();
       alert('La lista de invitados ha sido eliminada exitosamente. Puedes proceder a cargar un nuevo archivo Excel.');
     }
+  };
+
+  const [editingInvalidRows, setEditingInvalidRows] = useState<Record<number, { groupName: string; maxPasses: number; phone: string; responsible: string }>>({});
+
+  const handleApproveInvalidRow = (rowNum: number) => {
+    if (!validationResult) return;
+
+    const targetRow = validationResult.invalidRows.find(r => r.rowNumber === rowNum);
+    if (!targetRow) return;
+
+    const edited = editingInvalidRows[rowNum] || {};
+    const groupName = (edited.groupName !== undefined ? edited.groupName : targetRow.groupName).trim();
+    const maxPasses = edited.maxPasses !== undefined ? edited.maxPasses : (targetRow.maxPasses || 1);
+    const phone = (edited.phone !== undefined ? edited.phone : targetRow.phone || '').trim();
+    const responsible = (edited.responsible !== undefined ? edited.responsible : targetRow.responsible || '').trim();
+
+    if (!groupName) {
+      alert('Por favor especifica un nombre de grupo o persona para autorizar la fila.');
+      return;
+    }
+
+    const currentSheet = sheets[selectedSheetIndex];
+    const secondaryList = currentSheet?.secondaryCompanionsMap ? (currentSheet.secondaryCompanionsMap[groupName.toLowerCase()] || []) : [];
+    const companions = extractCompanionsForGroup(groupName, maxPasses, '', secondaryList);
+
+    const approvedRow: ValidatedGuestRow = {
+      rowNumber: rowNum,
+      groupName,
+      maxPasses,
+      phone,
+      responsible,
+      companions,
+      isValid: true,
+      errors: [],
+    };
+
+    const newValidRows = [...validationResult.validRows, approvedRow].sort((a, b) => a.rowNumber - b.rowNumber);
+    const newInvalidRows = validationResult.invalidRows.filter(r => r.rowNumber !== rowNum);
+    const newTotalPasses = newValidRows.reduce((sum, r) => sum + r.maxPasses, 0);
+
+    setValidationResult({
+      ...validationResult,
+      validCount: newValidRows.length,
+      errorCount: newInvalidRows.length,
+      totalPasses: newTotalPasses,
+      validRows: newValidRows,
+      invalidRows: newInvalidRows,
+    });
+  };
+
+  const handleDiscardInvalidRow = (rowNum: number) => {
+    if (!validationResult) return;
+    const newInvalidRows = validationResult.invalidRows.filter(r => r.rowNumber !== rowNum);
+    setValidationResult({
+      ...validationResult,
+      errorCount: newInvalidRows.length,
+      invalidRows: newInvalidRows,
+    });
   };
 
   return (
@@ -471,23 +529,119 @@ export default function ExcelImportWizardPage() {
               </div>
             </div>
 
-            {/* Error Report Banner */}
+            {/* Error & Warning Interactive Editor Section */}
             {validationResult.errorCount > 0 && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
-                  <div>
-                    <h4 className="text-sm font-bold text-amber-900">Se detectaron {validationResult.errorCount} filas inválidas u omitidas</h4>
-                    <p className="text-xs text-amber-700">Filas vacías o totales fueron aisladas automáticamente para prevenir corrupción de datos.</p>
+              <div className="card-luxury border border-amber-300 bg-amber-50/30 p-6 shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-amber-200 pb-3">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-bold text-amber-955">Filas con Advertencias o Errores ({validationResult.errorCount})</h4>
+                      <p className="text-xs text-amber-800">Puedes corregir los campos en línea y presionar <strong>[✓ Autorizar e Incluir]</strong> para no descartar estos pases.</p>
+                    </div>
                   </div>
+
+                  <button
+                    onClick={handleDownloadErrorReport}
+                    className="flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs px-3 py-1.5 rounded-xl transition shrink-0"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Exportar Errores (.xlsx)
+                  </button>
                 </div>
 
-                <button
-                  onClick={handleDownloadErrorReport}
-                  className="flex items-center gap-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shrink-0"
-                >
-                  <Download className="w-4 h-4" /> Descargar Reporte de Errores (.xlsx)
-                </button>
+                <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                  {validationResult.invalidRows.map((r) => {
+                    const rowData = editingInvalidRows[r.rowNumber] || {
+                      groupName: r.groupName || '',
+                      maxPasses: r.maxPasses || 1,
+                      phone: r.phone || '',
+                      responsible: r.responsible || '',
+                    };
+
+                    return (
+                      <div key={r.rowNumber} className="p-3 bg-white rounded-xl border border-amber-200 text-xs shadow-2xs space-y-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-slate-400 font-bold bg-slate-100 px-2 py-0.5 rounded">Fila #{r.rowNumber}</span>
+                            <span className="text-[11px] text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded font-medium">
+                              ⚠️ {r.errors.join(' | ')}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleApproveInvalidRow(r.rowNumber)}
+                              className="bg-emerald-700 hover:bg-emerald-800 text-white font-extrabold text-[11px] px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-sm"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-200" /> Autorizar e Incluir Fila
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDiscardInvalidRow(r.rowNumber)}
+                              className="bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-700 font-semibold text-[11px] px-2.5 py-1.5 rounded-lg transition border border-slate-200"
+                            >
+                              Descartar
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Inline Field Editor */}
+                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 pt-1">
+                          <div>
+                            <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Nombre Pase / Grupo</label>
+                            <input
+                              type="text"
+                              value={rowData.groupName}
+                              onChange={(e) => setEditingInvalidRows({
+                                ...editingInvalidRows,
+                                [r.rowNumber]: { ...rowData, groupName: e.target.value }
+                              })}
+                              className="w-full text-xs px-2.5 py-1 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-500 bg-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Pases Autorizados</label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={rowData.maxPasses}
+                              onChange={(e) => setEditingInvalidRows({
+                                ...editingInvalidRows,
+                                [r.rowNumber]: { ...rowData, maxPasses: parseInt(e.target.value, 10) || 1 }
+                              })}
+                              className="w-full text-xs px-2.5 py-1 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-500 bg-white font-bold text-amber-900"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Teléfono WhatsApp</label>
+                            <input
+                              type="text"
+                              value={rowData.phone}
+                              onChange={(e) => setEditingInvalidRows({
+                                ...editingInvalidRows,
+                                [r.rowNumber]: { ...rowData, phone: e.target.value }
+                              })}
+                              className="w-full text-xs px-2.5 py-1 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-500 bg-white font-mono"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-500 font-bold block mb-0.5">Responsable</label>
+                            <input
+                              type="text"
+                              value={rowData.responsible}
+                              onChange={(e) => setEditingInvalidRows({
+                                ...editingInvalidRows,
+                                [r.rowNumber]: { ...rowData, responsible: e.target.value }
+                              })}
+                              className="w-full text-xs px-2.5 py-1 rounded-lg border border-slate-300 focus:outline-none focus:border-indigo-500 bg-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             )}
 

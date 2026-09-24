@@ -287,9 +287,11 @@ export function validateMappedRows(
     }
 
     // 3. Optional Phone validation
-    const phone = mapping.phoneCol ? String(row[mapping.phoneCol] || '').trim() : '';
-    if (phone && !/^\+?[0-9\s\-]{6,15}$/.test(phone)) {
-      errors.push(`Formato de teléfono sospechoso: "${phone}"`);
+    const rawPhone = mapping.phoneCol ? String(row[mapping.phoneCol] || '').trim() : '';
+    const phoneDigitsOnly = rawPhone.replace(/[\s\-\(\)]/g, '');
+    const phone = rawPhone;
+    if (rawPhone && !/^\+?[0-9]{6,15}$/.test(phoneDigitsOnly)) {
+      errors.push(`Formato de teléfono sospechoso: "${rawPhone}"`);
     }
 
     // 4. Optional Responsible, Notes & Companions
