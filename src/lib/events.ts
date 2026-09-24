@@ -1,4 +1,4 @@
-import { Event, EventStatus, GuestGroup } from '@/lib/supabase/types';
+import { Event, EventStatus, GuestGroup, GuestCompanion } from '@/lib/supabase/types';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { deleteEventTables, deleteEventAssignments, deleteEventVenueElements, autoSyncTablesToServer } from '@/lib/tables';
 import { deleteEventCuts, getEventCutsAsync } from '@/lib/cuts';
@@ -607,4 +607,54 @@ export async function updateSingleGuestGroupCheckInAsync(
       }
     }
   }
+}
+
+export function updateGuestGroupCompanions(
+  eventId: string,
+  groupId: string,
+  companions: GuestCompanion[]
+): GuestGroup | undefined {
+  const store = getGroupsStore();
+  const eventGroups = store[eventId] || [];
+  const group = eventGroups.find(g => g.id === groupId);
+
+  if (group) {
+    group.companions = companions;
+    group.updated_at = new Date().toISOString();
+    saveGroupsToStorage(store);
+    checkInRealtimeChannel.notify({ type: 'GROUPS_UPDATED', eventId });
+
+    if (typeof window !== 'undefined') {
+      const workspaceId = group.workspace_id || '';
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: eventGroups }),
+      }).catch(err => console.warn('[Sync Companions dispatch warning]', err));
+    }
+  }
+  return group;
+}
+
+export async function updateGuestGroupCompanionsAsync(
+  eventId: string,
+  groupId: string,
+  companions: GuestCompanion[]
+): Promise<GuestGroup | undefined> {
+  const updatedGroup = updateGuestGroupCompanions(eventId, groupId, companions);
+  if (updatedGroup && typeof window !== 'undefined') {
+    const store = getGroupsStore();
+    const eventGroups = store[eventId] || [];
+    const workspaceId = updatedGroup.workspace_id || '';
+    try {
+      await fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: eventGroups }),
+      });
+    } catch (err) {
+      console.warn('[Sync Companions Async dispatch warning]', err);
+    }
+  }
+  return updatedGroup;
 }

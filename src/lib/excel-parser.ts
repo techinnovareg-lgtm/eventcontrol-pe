@@ -1,9 +1,11 @@
 import * as XLSX from 'xlsx';
+import { GuestCompanion } from '@/lib/supabase/types';
 
 export interface RawExcelSheet {
   sheetName: string;
   headers: string[];
   rows: Record<string, any>[];
+  secondaryCompanionsMap?: Record<string, string[]>;
 }
 
 export interface ColumnMapping {
@@ -11,6 +13,7 @@ export interface ColumnMapping {
   maxPassesCol: string;
   phoneCol?: string;
   responsibleCol?: string;
+  companionCol?: string;
   externalIdCol?: string;
   notesCol?: string;
 }
@@ -23,6 +26,7 @@ export interface ValidatedGuestRow {
   responsible?: string;
   externalId?: string;
   notes?: string;
+  companions?: GuestCompanion[];
   isValid: boolean;
   errors: string[];
 }
@@ -36,12 +40,143 @@ export interface ImportValidationResult {
   invalidRows: ValidatedGuestRow[];
 }
 
+export function isGenericCompanionName(str: string): boolean {
+  if (!str) return true;
+  const clean = str.trim().toLowerCase();
+  if (clean.length < 2) return true;
+  if (/^[x?*\-_\s]+$/.test(clean)) return true;
+  
+  const genericKeywords = [
+    'pareja', 'esposa', 'esposo', 'hijo', 'hija', 'mama', 'papa', 'novia', 'novio',
+    'enamorado', 'enamorada', 'acompañante', 'acompanante', 'invitado', 'invitada',
+    'amigo', 'amiga', 'familiar', '+1', '+2', '+3', 'xxxxxxxxxxxxxxx', 'n/a',
+    'ninguno', 'sin nombre', 'por confirmar', 'pendiente', 'sin definir', 'esposa amilcar'
+  ];
+
+  return genericKeywords.some(kw => clean === kw || clean.startsWith(kw + ' ') || clean.endsWith(' ' + kw));
+}
+
+export function extractCompanionsForGroup(
+  groupName: string,
+  maxPasses: number,
+  rawCompanionField?: string,
+  secondaryCompanions?: string[]
+): GuestCompanion[] {
+  const companionSlotsCount = Math.max(0, maxPasses - 1);
+  if (companionSlotsCount === 0) return [];
+
+  const rawNamesList: string[] = [];
+
+  // 1. From secondary sheet (e.g. ACOMPAÑASTES sheet)
+  if (Array.isArray(secondaryCompanions) && secondaryCompanions.length > 0) {
+    secondaryCompanions.forEach(c => {
+      if (c && c.trim()) rawNamesList.push(c.trim());
+    });
+  }
+
+  // 2. From raw companion column in main row
+  if (rawNamesList.length === 0 && rawCompanionField && rawCompanionField.trim()) {
+    if (rawCompanionField.includes(',')) {
+      rawCompanionField.split(',').forEach(s => {
+        if (s.trim()) rawNamesList.push(s.trim());
+      });
+    } else {
+      rawNamesList.push(rawCompanionField.trim());
+    }
+  }
+
+  // 3. From groupName if groupName contains comma-separated list (e.g. "Lili, Lucho, Moico")
+  if (rawNamesList.length === 0 && groupName && groupName.includes(',')) {
+    const parts = groupName.split(',').map(s => s.trim()).filter(Boolean);
+    if (parts.length > 1) {
+      parts.slice(1).forEach(p => rawNamesList.push(p));
+    }
+  }
+
+  const result: GuestCompanion[] = [];
+
+  for (let i = 0; i < companionSlotsCount; i++) {
+    const candidateName = rawNamesList[i] || '';
+    const isGeneric = isGenericCompanionName(candidateName);
+
+    result.push({
+      id: `comp-${i + 1}-${Math.random().toString(36).substring(2, 7)}`,
+      name: candidateName ? candidateName : `Acompañante ${i + 1}`,
+      isNamed: !isGeneric,
+      isApproved: !isGeneric, // Protocol 1 (named -> true), Protocol 2 (generic -> false, requires verification)
+    });
+  }
+
+  return result;
+}
+
+export function extractSecondarySheetCompanions(workbook: XLSX.WorkBook): Record<string, string[]> {
+  const map: Record<string, string[]> = {};
+  
+  const companionSheetName = workbook.SheetNames.find(name => {
+    const upper = name.toUpperCase();
+    return upper.includes('ACOMPAÑ') || upper.includes('ACOMPAN');
+  });
+
+  if (!companionSheetName) return map;
+
+  const worksheet = workbook.Sheets[companionSheetName];
+  const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { header: 1 });
+  if (jsonData.length < 2) return map;
+
+  let headerIndex = -1;
+  for (let r = 0; r < Math.min(10, jsonData.length); r++) {
+    const joined = (jsonData[r] || []).map((c: any) => String(c || '').toUpperCase()).join(' ');
+    if (joined.includes('APELLIDO') || joined.includes('ACOMPAÑANTE') || joined.includes('PASES')) {
+      headerIndex = r;
+      break;
+    }
+  }
+
+  if (headerIndex === -1) headerIndex = 0;
+  const headers = (jsonData[headerIndex] as any[]).map(h => String(h || '').trim().toUpperCase());
+  
+  const titularColIdx = headers.findIndex(h => h.includes('APELLIDO') || h.includes('TITULAR') || h.includes('NOMBRE'));
+  const companionColIdx = headers.findIndex(h => h.includes('ACOMPAÑANTE') || h.includes('ACOMPANANTE'));
+  const kidsColIdx = headers.findIndex(h => h.includes('NIÑO') || h.includes('NINO') || h.includes('HIJO'));
+
+  let currentTitularKey = '';
+
+  for (let i = headerIndex + 1; i < jsonData.length; i++) {
+    const row = jsonData[i] as any[];
+    if (!row || row.length === 0) continue;
+
+    const rawTitular = titularColIdx !== -1 && row[titularColIdx] ? String(row[titularColIdx]).trim() : '';
+    if (rawTitular) {
+      currentTitularKey = rawTitular.toLowerCase();
+      if (!map[currentTitularKey]) {
+        map[currentTitularKey] = [];
+      }
+    }
+
+    const companionVal = companionColIdx !== -1 && row[companionColIdx] ? String(row[companionColIdx]).trim() : '';
+    const kidsVal = kidsColIdx !== -1 && row[kidsColIdx] ? String(row[kidsColIdx]).trim() : '';
+
+    if (currentTitularKey) {
+      if (companionVal && companionVal.toUpperCase() !== 'ACOMPAÑANTE') {
+        map[currentTitularKey].push(companionVal);
+      }
+      if (kidsVal && kidsVal.toUpperCase() !== 'NIÑOS') {
+        map[currentTitularKey].push(kidsVal);
+      }
+    }
+  }
+
+  return map;
+}
+
 /**
  * Parses an Excel or CSV file buffer and returns sheet headers and row objects,
  * with smart header row detection for title rows (like Formato_ejemplo.xlsx).
  */
 export function parseExcelFile(fileBuffer: ArrayBuffer): RawExcelSheet[] {
   const workbook = XLSX.read(fileBuffer, { type: 'array' });
+  const secondaryCompanionsMap = extractSecondarySheetCompanions(workbook);
   const result: RawExcelSheet[] = [];
 
   for (const sheetName of workbook.SheetNames) {
@@ -58,8 +193,8 @@ export function parseExcelFile(fileBuffer: ArrayBuffer): RawExcelSheet[] {
       if (!rowArr || rowArr.length === 0) continue;
       const joinedRow = rowArr.map(c => String(c || '').toUpperCase()).join(' ');
       if (
-        (joinedRow.includes('PASES') || joinedRow.includes('INVITADO') || joinedRow.includes('GRUPO')) &&
-        (joinedRow.includes('PERSONAS') || joinedRow.includes('RESPONSABLE') || joinedRow.includes('CANTIDAD') || joinedRow.includes('NRO'))
+        (joinedRow.includes('PASES') || joinedRow.includes('INVITADO') || joinedRow.includes('GRUPO') || joinedRow.includes('CÓDIGO')) &&
+        (joinedRow.includes('PERSONAS') || joinedRow.includes('RESPONSABLE') || joinedRow.includes('CANTIDAD') || joinedRow.includes('NRO') || joinedRow.includes('PASES'))
       ) {
         headerIndex = r;
         break;
@@ -105,6 +240,7 @@ export function parseExcelFile(fileBuffer: ArrayBuffer): RawExcelSheet[] {
       sheetName,
       headers: rawHeaders,
       rows,
+      secondaryCompanionsMap,
     });
   }
 
@@ -116,7 +252,8 @@ export function parseExcelFile(fileBuffer: ArrayBuffer): RawExcelSheet[] {
  */
 export function validateMappedRows(
   rows: Record<string, any>[],
-  mapping: ColumnMapping
+  mapping: ColumnMapping,
+  secondaryCompanionsMap?: Record<string, string[]>
 ): ImportValidationResult {
   const validRows: ValidatedGuestRow[] = [];
   const invalidRows: ValidatedGuestRow[] = [];
@@ -155,10 +292,20 @@ export function validateMappedRows(
       errors.push(`Formato de teléfono sospechoso: "${phone}"`);
     }
 
-    // 4. Optional Responsible & Notes
+    // 4. Optional Responsible, Notes & Companions
     const responsible = mapping.responsibleCol ? String(row[mapping.responsibleCol] || '').trim() : '';
     const externalId = mapping.externalIdCol ? String(row[mapping.externalIdCol] || '').trim() : '';
     const notes = mapping.notesCol ? String(row[mapping.notesCol] || '').trim() : '';
+    const companionColVal = mapping.companionCol ? String(row[mapping.companionCol] || '').trim() : '';
+
+    const secondaryList = secondaryCompanionsMap ? (secondaryCompanionsMap[groupName.toLowerCase()] || []) : [];
+
+    const companions = extractCompanionsForGroup(
+      groupName,
+      isNaN(maxPasses) ? 0 : maxPasses,
+      companionColVal,
+      secondaryList
+    );
 
     const validatedRow: ValidatedGuestRow = {
       rowNumber: rowNum,
@@ -168,6 +315,7 @@ export function validateMappedRows(
       responsible,
       externalId,
       notes,
+      companions,
       isValid: errors.length === 0,
       errors,
     };

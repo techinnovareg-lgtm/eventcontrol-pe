@@ -82,11 +82,16 @@ export function executeAtomicCheckIn(
     if (tbl) tableName = tbl.name;
   }
 
-  // 2. Validate Overbooking (Caso 3)
-  const currentCheckedIn = group.checked_in_count || 0;
-  const availablePasses = group.max_passes - currentCheckedIn;
+  // 2. Validate Overbooking and Companion Authorization Protocol
+  const approvedCompanionsCount = Array.isArray(group.companions)
+    ? group.companions.filter(c => c.isApproved).length
+    : Math.max(0, group.max_passes - 1);
 
-  if (currentCheckedIn + passesRequested > group.max_passes) {
+  const effectiveMaxPasses = Math.min(group.max_passes, 1 + approvedCompanionsCount);
+  const currentCheckedIn = group.checked_in_count || 0;
+  const availablePasses = Math.max(0, effectiveMaxPasses - currentCheckedIn);
+
+  if (currentCheckedIn + passesRequested > effectiveMaxPasses) {
     // Audit log failed attempt
     checkInsLogStore.unshift({
       id: `ci-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -102,16 +107,21 @@ export function executeAtomicCheckIn(
       entry_timestamp: new Date().toISOString(),
     });
 
+    const isCompanionRestricted = effectiveMaxPasses < group.max_passes;
+    const msg = isCompanionRestricted
+      ? `⚠️ INGRESO DENEGADO POR PROTOCOLO DE ACOMPAÑANTES. Solo ${effectiveMaxPasses} de ${group.max_passes} pases están autorizados por el organizador (${effectiveMaxPasses > 1 ? `Titular + ${effectiveMaxPasses - 1} acompañante(s)` : 'Solo Titular'}). Disponibles: ${availablePasses}.`
+      : `⚠️ CANTIDAD NO AUTORIZADA. Disponibles: ${availablePasses}, Solicitados: ${passesRequested}.`;
+
     return {
       success: false,
       reason: 'REJECTED_EXCEEDED',
       groupName: group.group_name,
       tableName,
-      maxPasses: group.max_passes,
+      maxPasses: effectiveMaxPasses,
       alreadyEntered: currentCheckedIn,
       availablePasses,
       passesEntered: passesRequested,
-      message: `⚠️ CANTIDAD NO AUTORIZADA. Disponibles: ${availablePasses}, Solicitados: ${passesRequested}.`,
+      message: msg,
     };
   }
 

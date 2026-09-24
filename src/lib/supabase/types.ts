@@ -41,6 +41,14 @@ export interface Event {
   updated_at: string;
 }
 
+export interface GuestCompanion {
+  id: string;
+  name: string;
+  isNamed: boolean;
+  isApproved: boolean;
+  checkedIn?: boolean;
+}
+
 export interface GuestGroup {
   id: string;
   event_id: string;
@@ -52,6 +60,7 @@ export interface GuestGroup {
   external_id?: string;
   notes?: string;
   status: GroupStatus;
+  companions?: GuestCompanion[];
   created_at: string;
   updated_at: string;
 }

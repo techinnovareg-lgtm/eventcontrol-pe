@@ -156,12 +156,14 @@ export default function ExcelImportWizardPage() {
 
       const respCol = headers.find(h => /responsable/i.test(h)) || '';
       const phoneCol = headers.find(h => /tel[eé]fono|celular|whatsapp|phone/i.test(h)) || '';
+      const compCol = headers.find(h => /acompañante|acompanante|acompañantes/i.test(h)) || '';
 
       setMapping({
         groupNameCol: groupCol,
         maxPassesCol: passesCol,
         responsibleCol: respCol,
         phoneCol: phoneCol,
+        companionCol: compCol,
       });
 
       setStep(2);
@@ -175,7 +177,7 @@ export default function ExcelImportWizardPage() {
     }
 
     const currentSheet = sheets[selectedSheetIndex];
-    const result = validateMappedRows(currentSheet.rows, mapping);
+    const result = validateMappedRows(currentSheet.rows, mapping, currentSheet.secondaryCompanionsMap);
     setValidationResult(result);
     setStep(3);
   };
@@ -205,6 +207,7 @@ export default function ExcelImportWizardPage() {
       external_id: r.externalId,
       notes: r.responsible ? `Responsable: ${r.responsible}` : r.notes || '',
       status: 'PENDIENTE' as const,
+      companions: r.companions || [],
     }));
 
     await saveEventGuestGroupsAsync(eventId, currentWorkspaceId, guestGroups);
