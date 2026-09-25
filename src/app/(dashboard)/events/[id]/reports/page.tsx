@@ -11,7 +11,7 @@ import EventNavHeader from '@/components/EventNavHeader';
 import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
 import { calculateDashboardMetrics, getTablesOccupancyStats } from '@/lib/dashboard-stats';
 import { calculateCateringDiff, getEventCutsAsync } from '@/lib/cuts';
-import { getEventTablesAsync } from '@/lib/tables';
+import { getEventTables, getEventTablesAsync, getEventTableAssignments } from '@/lib/tables';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { exportEventToExcel } from '@/lib/export-engine';
 
@@ -247,11 +247,12 @@ export default function EventReportsPage() {
             </h2>
 
             <div className="overflow-x-auto w-full border border-slate-200 rounded-xl shadow-2xs">
-              <table className="w-full text-left border-collapse text-xs min-w-[600px]">
+              <table className="w-full text-left border-collapse text-xs min-w-[700px]">
                 <thead>
                   <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
                     <th className="py-2.5 px-4">#</th>
                     <th className="py-2.5 px-4">Grupo / Responsable</th>
+                    <th className="py-2.5 px-4">Mesa Asignada</th>
                     <th className="py-2.5 px-4">Invitados Permitidos (Máx)</th>
                     <th className="py-2.5 px-4">Ingresados</th>
                     <th className="py-2.5 px-4">Pendientes</th>
@@ -259,24 +260,36 @@ export default function EventReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
-                  {groups.map((g, idx) => (
-                    <tr key={g.id}>
-                      <td className="py-2 px-4 text-slate-400 font-mono">{idx + 1}</td>
-                      <td className="py-2 px-4 font-semibold text-slate-900">{g.group_name}</td>
-                      <td className="py-2 px-4 font-bold text-slate-700">{g.max_passes}</td>
-                      <td className="py-2 px-4 font-bold text-emerald-600">{g.checked_in_count || 0}</td>
-                      <td className="py-2 px-4 text-amber-700 font-semibold">{Math.max(0, g.max_passes - (g.checked_in_count || 0))}</td>
-                      <td className="py-2 px-4">
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                          g.status === 'COMPLETO' ? 'bg-emerald-100 text-emerald-800' :
-                          g.status === 'PARCIAL' ? 'bg-amber-100 text-amber-800' :
-                          'bg-slate-100 text-slate-700'
-                        }`}>
-                          {g.status}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {groups.map((g, idx) => {
+                    const tables = getEventTables(eventId);
+                    const assignments = getEventTableAssignments(eventId);
+                    const asgn = assignments.find((a) => a.group_id === g.id);
+                    let tableName = 'Sin Mesa Asignada';
+                    if (asgn) {
+                      const tbl = tables.find((t) => t.id === asgn.table_id);
+                      if (tbl) tableName = tbl.name;
+                    }
+
+                    return (
+                      <tr key={g.id}>
+                        <td className="py-2 px-4 text-slate-400 font-mono">{idx + 1}</td>
+                        <td className="py-2 px-4 font-semibold text-slate-900">{g.group_name}</td>
+                        <td className="py-2 px-4 text-purple-700 font-bold">{tableName}</td>
+                        <td className="py-2 px-4 font-bold text-slate-700">{g.max_passes}</td>
+                        <td className="py-2 px-4 font-bold text-emerald-600">{g.checked_in_count || 0}</td>
+                        <td className="py-2 px-4 text-amber-700 font-semibold">{Math.max(0, g.max_passes - (g.checked_in_count || 0))}</td>
+                        <td className="py-2 px-4">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            g.status === 'COMPLETO' ? 'bg-emerald-100 text-emerald-800' :
+                            g.status === 'PARCIAL' ? 'bg-amber-100 text-amber-800' :
+                            'bg-slate-100 text-slate-700'
+                          }`}>
+                            {g.status}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

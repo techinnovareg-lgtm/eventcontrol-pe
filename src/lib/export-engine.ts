@@ -35,16 +35,29 @@ export function exportEventToExcel(eventId: string, workspaceId: string) {
   const wsResumen = XLSX.utils.json_to_sheet(resumenData);
   XLSX.utils.book_append_sheet(workbook, wsResumen, 'Resumen');
 
+  const tables = getEventTables(eventId);
+  const assignments = getEventTableAssignments(eventId);
+
   // SHEET 2: Lista de Invitados / Grupos
-  const invitadosData = groups.map((g) => ({
-    'Grupo / Responsable': g.group_name,
-    'Pases Autorizados': g.max_passes,
-    'Pases Ingresados': g.checked_in_count || 0,
-    'Pases Pendientes': Math.max(0, g.max_passes - (g.checked_in_count || 0)),
-    Estado: g.status,
-    Teléfono: g.responsible_phone || '-',
-    Notas: g.notes || '',
-  }));
+  const invitadosData = groups.map((g) => {
+    const asgn = assignments.find((a) => a.group_id === g.id);
+    let tableName = 'Sin Mesa Asignada';
+    if (asgn) {
+      const tbl = tables.find((t) => t.id === asgn.table_id);
+      if (tbl) tableName = tbl.name;
+    }
+
+    return {
+      'Grupo / Responsable': g.group_name,
+      'Mesa Asignada': tableName,
+      'Pases Autorizados': g.max_passes,
+      'Pases Ingresados': g.checked_in_count || 0,
+      'Pases Pendientes': Math.max(0, g.max_passes - (g.checked_in_count || 0)),
+      Estado: g.status,
+      Teléfono: g.responsible_phone || '-',
+      Notas: g.notes || '',
+    };
+  });
   const wsInvitados = XLSX.utils.json_to_sheet(invitadosData);
   XLSX.utils.book_append_sheet(workbook, wsInvitados, 'Invitados');
 

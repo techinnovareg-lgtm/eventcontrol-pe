@@ -8,7 +8,7 @@ import {
   Copy, ExternalLink, Settings, Sparkles, MapPin, QrCode, Users,
   ShieldAlert, Clock, AlertTriangle, ChevronDown, ChevronUp, Coffee,
   Lock, ShieldCheck, HelpCircle, Info, RefreshCw, FileText,
-  Edit3, Save, X, Play, Pause, RotateCcw, Check
+  Edit3, Save, X, Play, Pause, RotateCcw, Check, Grid
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
 import { 
@@ -172,7 +172,21 @@ export default function WhatsAppMessagingPage() {
     groups, sentLogs, autoBlockSentCount, autoBatchSize, autoRestMinutes, template, eventId, messageMode
   ]);
 
+  // Table Filter & Prerequisite State
+  const [tableFilterMode, setTableFilterMode] = useState<'ALL' | 'WITH_TABLE' | 'WITHOUT_TABLE'>('ALL');
+
+  // Compute table assignment counts
+  const groupsWithTableCount = groups.filter(g => assignments.some(a => a.group_id === g.id)).length;
+  const groupsWithoutTableCount = Math.max(0, groups.length - groupsWithTableCount);
+
   const handleStartAutoRunner = () => {
+    if (groupsWithoutTableCount > 0) {
+      const confirmSend = confirm(
+        `⚠️ ADVERTENCIA DE ASIGNACIÓN DE MESAS\n\nTienes ${groupsWithoutTableCount} pases sin mesa asignada.\n\nSi envías los mensajes de WhatsApp ahora, la etiqueta {MESA} dirá "Sin Mesa Asignada" en las invitaciones.\n\n¿Deseas continuar de todas formas con el envío automático?`
+      );
+      if (!confirmSend) return;
+    }
+
     const pending = groups.filter(g => !sentLogs[g.id] && g.responsible_phone && g.responsible_phone.trim() !== '');
     if (pending.length === 0) {
       alert('No hay invitaciones pendientes con número de teléfono registrado.');
@@ -349,6 +363,30 @@ export default function WhatsAppMessagingPage() {
             </div>
           </div>
         </div>
+
+        {/* TABLE ASSIGNMENT PREREQUISITE WARNING BANNER */}
+        {groupsWithoutTableCount > 0 && (
+          <div className="card-luxury p-4 border border-amber-300 bg-amber-50 rounded-2xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
+              <div>
+                <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
+                  ⚠️ Protocolo Previo: {groupsWithoutTableCount} pases aún no tienen mesa asignada
+                </h4>
+                <p className="text-xs text-amber-800 mt-0.5">
+                  Se recomienda asignar las mesas antes del despacho por WhatsApp para que las invitaciones incluyan el nombre de la mesa.
+                </p>
+              </div>
+            </div>
+
+            <Link
+              href={`/events/${eventId}/tables`}
+              className="px-3.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto shadow-2xs"
+            >
+              <Grid className="w-4 h-4" /> Ir a Asignar Mesas Primero
+            </Link>
+          </div>
+        )}
 
         {/* AUTOMATED BATCH DISPATCHER CONTROL BAR */}
         <div className="card-luxury p-5 border border-emerald-400 bg-gradient-to-r from-emerald-900 to-teal-950 text-white shadow-lg rounded-2xl space-y-4">
@@ -598,11 +636,50 @@ export default function WhatsAppMessagingPage() {
         {/* GUEST GROUPS DISPATCH LIST WITH TIMESTAMP LOGGING & INLINE PHONE EDITING */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-3">
-            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-              <Users className="w-5 h-5 text-emerald-600" /> Lista de Invitados para Envío ({groups.length})
-            </h3>
+            <div>
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" /> Lista de Invitados para Envío ({groups.length})
+              </h3>
+              
+              {/* Filter Tabs by Table Assignment */}
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                <button
+                  type="button"
+                  onClick={() => setTableFilterMode('ALL')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                    tableFilterMode === 'ALL'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Todos ({groups.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableFilterMode('WITH_TABLE')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                    tableFilterMode === 'WITH_TABLE'
+                      ? 'bg-emerald-700 text-white'
+                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  }`}
+                >
+                  Con Mesa ({groupsWithTableCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTableFilterMode('WITHOUT_TABLE')}
+                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
+                    tableFilterMode === 'WITHOUT_TABLE'
+                      ? 'bg-amber-700 text-white'
+                      : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
+                  }`}
+                >
+                  Sin Mesa ({groupsWithoutTableCount})
+                </button>
+              </div>
+            </div>
 
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-3 text-xs self-start sm:self-auto">
               <span className="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                 ✅ Enviados: {sentCount}
               </span>
@@ -632,7 +709,14 @@ export default function WhatsAppMessagingPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {groups.map((group) => {
+                {groups
+                  .filter((g) => {
+                    const hasTable = assignments.some((a) => a.group_id === g.id);
+                    if (tableFilterMode === 'WITH_TABLE') return hasTable;
+                    if (tableFilterMode === 'WITHOUT_TABLE') return !hasTable;
+                    return true;
+                  })
+                  .map((group) => {
                   const hasPhone = Boolean(group.responsible_phone && group.responsible_phone.trim());
                   const logItem = sentLogs[group.id];
                   const sentTimeFormatted = logItem ? formatSentTime(logItem.sentAt) : null;
