@@ -61,8 +61,18 @@ export interface GuestGroup {
   notes?: string;
   status: GroupStatus;
   companions?: GuestCompanion[];
+  whatsapp_sent_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface WhatsAppDispatchLog {
+  id: string;
+  event_id: string;
+  group_id: string;
+  phone: string;
+  sent_at: string;
+  message_type: 'FULL_INVITATION' | 'FIRST_GREETING';
 }
 
 export interface QRToken {
