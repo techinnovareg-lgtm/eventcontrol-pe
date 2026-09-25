@@ -7,13 +7,17 @@ import {
   MessageSquare, ArrowLeft, Send, CheckCircle2, PhoneOff, 
   Copy, ExternalLink, Settings, Sparkles, MapPin, QrCode, Users,
   ShieldAlert, Clock, AlertTriangle, ChevronDown, ChevronUp, Coffee,
-  Lock, ShieldCheck, HelpCircle, Info, RefreshCw, FileText
+  Lock, ShieldCheck, HelpCircle, Info, RefreshCw, FileText,
+  Edit3, Save, X, Play, Pause, RotateCcw, Check
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
-import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync } from '@/lib/events';
+import { 
+  getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGroupsAsync,
+  updateGuestGroupPhoneAsync 
+} from '@/lib/events';
 import { getEventTables, getEventTableAssignments } from '@/lib/tables';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
-import { Event } from '@/lib/supabase/types';
+import { Event, GuestGroup } from '@/lib/supabase/types';
 import { getOrCreateGroupQRToken } from '@/lib/qr-engine';
 import { 
   DEFAULT_WHATSAPP_TEMPLATE, FIRST_GREETING_SAFE_TEMPLATE, formatWhatsAppMessage,
@@ -26,7 +30,7 @@ export default function WhatsAppMessagingPage() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
 
   const [event, setEvent] = useState<Event | undefined>(() => getEventById(eventId));
-  const [groups, setGroups] = useState(() => getEventGuestGroups(eventId));
+  const [groups, setGroups] = useState<GuestGroup[]>(() => getEventGuestGroups(eventId));
   const assignments = getEventTableAssignments(eventId);
   const tables = getEventTables(eventId);
 
@@ -37,9 +41,23 @@ export default function WhatsAppMessagingPage() {
   const [copiedGroup, setCopiedGroup] = useState<string | null>(null);
   const [showAntiBanGuide, setShowAntiBanGuide] = useState<boolean>(true);
 
+  // Inline Phone Editing State
+  const [editingPhoneGroupId, setEditingPhoneGroupId] = useState<string | null>(null);
+  const [editingPhoneValue, setEditingPhoneValue] = useState<string>('');
+  const [isSavingPhone, setIsSavingPhone] = useState<boolean>(false);
+
   // Anti-Spam Timer / Cooldown State
   const [lastSentTimestamp, setLastSentTimestamp] = useState<number | null>(null);
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
+
+  // Automated Batch Dispatch Runner State
+  const [isAutoRunning, setIsAutoRunning] = useState<boolean>(false);
+  const [autoBatchSize, setAutoBatchSize] = useState<number>(20);
+  const [autoDelaySeconds, setAutoDelaySeconds] = useState<number>(35);
+  const [autoRestMinutes, setAutoRestMinutes] = useState<number>(15);
+  const [autoRestSecondsRemaining, setAutoRestSecondsRemaining] = useState<number>(0);
+  const [autoBlockSentCount, setAutoBlockSentCount] = useState<number>(0);
+  const [autoStatusText, setAutoStatusText] = useState<string>('Listo para iniciar envío automático por bloques');
 
   useEffect(() => {
     async function loadOnlineData() {
@@ -61,15 +79,113 @@ export default function WhatsAppMessagingPage() {
     loadOnlineData();
   }, [eventId]);
 
+  // Anti-Spam Cooldown Countdown (1 sec ticker)
   useEffect(() => {
     if (!lastSentTimestamp) return;
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - lastSentTimestamp) / 1000);
-      const remaining = Math.max(0, 35 - elapsed); // 35s recommended delay
+      const remaining = Math.max(0, autoDelaySeconds - elapsed);
       setSecondsRemaining(remaining);
     }, 1000);
     return () => clearInterval(interval);
-  }, [lastSentTimestamp]);
+  }, [lastSentTimestamp, autoDelaySeconds]);
+
+  // Automated Batch Dispatch Runner Loop
+  useEffect(() => {
+    if (!isAutoRunning) return;
+
+    const autoInterval = setInterval(() => {
+      // 1. Check if resting between blocks
+      if (autoRestSecondsRemaining > 0) {
+        setAutoRestSecondsRemaining(prev => {
+          const next = prev - 1;
+          if (next <= 0) {
+            setAutoBlockSentCount(0);
+            setAutoStatusText('☕ Pausa completada. Reanudando envío del siguiente bloque...');
+            return 0;
+          }
+          const m = Math.floor(next / 60);
+          const s = next % 60;
+          setAutoStatusText(`☕ Pausa de Seguridad en curso: ${m}m ${s < 10 ? '0' : ''}${s}s para reanudar`);
+          return next;
+        });
+        return;
+      }
+
+      // 2. Check if currently waiting for anti-spam delay between individual messages
+      if (lastSentTimestamp) {
+        const elapsedSec = Math.floor((Date.now() - lastSentTimestamp) / 1000);
+        if (elapsedSec < autoDelaySeconds) {
+          const rem = autoDelaySeconds - elapsedSec;
+          setAutoStatusText(`⏳ Próximo envío en ${rem}s (Respetando intervalo anti-baneo)...`);
+          return;
+        }
+      }
+
+      // 3. Find next pending group with phone number
+      const pendingGroup = groups.find(g => !sentLogs[g.id] && g.responsible_phone && g.responsible_phone.trim() !== '');
+
+      if (!pendingGroup) {
+        setIsAutoRunning(false);
+        setAutoStatusText('🎉 ¡Envío finalizado! Todos los grupos han recibido sus invitaciones.');
+        return;
+      }
+
+      // 4. Check if we reached block limit (e.g. 20 messages)
+      if (autoBlockSentCount >= autoBatchSize) {
+        const restSec = autoRestMinutes * 60;
+        setAutoRestSecondsRemaining(restSec);
+        setAutoStatusText(`☕ Bloque de ${autoBatchSize} invitaciones completado. Iniciando pausa de seguridad de ${autoRestMinutes} minutos...`);
+        return;
+      }
+
+      // 5. Dispatch message to next group
+      const data = getGroupDetails(pendingGroup);
+      const message = formatWhatsAppMessage(template, data);
+      const phone = pendingGroup.responsible_phone!.trim();
+      const link = generateWhatsAppLink(phone, message);
+
+      const sentIso = recordWhatsAppSent(eventId, pendingGroup.id, phone, messageMode);
+      setSentLogs(prev => ({
+        ...prev,
+        [pendingGroup.id]: {
+          groupId: pendingGroup.id,
+          phone,
+          sentAt: sentIso,
+          messageType: messageMode,
+        }
+      }));
+
+      setLastSentTimestamp(Date.now());
+      setSecondsRemaining(autoDelaySeconds);
+      setAutoBlockSentCount(prev => prev + 1);
+      setAutoStatusText(`🚀 Enviada invitación a ${pendingGroup.group_name} (${autoBlockSentCount + 1}/${autoBatchSize} del bloque actual)`);
+
+      // Open WhatsApp tab automatically
+      window.open(link, '_blank');
+
+    }, 1000);
+
+    return () => clearInterval(autoInterval);
+  }, [
+    isAutoRunning, autoRestSecondsRemaining, lastSentTimestamp, autoDelaySeconds,
+    groups, sentLogs, autoBlockSentCount, autoBatchSize, autoRestMinutes, template, eventId, messageMode
+  ]);
+
+  const handleStartAutoRunner = () => {
+    const pending = groups.filter(g => !sentLogs[g.id] && g.responsible_phone && g.responsible_phone.trim() !== '');
+    if (pending.length === 0) {
+      alert('No hay invitaciones pendientes con número de teléfono registrado.');
+      return;
+    }
+    setIsAutoRunning(true);
+    setAutoStatusText('🚀 Envío automático iniciado. Procesando invitaciones por bloques...');
+  };
+
+  const handlePauseAutoRunner = () => {
+    setIsAutoRunning(false);
+    setAutoStatusText('⏸️ Envío automático pausado por el usuario.');
+  };
 
   const handleModeChange = (mode: 'FULL_INVITATION' | 'FIRST_GREETING') => {
     setMessageMode(mode);
@@ -129,7 +245,7 @@ export default function WhatsAppMessagingPage() {
       }
     }));
     setLastSentTimestamp(Date.now());
-    setSecondsRemaining(35);
+    setSecondsRemaining(autoDelaySeconds);
 
     window.open(link, '_blank');
   };
@@ -155,6 +271,33 @@ export default function WhatsAppMessagingPage() {
     setTimeout(() => setCopiedGroup(null), 2000);
   };
 
+  // Handlers for Inline Phone Editing
+  const handleStartEditPhone = (group: GuestGroup) => {
+    setEditingPhoneGroupId(group.id);
+    setEditingPhoneValue(group.responsible_phone || '');
+  };
+
+  const handleCancelEditPhone = () => {
+    setEditingPhoneGroupId(null);
+    setEditingPhoneValue('');
+  };
+
+  const handleSavePhone = async (groupId: string) => {
+    const trimmed = editingPhoneValue.trim();
+    setIsSavingPhone(true);
+    try {
+      await updateGuestGroupPhoneAsync(eventId, groupId, trimmed);
+      setGroups(prev => prev.map(g => g.id === groupId ? { ...g, responsible_phone: trimmed } : g));
+      setEditingPhoneGroupId(null);
+      setEditingPhoneValue('');
+    } catch (err) {
+      console.error('Error updating group phone:', err);
+      alert('Error al guardar el número de teléfono. Inténtalo de nuevo.');
+    } finally {
+      setIsSavingPhone(false);
+    }
+  };
+
   const formatSentTime = (isoString?: string) => {
     if (!isoString) return null;
     try {
@@ -172,9 +315,9 @@ export default function WhatsAppMessagingPage() {
   const totalCount = groups.length;
   const sentCount = Object.keys(sentLogs).length;
   const pendingCount = Math.max(0, totalCount - sentCount);
-  const currentBatchMessageNum = (sentCount % 25) + 1;
-  const currentBatchNum = Math.floor(sentCount / 25) + 1;
-  const isRestingPeriod = sentCount > 0 && sentCount % 25 === 0 && pendingCount > 0;
+  const currentBatchMessageNum = (sentCount % autoBatchSize) + 1;
+  const currentBatchNum = Math.floor(sentCount / autoBatchSize) + 1;
+  const isRestingPeriod = autoRestSecondsRemaining > 0 || (sentCount > 0 && sentCount % autoBatchSize === 0 && pendingCount > 0);
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] flex flex-col select-none">
@@ -194,7 +337,7 @@ export default function WhatsAppMessagingPage() {
             </div>
             <h1 className="text-2xl font-serif font-bold text-slate-900 mt-1">Despacho de Invitaciones por WhatsApp</h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Sistema de envío seguro con temporizador de ritmo, descansos por bloque y registro de hora de envío.
+              Sistema de envío seguro con temporizador de ritmo, edición de teléfonos, descansos por bloque y registro de hora de envío.
             </p>
           </div>
 
@@ -202,7 +345,67 @@ export default function WhatsAppMessagingPage() {
             <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
             <div>
               <strong className="block text-[11px]">Protección Anti-Spam Activa</strong>
-              <span className="text-[10px] text-emerald-700">Ritmo seguro: 30-60s entre envíos</span>
+              <span className="text-[10px] text-emerald-700">Ritmo seguro: {autoDelaySeconds}s entre envíos</span>
+            </div>
+          </div>
+        </div>
+
+        {/* AUTOMATED BATCH DISPATCHER CONTROL BAR */}
+        <div className="card-luxury p-5 border border-emerald-400 bg-gradient-to-r from-emerald-900 to-teal-950 text-white shadow-lg rounded-2xl space-y-4">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-emerald-800/80 pb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-700/60 border border-emerald-500/50 flex items-center justify-center shrink-0">
+                {isAutoRunning ? <Play className="w-5 h-5 text-emerald-300 animate-pulse" /> : <RocketIcon />}
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center gap-2">
+                  🚀 Envío Automático por Bloques Anti-Baneo
+                </h3>
+                <p className="text-xs text-emerald-200/90">
+                  Despacha bloques de {autoBatchSize} invitaciones en segundo plano respetando las pausas de seguridad de {autoRestMinutes} min.
+                </p>
+              </div>
+            </div>
+
+            {/* Run / Pause Controls */}
+            <div className="flex items-center gap-3">
+              {!isAutoRunning ? (
+                <button
+                  type="button"
+                  onClick={handleStartAutoRunner}
+                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4 text-slate-950 fill-current" /> Iniciar Envío Automático
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handlePauseAutoRunner}
+                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2 animate-pulse"
+                >
+                  <Pause className="w-4 h-4 text-slate-950 fill-current" /> Pausar Envío
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Status Message & Live Settings */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-emerald-100 font-mono">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
+              <strong className="text-emerald-300">Estado:</strong> {autoStatusText}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 text-[11px] text-emerald-200/90">
+              <span className="bg-emerald-800/60 border border-emerald-700/80 px-2.5 py-1 rounded-lg">
+                Bloque: <strong>{autoBatchSize} msgs</strong>
+              </span>
+              <span className="bg-emerald-800/60 border border-emerald-700/80 px-2.5 py-1 rounded-lg">
+                Espera: <strong>{autoDelaySeconds}s</strong>
+              </span>
+              <span className="bg-emerald-800/60 border border-emerald-700/80 px-2.5 py-1 rounded-lg">
+                Pausa: <strong>{autoRestMinutes}m</strong>
+              </span>
             </div>
           </div>
         </div>
@@ -297,7 +500,7 @@ export default function WhatsAppMessagingPage() {
 
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
-                Bloque #{currentBatchNum} (Envío {currentBatchMessageNum} de 25)
+                Bloque #{currentBatchNum} (Envío {currentBatchMessageNum} de {autoBatchSize})
               </span>
 
               {secondsRemaining > 0 ? (
@@ -317,8 +520,8 @@ export default function WhatsAppMessagingPage() {
             <div className="p-3 bg-amber-100/80 border border-amber-300 rounded-xl flex items-center gap-3 text-xs text-amber-950 font-semibold">
               <Coffee className="w-6 h-6 text-amber-700 shrink-0" />
               <div>
-                <strong className="block text-amber-900 font-bold">☕ PAUSA DE SEGURIDAD RECOMENDADA (15 - 20 minutos)</strong>
-                <span>Has completado {sentCount} envíos en el Bloque #{currentBatchNum - 1}. Toma un descanso para garantizar que tu cuenta de WhatsApp no sea sancionada.</span>
+                <strong className="block text-amber-900 font-bold">☕ PAUSA DE SEGURIDAD RECOMENDADA ({autoRestMinutes} minutos)</strong>
+                <span>Has completado los envíos del bloque actual. Toma un descanso para garantizar que tu cuenta de WhatsApp no sea sancionada.</span>
               </div>
             </div>
           )}
@@ -392,7 +595,7 @@ export default function WhatsAppMessagingPage() {
           </div>
         </div>
 
-        {/* GUEST GROUPS DISPATCH LIST WITH TIMESTAMP LOGGING */}
+        {/* GUEST GROUPS DISPATCH LIST WITH TIMESTAMP LOGGING & INLINE PHONE EDITING */}
         <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-3">
             <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
@@ -423,7 +626,7 @@ export default function WhatsAppMessagingPage() {
                   <th className="py-3 px-4">Grupo / Responsable</th>
                   <th className="py-3 px-4">Pases</th>
                   <th className="py-3 px-4">Mesa</th>
-                  <th className="py-3 px-4">Teléfono</th>
+                  <th className="py-3 px-4">Teléfono (Modificable)</th>
                   <th className="py-3 px-4">Hora de Envío (sent_at)</th>
                   <th className="py-3 px-4">Acción WhatsApp</th>
                 </tr>
@@ -433,21 +636,64 @@ export default function WhatsAppMessagingPage() {
                   const hasPhone = Boolean(group.responsible_phone && group.responsible_phone.trim());
                   const logItem = sentLogs[group.id];
                   const sentTimeFormatted = logItem ? formatSentTime(logItem.sentAt) : null;
+                  const isEditingThisPhone = editingPhoneGroupId === group.id;
 
                   return (
                     <tr key={group.id} className="hover:bg-slate-50 transition">
                       <td className="py-3 px-4 font-bold text-slate-900">{group.group_name}</td>
                       <td className="py-3 px-4 font-bold text-emerald-600">{group.max_passes} pases</td>
                       <td className="py-3 px-4 text-purple-700 font-semibold">{getGroupDetails(group).tableName}</td>
+                      
+                      {/* INLINE PHONE EDITING CELL */}
                       <td className="py-3 px-4 font-mono text-slate-600">
-                        {hasPhone ? (
-                          <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                            <Send className="w-3 h-3 text-emerald-600" /> {group.responsible_phone}
-                          </span>
+                        {isEditingThisPhone ? (
+                          <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
+                            <input
+                              type="text"
+                              value={editingPhoneValue}
+                              onChange={(e) => setEditingPhoneValue(e.target.value)}
+                              placeholder="Ej. 987654321"
+                              disabled={isSavingPhone}
+                              className="w-32 px-2.5 py-1 text-xs border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white font-mono"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleSavePhone(group.id)}
+                              disabled={isSavingPhone}
+                              className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition"
+                              title="Guardar teléfono"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={handleCancelEditPhone}
+                              disabled={isSavingPhone}
+                              className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition"
+                              title="Cancelar"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         ) : (
-                          <span className="text-slate-400 italic flex items-center gap-1">
-                            <PhoneOff className="w-3 h-3" /> Sin Teléfono
-                          </span>
+                          <div className="flex items-center gap-2">
+                            {hasPhone ? (
+                              <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                                <Send className="w-3 h-3 text-emerald-600" /> {group.responsible_phone}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400 italic flex items-center gap-1">
+                                <PhoneOff className="w-3 h-3" /> Sin Teléfono
+                              </span>
+                            )}
+
+                            <button
+                              onClick={() => handleStartEditPhone(group)}
+                              className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition"
+                              title="Editar número de teléfono"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         )}
                       </td>
                       
@@ -495,5 +741,13 @@ export default function WhatsAppMessagingPage() {
         </div>
       </main>
     </div>
+  );
+}
+
+function RocketIcon() {
+  return (
+    <svg className="w-5 h-5 text-emerald-300 fill-current" viewBox="0 0 24 24">
+      <path d="M12 2.5s-4.5 4.5-4.5 10.5c0 2.5 1 4.5 2.5 5.5v3h4v-3c1.5-1 2.5-3 2.5-5.5C16.5 7 12 2.5 12 2.5zM12 15a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
+    </svg>
   );
 }

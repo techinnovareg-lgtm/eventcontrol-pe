@@ -658,3 +658,53 @@ export async function updateGuestGroupCompanionsAsync(
   }
   return updatedGroup;
 }
+
+export function updateGuestGroupPhone(
+  eventId: string,
+  groupId: string,
+  phone: string
+): GuestGroup | undefined {
+  const store = getGroupsStore();
+  const eventGroups = store[eventId] || [];
+  const group = eventGroups.find(g => g.id === groupId);
+
+  if (group) {
+    group.responsible_phone = phone;
+    group.updated_at = new Date().toISOString();
+    saveGroupsToStorage(store);
+    checkInRealtimeChannel.notify({ type: 'GROUPS_UPDATED', eventId });
+
+    if (typeof window !== 'undefined') {
+      const workspaceId = group.workspace_id || '';
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: eventGroups }),
+      }).catch(err => console.warn('[Sync Phone dispatch warning]', err));
+    }
+  }
+  return group;
+}
+
+export async function updateGuestGroupPhoneAsync(
+  eventId: string,
+  groupId: string,
+  phone: string
+): Promise<GuestGroup | undefined> {
+  const updatedGroup = updateGuestGroupPhone(eventId, groupId, phone);
+  if (updatedGroup && typeof window !== 'undefined') {
+    const store = getGroupsStore();
+    const eventGroups = store[eventId] || [];
+    const workspaceId = updatedGroup.workspace_id || '';
+    try {
+      await fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: eventGroups }),
+      });
+    } catch (err) {
+      console.warn('[Sync Phone Async dispatch warning]', err);
+    }
+  }
+  return updatedGroup;
+}
