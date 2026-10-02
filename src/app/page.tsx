@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { 
   Calendar, Users, QrCode, Grid, Clock, FileSpreadsheet, 
   ShieldCheck, CheckCircle2, ArrowRight, Utensils, HelpCircle, Sparkles, ExternalLink, Video, Star,
-  Mail, Phone, MessageSquare
+  Mail, Phone, MessageSquare, ShieldAlert, Send, Edit3, Lock, Coffee, Smartphone, Check
 } from 'lucide-react';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 import HeroBannerSlider from '@/components/HeroBannerSlider';
@@ -150,6 +150,14 @@ export default function Home() {
           
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
             
+            {/* New Features Luxury Announcement Badge */}
+            <div className="inline-flex items-center gap-2 bg-amber-50 border border-[#C5A059]/60 px-4 py-1.5 rounded-full shadow-2xs">
+              <Sparkles className="w-4 h-4 text-[#B8860B] shrink-0" />
+              <span className="text-xs font-serif font-bold text-[#8B6508] uppercase tracking-wider">
+                Novedad 2026: Despacho por Bloques WhatsApp Anti-Baneo & Protocolo de Acompañantes
+              </span>
+            </div>
+
             {/* LoveStory Script Tagline */}
             <span className="font-handwriting text-3xl sm:text-5xl text-[#DBBB6E] font-normal tracking-wide block">
               bienvenidos a la era digital de bodas & eventos
@@ -350,6 +358,123 @@ export default function Home() {
               </div>
 
             </div>
+          </div>
+        </section>
+
+        {/* NEW 2026 ADVANCED FEATURES & SECURITY PROTOCOLS SECTION */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+          <BaroqueFloralCrestDivider />
+
+          <div className="text-center max-w-3xl mx-auto space-y-2">
+            <span className="font-handwriting text-3xl sm:text-4xl text-[#DBBB6E] font-normal block">
+              innovaciones & control de alta seguridad
+            </span>
+            <h2 className="text-3xl sm:text-5xl font-serif text-[#1A1A1A] font-bold tracking-tight uppercase">
+              Nuevas Funcionalidades 2026
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 max-w-2xl mx-auto pt-1 leading-relaxed">
+              Diseñadas para proteger tu cuenta de WhatsApp, garantizar cero colados o personas extrañas y sincronizar tu evento en tiempo real.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            
+            {/* Feature 1: WhatsApp Batch Dispatcher */}
+            <div className="bg-white rounded-2xl p-6 border-2 border-emerald-200 shadow-md space-y-3 relative hover-lift flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-emerald-50 border border-emerald-300 flex items-center justify-center">
+                    <MessageSquare className="w-6 h-6 text-emerald-600" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-800 bg-emerald-100/90 px-2.5 py-1 rounded-full">
+                    Anti-Baneo WA
+                  </span>
+                </div>
+
+                <h3 className="text-lg font-serif font-bold text-slate-900">Despacho por Bloques Anti-Baneo</h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Envío masivo en bloques de 20 mensajes con pausas automáticas de 15 minutos, ritmo seguro de 35s, edición de teléfonos e historial auditado <code className="bg-slate-100 text-emerald-800 px-1 rounded">sent_at</code>.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 text-[11px] text-emerald-700 font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-emerald-600" /> Protección total de tu línea
+              </div>
+            </div>
+
+            {/* Feature 2: Companion Protocol */}
+            <div className="bg-white rounded-2xl p-6 border-2 border-amber-200 shadow-md space-y-3 relative hover-lift flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-center">
+                    <ShieldCheck className="w-6 h-6 text-amber-600" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800 bg-amber-100/90 px-2.5 py-1 rounded-full">
+                    Cero Extraños
+                  </span>
+                </div>
+
+                <h3 className="text-lg font-serif font-bold text-slate-900">Protocolo de Acompañantes</h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Verificación previa por nombre y mini-formulario de autorización en puerta para supuestos acompañantes. Control estricto de accesos no deseados.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 text-[11px] text-amber-800 font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-amber-600" /> Acompañantes autorizados por novios
+              </div>
+            </div>
+
+            {/* Feature 3: Dynamic QR Table Sync */}
+            <div className="bg-white rounded-2xl p-6 border-2 border-purple-200 shadow-md space-y-3 relative hover-lift flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-purple-50 border border-purple-300 flex items-center justify-center">
+                    <Grid className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-purple-800 bg-purple-100/90 px-2.5 py-1 rounded-full">
+                    QR Dinámico
+                  </span>
+                </div>
+
+                <h3 className="text-lg font-serif font-bold text-slate-900">Prerrequisito & QR Dinámico</h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Advertencia antes de WhatsApp y resolución de mesa en tiempo real al escanear. Si la mesa cambia después de enviar el QR, la puerta mostrará la mesa correcta sin re-envíos.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 text-[11px] text-purple-800 font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-purple-600" /> Sincronización dinámica instantánea
+              </div>
+            </div>
+
+            {/* Feature 4: RBAC Roles & PWA Offline */}
+            <div className="bg-white rounded-2xl p-6 border-2 border-indigo-200 shadow-md space-y-3 relative hover-lift flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-300 flex items-center justify-center">
+                    <Smartphone className="w-6 h-6 text-indigo-600" />
+                  </div>
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-800 bg-indigo-100/90 px-2.5 py-1 rounded-full">
+                    RBAC & Offline
+                  </span>
+                </div>
+
+                <h3 className="text-lg font-serif font-bold text-slate-900">Control RBAC & PWA Offline</h3>
+
+                <p className="text-xs text-slate-600 leading-relaxed font-normal">
+                  Permisos de operador de puerta restringidos a <code className="bg-slate-100 text-indigo-800 px-1 rounded">/scan</code>. Sincronización instantánea de los 9 módulos en todos los dispositivos con resiliencia ante caídas de red.
+                </p>
+              </div>
+
+              <div className="pt-3 border-t border-slate-100 text-[11px] text-indigo-800 font-bold flex items-center gap-1">
+                <Check className="w-3.5 h-3.5 text-indigo-600" /> Mínimo privilegio y resiliencia
+              </div>
+            </div>
+
           </div>
         </section>
 
