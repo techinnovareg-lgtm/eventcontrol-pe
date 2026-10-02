@@ -65,7 +65,7 @@ export default function QACenterPage() {
             </span>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Centro de Control de QA y Auditoría Final</h1>
             <p className="text-xs text-slate-500">
-              Ejecución e inspección integral de los 10 Casos Críticos de QA exigidos por la especificación del proyecto.
+              Ejecución e inspección integral de los 15 Casos Críticos de QA, Seguridad, Anti-Baneo y Resiliencia DB exigidos.
             </p>
           </div>
 
@@ -74,7 +74,7 @@ export default function QACenterPage() {
             disabled={running}
             className="gold-button font-bold text-xs px-5 py-3 rounded-xl transition shadow-md disabled:opacity-50 flex items-center gap-2 self-start sm:self-auto"
           >
-            <Play className="w-4 h-4 text-amber-100" /> {running ? 'Ejecutando Pruebas...' : 'Ejecutar Batería de 10 Casos QA'}
+            <Play className="w-4 h-4 text-amber-100" /> {running ? 'Ejecutando Pruebas...' : 'Ejecutar Batería de 15 Casos QA'}
           </button>
         </div>
 
@@ -83,7 +83,7 @@ export default function QACenterPage() {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="card-luxury p-5 text-center">
               <span className="text-xs text-slate-400 font-bold uppercase block">Total Casos Práctica</span>
-              <strong className="text-3xl font-serif font-black text-slate-900">10</strong>
+              <strong className="text-3xl font-serif font-black text-slate-900">{suiteResult.results.length}</strong>
             </div>
 
             <div className="card-luxury p-5 text-center bg-emerald-50/60 border border-emerald-200">
