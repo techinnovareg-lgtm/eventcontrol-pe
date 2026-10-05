@@ -99,7 +99,7 @@ export async function GET(req: Request) {
     const cleanedInput = emailOrUser.trim().toLowerCase();
     const trimmedPass = password.trim();
 
-    const found = globalServerMembersStore.find(m => {
+    let found = globalServerMembersStore.find(m => {
       const emailClean = (m.email || '').trim().toLowerCase();
       const nameClean = (m.name || '').trim().toLowerCase();
 
@@ -113,6 +113,43 @@ export async function GET(req: Request) {
       const expectedPass = (m.initialPassword || 'puerta2026').trim();
       return expectedPass === trimmedPass;
     });
+
+    // Fallback: If member not in local memory, check Supabase Auth Authority
+    if (!found && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      try {
+        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
+        const sbRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: cleanedInput, password: trimmedPass })
+        });
+        const sbData = await sbRes.json();
+
+        if (sbData.access_token || sbData.user || sbData.error_code === 'email_not_confirmed') {
+          const userMeta = sbData.user?.user_metadata || {};
+          found = {
+            id: sbData.user?.id || `usr-mb-${Date.now()}`,
+            workspaceId: userMeta.workspaceId || 'ws-a-1111',
+            eventId: userMeta.eventId,
+            name: userMeta.name || userMeta.companyName || 'Colaborador',
+            email: cleanedInput,
+            role: userMeta.role === 'OPERATOR' ? 'OPERATOR' : 'ADMIN',
+            roleLabel: userMeta.role === 'OPERATOR' ? 'Operador de Puerta' : 'Administrador',
+            permissionsScope: userMeta.permissionsScope || 'Acceso Estándar',
+            status: 'ACTIVO',
+            initialPassword: trimmedPass,
+            created_at: sbData.user?.created_at || new Date().toISOString()
+          };
+          globalServerMembersStore.unshift(found);
+          saveMembersToFile();
+        }
+      } catch (err) {
+        console.warn('[Sync Members Route - Supabase Auth Check Warning]', err);
+      }
+    }
 
     if (found) {
       return NextResponse.json({ success: true, member: found });
