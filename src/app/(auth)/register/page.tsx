@@ -6,6 +6,8 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { createAdminAccount, setActiveSession } from '@/lib/superadmin-store';
 
+import { createClient } from '@/lib/supabase/client';
+
 export default function RegisterPage() {
   const router = useRouter();
   const [workspaceName, setWorkspaceName] = useState('');
@@ -19,16 +21,39 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      const cleanEmail = email.trim().toLowerCase();
+      const cleanPass = password.trim();
+
       const { account } = createAdminAccount({
         companyName: workspaceName.trim(),
         adminName: workspaceName.trim(),
-        contactEmail: email.trim().toLowerCase(),
+        contactEmail: cleanEmail,
         planCode: 'STARTER',
         durationDays: 30,
-        initialPassword: password.trim(),
+        initialPassword: cleanPass,
       });
 
-      // Synchronously sync created account to central server DB authority
+      // 1. Primary: Register account with Supabase Auth authority
+      try {
+        const supabase = createClient();
+        await supabase.auth.signUp({
+          email: cleanEmail,
+          password: cleanPass,
+          options: {
+            data: {
+              companyName: workspaceName.trim(),
+              workspaceId: account.workspaceId,
+              initialPassword: cleanPass,
+              planCode: 'STARTER',
+              role: 'ADMIN',
+            },
+          },
+        });
+      } catch (sbErr) {
+        console.warn('[Supabase Auth Registration Notice]', sbErr);
+      }
+
+      // 2. Synchronously sync created account to central server DB authority
       await fetch('/api/auth/sync-accounts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

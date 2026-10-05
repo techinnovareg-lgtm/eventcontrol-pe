@@ -158,7 +158,49 @@ export async function GET(req: Request) {
     const cleanedEmail = email.trim().toLowerCase();
     const trimmedPass = password.trim();
 
-    const matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
+    let matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
+
+    // Fallback: If not in local memory, check Supabase Auth Authority
+    if (!matchedAccount && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+      try {
+        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
+        const sbRes = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ email: cleanedEmail, password: trimmedPass })
+        });
+        const sbData = await sbRes.json();
+
+        // If credentials match (success OR email_not_confirmed means password is valid)
+        if (sbData.access_token || sbData.user || sbData.error_code === 'email_not_confirmed') {
+          const userMeta = sbData.user?.user_metadata || {};
+          matchedAccount = {
+            id: sbData.user?.id || `usr-${Date.now()}`,
+            workspaceId: userMeta.workspaceId || `ws-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
+            companyName: userMeta.companyName || userMeta.name || 'Workspace Evento',
+            adminName: userMeta.adminName || 'Administrador',
+            contactEmail: cleanedEmail,
+            planCode: userMeta.planCode || 'STARTER',
+            contractStartDate: sbData.user?.created_at || new Date().toISOString(),
+            contractEndDate: '2027-12-31T23:59:59.000Z',
+            status: 'ACTIVA',
+            mustChangePassword: false,
+            initialPassword: trimmedPass,
+            passwordHashMasked: '••••••••••••',
+            created_at: sbData.user?.created_at || new Date().toISOString()
+          };
+          globalServerAccountsStore.unshift(matchedAccount);
+          saveAccountsToFile();
+        } else if (sbData.error_code === 'invalid_credentials') {
+          return NextResponse.json({ success: false, message: 'Contraseña incorrecta' }, { status: 401 });
+        }
+      } catch (err) {
+        console.warn('[Sync Accounts Route - Supabase Auth Check Warning]', err);
+      }
+    }
 
     if (matchedAccount) {
       if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
