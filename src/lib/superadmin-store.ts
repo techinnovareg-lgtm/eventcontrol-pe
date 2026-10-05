@@ -311,7 +311,7 @@ export function getAccountForSession(): AdminAccount {
   const store = getAdminAccountsStore();
   if (session && session.user) {
     const found = store.find(
-      a => a.workspaceId === session.user.workspaceId || a.contactEmail === session.user.email
+      a => a.workspaceId === session.user.workspaceId || a.contactEmail.toLowerCase() === session.user.email?.toLowerCase()
     );
     if (found) return found;
   }
