@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 export interface WorkspaceMemberUser {
   id: string;
@@ -21,11 +22,16 @@ export interface WorkspaceMemberUser {
 let globalServerMembersStore: WorkspaceMemberUser[] = [];
 
 const MEMBERS_DB_FILE = path.join(process.cwd(), 'data', 'server_members_db.json');
+const TMP_MEMBERS_DB_FILE = path.join(os.tmpdir(), 'server_members_db.json');
 
 function loadMembersFromFile() {
   try {
-    if (fs.existsSync(MEMBERS_DB_FILE)) {
-      const raw = fs.readFileSync(MEMBERS_DB_FILE, 'utf-8');
+    const targetFile = fs.existsSync(MEMBERS_DB_FILE) 
+      ? MEMBERS_DB_FILE 
+      : (fs.existsSync(TMP_MEMBERS_DB_FILE) ? TMP_MEMBERS_DB_FILE : null);
+
+    if (targetFile) {
+      const raw = fs.readFileSync(targetFile, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         globalServerMembersStore = parsed;
@@ -35,11 +41,14 @@ function loadMembersFromFile() {
 }
 
 function saveMembersToFile() {
+  const content = JSON.stringify(globalServerMembersStore, null, 2);
+
+  // Primary: process.cwd()/data/
   try {
     const dir = path.dirname(MEMBERS_DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const tempFile = `${MEMBERS_DB_FILE}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 6)}`;
-    fs.writeFileSync(tempFile, JSON.stringify(globalServerMembersStore, null, 2), 'utf-8');
+    const tempFile = `${MEMBERS_DB_FILE}.tmp.${Date.now()}`;
+    fs.writeFileSync(tempFile, content, 'utf-8');
     try {
       if (fs.existsSync(MEMBERS_DB_FILE)) fs.unlinkSync(MEMBERS_DB_FILE);
       fs.renameSync(tempFile, MEMBERS_DB_FILE);
@@ -47,6 +56,13 @@ function saveMembersToFile() {
       fs.copyFileSync(tempFile, MEMBERS_DB_FILE);
       if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     }
+  } catch (e) {
+    console.warn('[saveMembersToFile] Local directory write failed, falling back to OS temp', e);
+  }
+
+  // Fallback: OS temp directory
+  try {
+    fs.writeFileSync(TMP_MEMBERS_DB_FILE, content, 'utf-8');
   } catch (e) {
     console.error('[saveMembersToFile Error]', e);
   }
@@ -95,7 +111,7 @@ export async function GET(req: Request) {
       }
 
       const expectedPass = (m.initialPassword || 'puerta2026').trim();
-      return expectedPass === trimmedPass || expectedPass.toLowerCase() === trimmedPass.toLowerCase();
+      return expectedPass === trimmedPass;
     });
 
     if (found) {

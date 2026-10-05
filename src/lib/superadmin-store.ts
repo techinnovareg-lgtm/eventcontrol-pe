@@ -191,10 +191,7 @@ export async function authenticateAdminAccountAsync(emailInput: string, password
   if (matched) {
     if (matched.status === 'SUSPENDIDA' || matched.status === 'VENCIDA') return null;
     const expectedPassword = matched.initialPassword || 'EventControl2026!';
-    const isDefaultInitial = expectedPassword.toLowerCase() === 'eventcontrol2026!';
-    const isMatch = isDefaultInitial 
-      ? trimmedPass.toLowerCase() === 'eventcontrol2026!'
-      : trimmedPass.toLowerCase() === expectedPassword.toLowerCase();
+    const isMatch = trimmedPass === expectedPassword;
 
     if (isMatch) {
       // Sync account to server central DB if missing on server
@@ -240,9 +237,6 @@ export function setSuperAdminPassword(newPassword: string): void {
 export function verifySuperAdminPassword(passwordInput: string): boolean {
   const currentPass = getSuperAdminPassword();
   const trimmed = passwordInput.trim();
-  if (currentPass.toLowerCase() === 'eventcontrol2026!' && trimmed.toLowerCase() === 'eventcontrol2026!') {
-    return true;
-  }
   return currentPass === trimmed;
 }
 

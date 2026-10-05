@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 export interface AdminAccount {
   id: string;
@@ -89,14 +90,18 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
 let globalServerAccountsStore: AdminAccount[] = [];
 
 const ACCOUNTS_DB_FILE = path.join(process.cwd(), 'data', 'server_accounts_db.json');
+const TMP_ACCOUNTS_DB_FILE = path.join(os.tmpdir(), 'server_accounts_db.json');
 
 function loadAccountsFromFile() {
   try {
-    if (fs.existsSync(ACCOUNTS_DB_FILE)) {
-      const raw = fs.readFileSync(ACCOUNTS_DB_FILE, 'utf-8');
+    const targetFile = fs.existsSync(ACCOUNTS_DB_FILE) 
+      ? ACCOUNTS_DB_FILE 
+      : (fs.existsSync(TMP_ACCOUNTS_DB_FILE) ? TMP_ACCOUNTS_DB_FILE : null);
+      
+    if (targetFile) {
+      const raw = fs.readFileSync(targetFile, 'utf-8');
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        // Merge file accounts with INITIAL_ADMIN_ACCOUNTS so defaults are always available
         INITIAL_ADMIN_ACCOUNTS.forEach(initAcc => {
           if (!parsed.some((a: AdminAccount) => a.contactEmail.toLowerCase() === initAcc.contactEmail.toLowerCase())) {
             parsed.unshift(initAcc);
@@ -112,11 +117,15 @@ function loadAccountsFromFile() {
 }
 
 function saveAccountsToFile() {
+  const content = JSON.stringify(globalServerAccountsStore, null, 2);
+  let saved = false;
+
+  // Primary: Attempt process.cwd()/data/
   try {
     const dir = path.dirname(ACCOUNTS_DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    const tempFile = `${ACCOUNTS_DB_FILE}.tmp.${Date.now()}.${Math.random().toString(36).substring(2, 6)}`;
-    fs.writeFileSync(tempFile, JSON.stringify(globalServerAccountsStore, null, 2), 'utf-8');
+    const tempFile = `${ACCOUNTS_DB_FILE}.tmp.${Date.now()}`;
+    fs.writeFileSync(tempFile, content, 'utf-8');
     try {
       if (fs.existsSync(ACCOUNTS_DB_FILE)) fs.unlinkSync(ACCOUNTS_DB_FILE);
       fs.renameSync(tempFile, ACCOUNTS_DB_FILE);
@@ -124,6 +133,14 @@ function saveAccountsToFile() {
       fs.copyFileSync(tempFile, ACCOUNTS_DB_FILE);
       if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     }
+    saved = true;
+  } catch (e) {
+    console.warn('[saveAccountsToFile] Local directory write failed, falling back to OS temp', e);
+  }
+
+  // Fallback: Attempt OS temp directory (for read-only serverless platforms like Vercel)
+  try {
+    fs.writeFileSync(TMP_ACCOUNTS_DB_FILE, content, 'utf-8');
   } catch (e) {
     console.error('[saveAccountsToFile Error]', e);
   }
@@ -149,10 +166,7 @@ export async function GET(req: Request) {
       }
 
       const expectedPassword = matchedAccount.initialPassword || 'EventControl2026!';
-      const isDefaultInitial = expectedPassword.toLowerCase() === 'eventcontrol2026!';
-      const isPassMatch = isDefaultInitial 
-        ? trimmedPass.toLowerCase() === 'eventcontrol2026!'
-        : trimmedPass === expectedPassword;
+      const isPassMatch = trimmedPass === expectedPassword;
 
       if (isPassMatch) {
         return NextResponse.json({ success: true, account: matchedAccount });

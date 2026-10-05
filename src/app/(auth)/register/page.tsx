@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workspaceName || !email || !password) return;
     setLoading(true);
@@ -28,6 +28,13 @@ export default function RegisterPage() {
         initialPassword: password.trim(),
       });
 
+      // Synchronously sync created account to central server DB authority
+      await fetch('/api/auth/sync-accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPSERT', account }),
+      }).catch(() => {});
+
       setActiveSession({
         user: {
           id: account.id,
@@ -38,9 +45,7 @@ export default function RegisterPage() {
         },
       });
 
-      setTimeout(() => {
-        router.push('/dashboard');
-      }, 500);
+      router.push('/dashboard');
     } catch (err) {
       setLoading(false);
     }

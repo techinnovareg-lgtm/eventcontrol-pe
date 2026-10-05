@@ -339,7 +339,7 @@ export function authenticateWorkspaceMember(emailOrUser: string, passwordInput: 
     }
 
     const expectedPass = (m.initialPassword || 'puerta2026').trim();
-    return expectedPass === trimmedPassword || expectedPass.toLowerCase() === trimmedPassword.toLowerCase();
+    return expectedPass === trimmedPassword;
   });
 }
 
@@ -379,7 +379,7 @@ export async function authenticateWorkspaceMemberAsync(emailOrUser: string, pass
 
         // Verify password strictly against the latest initialPassword from central server
         const expectedPass = (serverMember.initialPassword || 'puerta2026').trim();
-        const isMatch = expectedPass === trimmedPassword || expectedPass.toLowerCase() === trimmedPassword.toLowerCase();
+        const isMatch = expectedPass === trimmedPassword;
         if (isMatch) return serverMember;
 
         return undefined; // Reject if password does not match

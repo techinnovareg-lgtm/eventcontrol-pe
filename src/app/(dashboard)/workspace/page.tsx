@@ -59,10 +59,7 @@ export default function AccountProfilePage() {
     e.preventDefault();
     const currentPass = currentPassword.trim();
     const expectedPass = contractInfo.initialPassword || 'EventControl2026!';
-    const isDefaultInitial = expectedPass.toLowerCase() === 'eventcontrol2026!';
-    const isCurrentValid = isDefaultInitial
-      ? currentPass.toLowerCase() === 'eventcontrol2026!'
-      : currentPass === expectedPass;
+    const isCurrentValid = currentPass === expectedPass;
 
     if (!isCurrentValid) {
       setPasswordMsg({ type: 'error', text: 'La contraseña actual ingresada es incorrecta.' });
