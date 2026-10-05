@@ -208,9 +208,15 @@ export async function GET(req: Request) {
     const trimmedPass = password.trim();
 
     let matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
+    let isPassMatch = false;
 
-    // Fallback: If not in local memory, check Supabase Auth Authority
-    if (!matchedAccount && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (matchedAccount) {
+      const expectedPassword = (matchedAccount.initialPassword || 'EventControl2026!').trim();
+      isPassMatch = trimmedPass === expectedPassword;
+    }
+
+    // Fallback: If not in local memory or password mismatch, verify with Supabase Auth Authority
+    if ((!matchedAccount || !isPassMatch) && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       try {
         const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
         const sbRes = await fetch(url, {
@@ -226,26 +232,30 @@ export async function GET(req: Request) {
         // If credentials match (success OR email_not_confirmed means password is valid)
         if (sbData.access_token || sbData.user || sbData.error_code === 'email_not_confirmed') {
           const userMeta = sbData.user?.user_metadata || {};
-          matchedAccount = {
-            id: sbData.user?.id || `usr-${Date.now()}`,
-            workspaceId: userMeta.workspaceId || `ws-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
-            companyName: userMeta.companyName || userMeta.name || 'Workspace Evento',
-            adminName: userMeta.adminName || 'Administrador',
-            contactEmail: cleanedEmail,
-            planCode: userMeta.planCode || 'STARTER',
-            contractStartDate: sbData.user?.created_at || new Date().toISOString(),
-            contractEndDate: '2027-12-31T23:59:59.000Z',
-            status: 'ACTIVA',
-            mustChangePassword: false,
-            initialPassword: trimmedPass,
-            passwordHashMasked: '••••••••••••',
-            created_at: sbData.user?.created_at || new Date().toISOString()
-          };
-          globalServerAccountsStore.unshift(matchedAccount);
+          if (matchedAccount) {
+            matchedAccount.initialPassword = trimmedPass;
+            isPassMatch = true;
+          } else {
+            matchedAccount = {
+              id: sbData.user?.id || `usr-${Date.now()}`,
+              workspaceId: userMeta.workspaceId || `ws-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
+              companyName: userMeta.companyName || userMeta.name || 'Workspace Evento',
+              adminName: userMeta.adminName || 'Administrador',
+              contactEmail: cleanedEmail,
+              planCode: userMeta.planCode || 'STARTER',
+              contractStartDate: sbData.user?.created_at || new Date().toISOString(),
+              contractEndDate: '2027-12-31T23:59:59.000Z',
+              status: 'ACTIVA',
+              mustChangePassword: false,
+              initialPassword: trimmedPass,
+              passwordHashMasked: '••••••••••••',
+              created_at: sbData.user?.created_at || new Date().toISOString()
+            };
+            globalServerAccountsStore.unshift(matchedAccount);
+          }
+          isPassMatch = true;
           saveAccountsToFile();
           persistAccountToSupabase(matchedAccount);
-        } else if (sbData.error_code === 'invalid_credentials') {
-          return NextResponse.json({ success: false, message: 'Contraseña incorrecta' }, { status: 401 });
         }
       } catch (err) {
         console.warn('[Sync Accounts Route - Supabase Auth Check Warning]', err);
@@ -256,9 +266,6 @@ export async function GET(req: Request) {
       if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
         return NextResponse.json({ success: false, message: `Cuenta ${matchedAccount.status.toLowerCase()}` }, { status: 403 });
       }
-
-      const expectedPassword = (matchedAccount.initialPassword || 'EventControl2026!').trim();
-      const isPassMatch = trimmedPass === expectedPassword;
 
       if (isPassMatch) {
         return NextResponse.json({ success: true, account: matchedAccount });

@@ -166,14 +166,15 @@ export function createWorkspaceMember(data: {
     permissionsScope = 'Escaneo de QR y registro de check-in únicamente';
   }
 
-  // Determine expiration date: custom date provided by client OR default to main admin contract end date
+  // Determine expiration date: custom date provided by client OR default to 1 year in the future
   let expiresAt = data.credentialsExpiresAt ? data.credentialsExpiresAt.trim() : undefined;
   if (!expiresAt) {
     const adminAccounts = getAllAdminAccounts();
     const mainAccount = adminAccounts.find(a => a.workspaceId === data.workspaceId);
-    if (mainAccount && mainAccount.contractEndDate) {
+    if (mainAccount && mainAccount.contractEndDate && new Date(mainAccount.contractEndDate).getTime() > Date.now()) {
       expiresAt = mainAccount.contractEndDate;
     } else {
+      // Default to 1 year from creation date
       expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     }
   }

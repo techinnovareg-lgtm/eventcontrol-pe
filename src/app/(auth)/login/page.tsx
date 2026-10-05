@@ -269,6 +269,9 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="tu.correo@empresa.pe"
@@ -286,7 +289,9 @@ export default function LoginPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                minLength={8}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••••••"
