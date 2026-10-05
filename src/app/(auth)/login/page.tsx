@@ -45,8 +45,8 @@ export default function LoginPage() {
       return;
     }
 
-    if (!password || password.trim().length < 8) {
-      setErrorMsg('La contraseña debe tener al menos 8 caracteres.');
+    if (!password || password.trim().length < 6) {
+      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
       setLoading(false);
       return;
     }
@@ -115,8 +115,11 @@ export default function LoginPage() {
           workspaceId: wsId,
         },
       });
-      const userEvents = await getWorkspaceEventsAsync(wsId);
-      const targetEvtId = userEvents[0]?.id;
+      let targetEvtId: string | undefined = undefined;
+      try {
+        const userEvents = await getWorkspaceEventsAsync(wsId);
+        targetEvtId = userEvents[0]?.id;
+      } catch (e) {}
       router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
       return;
     }
@@ -140,8 +143,11 @@ export default function LoginPage() {
         },
       });
 
-      const userEvents = await getWorkspaceEventsAsync(matchedAccount.workspaceId);
-      const targetEvtId = userEvents[0]?.id;
+      let targetEvtId: string | undefined = undefined;
+      try {
+        const userEvents = await getWorkspaceEventsAsync(matchedAccount.workspaceId);
+        targetEvtId = userEvents[0]?.id;
+      } catch (e) {}
       router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
       return;
     }
@@ -164,8 +170,11 @@ export default function LoginPage() {
         const scanRoute = matchedSubUser.eventId ? `/scan?event=${matchedSubUser.eventId}` : '/scan';
         router.push(scanRoute);
       } else {
-        const subUserEvents = await getWorkspaceEventsAsync(matchedSubUser.workspaceId);
-        const targetEvtId = subUserEvents[0]?.id;
+        let targetEvtId: string | undefined = undefined;
+        try {
+          const subUserEvents = await getWorkspaceEventsAsync(matchedSubUser.workspaceId);
+          targetEvtId = subUserEvents[0]?.id;
+        } catch (e) {}
         router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
       }
       return;
