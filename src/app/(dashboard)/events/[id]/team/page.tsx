@@ -14,7 +14,7 @@ import { checkInRealtimeChannel } from '@/lib/realtime';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { 
   getEventMembers, getEventMembersAsync, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
-  WorkspaceMemberUser, WorkspaceUserRole, isCredentialsExpired, formatExpirationDate
+  WorkspaceMemberUser, WorkspaceUserRole, isCredentialsExpired, formatExpirationDate, syncWorkspaceMemberOnlineAsync
 } from '@/lib/workspace-users';
 
 export default function EventTeamPage() {
@@ -91,7 +91,7 @@ export default function EventTeamPage() {
   const [editExpiresAt, setEditExpiresAt] = useState('');
   const [editMemberSuccess, setEditMemberSuccess] = useState<string | null>(null);
 
-  const handleCreateSubUser = (e: React.FormEvent) => {
+  const handleCreateSubUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim() || !newMemberEmail.trim()) return;
 
@@ -105,6 +105,8 @@ export default function EventTeamPage() {
       role: newMemberRole,
       credentialsExpiresAt: newMemberExpiresAt ? newMemberExpiresAt.trim() : undefined,
     });
+
+    await syncWorkspaceMemberOnlineAsync(created);
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
     setCreatedMemberSuccess({ member: created, rawPass: pass });
@@ -121,11 +123,11 @@ export default function EventTeamPage() {
     setEditMemberSuccess(null);
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember || !editName.trim() || !editEmail.trim()) return;
 
-    updateWorkspaceMember(editingMember.id, {
+    const updated = updateWorkspaceMember(editingMember.id, {
       name: editName,
       email: editEmail,
       initialPassword: editPassword,
@@ -133,6 +135,10 @@ export default function EventTeamPage() {
       status: editStatus,
       credentialsExpiresAt: editExpiresAt ? editExpiresAt.trim() : '',
     });
+
+    if (updated) {
+      await syncWorkspaceMemberOnlineAsync(updated);
+    }
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
     setEditMemberSuccess('¡Colaborador actualizado exitosamente!');

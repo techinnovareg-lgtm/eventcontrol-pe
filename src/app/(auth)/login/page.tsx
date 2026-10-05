@@ -269,11 +269,12 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                autoComplete="email"
                 placeholder="tu.correo@empresa.pe"
                 className="w-full pl-9 pr-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
               />
@@ -289,11 +290,13 @@ export default function LoginPage() {
               <input
                 type={showPassword ? 'text' : 'password'}
                 required
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck="false"
+                autoComplete="current-password"
                 placeholder="••••••••••••"
                 className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
               />

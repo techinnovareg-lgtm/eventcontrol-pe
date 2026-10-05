@@ -116,9 +116,6 @@ export default function RegisterPage() {
             <input
               type="email"
               required
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="contacto@miestudio.pe"
@@ -133,9 +130,6 @@ export default function RegisterPage() {
             <input
               type="password"
               required
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"

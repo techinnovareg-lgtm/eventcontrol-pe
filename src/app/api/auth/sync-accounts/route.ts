@@ -113,13 +113,19 @@ async function fetchOnlineAccountsFromSupabase(): Promise<AdminAccount[]> {
   return [];
 }
 
+import crypto from 'crypto';
+
+function generateDeterministicUUID(keyString: string): string {
+  const hash = crypto.createHash('sha256').update(keyString.toLowerCase().trim()).digest('hex');
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
+
 async function persistAccountToSupabase(acc: AdminAccount) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return;
   try {
-    const cleanId = (acc.id + (acc.contactEmail || '')).replace(/[^a-f0-9]/gi, '').padEnd(32, '0').slice(0, 32);
-    const uuid = `${cleanId.slice(0,8)}-${cleanId.slice(8,12)}-${cleanId.slice(12,16)}-${cleanId.slice(16,20)}-${cleanId.slice(20,32)}`;
+    const uuid = generateDeterministicUUID(`acc_${acc.id}_${acc.contactEmail}`);
     
     await fetch(`${url}/rest/v1/check_ins`, {
       method: 'POST',
@@ -208,15 +214,9 @@ export async function GET(req: Request) {
     const trimmedPass = password.trim();
 
     let matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
-    let isPassMatch = false;
 
-    if (matchedAccount) {
-      const expectedPassword = (matchedAccount.initialPassword || 'EventControl2026!').trim();
-      isPassMatch = trimmedPass === expectedPassword;
-    }
-
-    // Fallback: If not in local memory or password mismatch, verify with Supabase Auth Authority
-    if ((!matchedAccount || !isPassMatch) && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    // Fallback: If not in local memory, check Supabase Auth Authority
+    if (!matchedAccount && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       try {
         const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
         const sbRes = await fetch(url, {
@@ -232,30 +232,26 @@ export async function GET(req: Request) {
         // If credentials match (success OR email_not_confirmed means password is valid)
         if (sbData.access_token || sbData.user || sbData.error_code === 'email_not_confirmed') {
           const userMeta = sbData.user?.user_metadata || {};
-          if (matchedAccount) {
-            matchedAccount.initialPassword = trimmedPass;
-            isPassMatch = true;
-          } else {
-            matchedAccount = {
-              id: sbData.user?.id || `usr-${Date.now()}`,
-              workspaceId: userMeta.workspaceId || `ws-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
-              companyName: userMeta.companyName || userMeta.name || 'Workspace Evento',
-              adminName: userMeta.adminName || 'Administrador',
-              contactEmail: cleanedEmail,
-              planCode: userMeta.planCode || 'STARTER',
-              contractStartDate: sbData.user?.created_at || new Date().toISOString(),
-              contractEndDate: '2027-12-31T23:59:59.000Z',
-              status: 'ACTIVA',
-              mustChangePassword: false,
-              initialPassword: trimmedPass,
-              passwordHashMasked: '••••••••••••',
-              created_at: sbData.user?.created_at || new Date().toISOString()
-            };
-            globalServerAccountsStore.unshift(matchedAccount);
-          }
-          isPassMatch = true;
+          matchedAccount = {
+            id: sbData.user?.id || `usr-${Date.now()}`,
+            workspaceId: userMeta.workspaceId || `ws-${cleanedEmail.replace(/[^a-z0-9]/g, '')}`,
+            companyName: userMeta.companyName || userMeta.name || 'Workspace Evento',
+            adminName: userMeta.adminName || 'Administrador',
+            contactEmail: cleanedEmail,
+            planCode: userMeta.planCode || 'STARTER',
+            contractStartDate: sbData.user?.created_at || new Date().toISOString(),
+            contractEndDate: '2027-12-31T23:59:59.000Z',
+            status: 'ACTIVA',
+            mustChangePassword: false,
+            initialPassword: trimmedPass,
+            passwordHashMasked: '••••••••••••',
+            created_at: sbData.user?.created_at || new Date().toISOString()
+          };
+          globalServerAccountsStore.unshift(matchedAccount);
           saveAccountsToFile();
           persistAccountToSupabase(matchedAccount);
+        } else if (sbData.error_code === 'invalid_credentials') {
+          return NextResponse.json({ success: false, message: 'Contraseña incorrecta' }, { status: 401 });
         }
       } catch (err) {
         console.warn('[Sync Accounts Route - Supabase Auth Check Warning]', err);
@@ -266,6 +262,9 @@ export async function GET(req: Request) {
       if (matchedAccount.status === 'SUSPENDIDA' || matchedAccount.status === 'VENCIDA') {
         return NextResponse.json({ success: false, message: `Cuenta ${matchedAccount.status.toLowerCase()}` }, { status: 403 });
       }
+
+      const expectedPassword = (matchedAccount.initialPassword || 'EventControl2026!').trim();
+      const isPassMatch = trimmedPass === expectedPassword;
 
       if (isPassMatch) {
         return NextResponse.json({ success: true, account: matchedAccount });
@@ -296,15 +295,15 @@ export async function POST(req: Request) {
     const { action, accounts, account, accountId, password } = body;
 
     if (action === 'SYNC' && Array.isArray(accounts)) {
-      accounts.forEach((acc: AdminAccount) => {
+      for (const acc of accounts) {
         const idx = globalServerAccountsStore.findIndex(a => a.id === acc.id || a.contactEmail.toLowerCase() === acc.contactEmail.toLowerCase());
         if (idx !== -1) {
           globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...acc };
         } else {
           globalServerAccountsStore.unshift(acc);
         }
-        persistAccountToSupabase(acc);
-      });
+        await persistAccountToSupabase(acc);
+      }
       saveAccountsToFile();
       return NextResponse.json({ success: true, accounts: globalServerAccountsStore });
     }
@@ -317,7 +316,7 @@ export async function POST(req: Request) {
         globalServerAccountsStore.unshift(account);
       }
       saveAccountsToFile();
-      persistAccountToSupabase(account);
+      await persistAccountToSupabase(account);
       return NextResponse.json({ success: true, account });
     }
 
@@ -328,7 +327,7 @@ export async function POST(req: Request) {
         acc.initialPassword = password.trim();
         acc.mustChangePassword = false;
         saveAccountsToFile();
-        persistAccountToSupabase(acc);
+        await persistAccountToSupabase(acc);
         return NextResponse.json({ success: true, account: acc });
       }
       return NextResponse.json({ success: false, message: 'Cuenta no encontrada' }, { status: 404 });

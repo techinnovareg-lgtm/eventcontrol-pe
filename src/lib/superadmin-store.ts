@@ -414,6 +414,21 @@ export async function sendClientWelcomeEmail(account: {
 /**
  * Super Admin: Create a new Client / Admin Account with automatic plan limits enforcement
  */
+export async function syncAdminAccountOnlineAsync(account: AdminAccount): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/api/auth/sync-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UPSERT', account }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Sync Accounts Online Error]', err);
+    return false;
+  }
+}
+
 export function createAdminAccount(data: {
   companyName: string;
   adminName: string;
@@ -451,13 +466,7 @@ export function createAdminAccount(data: {
   store.unshift(account);
   saveAccountsToStorage(store);
 
-  if (typeof window !== 'undefined') {
-    fetch('/api/auth/sync-accounts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'UPSERT', account }),
-    }).catch(err => console.warn('[Sync Accounts UPSERT warning]', err));
-  }
+  syncAdminAccountOnlineAsync(account).catch(err => console.warn('[Sync Accounts UPSERT warning]', err));
 
   return {
     account,

@@ -140,6 +140,21 @@ export async function getEventMembersAsync(eventId: string, workspaceId?: string
   return allMembers.filter(m => m.eventId === eventId);
 }
 
+export async function syncWorkspaceMemberOnlineAsync(member: WorkspaceMemberUser): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/api/auth/sync-members', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UPSERT', member }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.warn('[Sync Members Online Error]', err);
+    return false;
+  }
+}
+
 export function createWorkspaceMember(data: {
   workspaceId: string;
   eventId?: string;
@@ -166,15 +181,14 @@ export function createWorkspaceMember(data: {
     permissionsScope = 'Escaneo de QR y registro de check-in únicamente';
   }
 
-  // Determine expiration date: custom date provided by client OR default to 1 year in the future
+  // Determine expiration date: custom date provided by client OR default to main admin contract end date
   let expiresAt = data.credentialsExpiresAt ? data.credentialsExpiresAt.trim() : undefined;
   if (!expiresAt) {
     const adminAccounts = getAllAdminAccounts();
     const mainAccount = adminAccounts.find(a => a.workspaceId === data.workspaceId);
-    if (mainAccount && mainAccount.contractEndDate && new Date(mainAccount.contractEndDate).getTime() > Date.now()) {
+    if (mainAccount && mainAccount.contractEndDate) {
       expiresAt = mainAccount.contractEndDate;
     } else {
-      // Default to 1 year from creation date
       expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     }
   }
@@ -197,14 +211,7 @@ export function createWorkspaceMember(data: {
   const updatedStore = [newMember, ...store];
   saveMembersToStorage(updatedStore);
 
-  // Sync with central server API for cross-device access (Mobile phones, PCs, tablets)
-  if (typeof window !== 'undefined') {
-    fetch('/api/auth/sync-members', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'CREATE', member: newMember }),
-    }).catch(err => console.warn('[Sync API dispatch warning]', err));
-  }
+  syncWorkspaceMemberOnlineAsync(newMember).catch(err => console.warn('[Sync API dispatch warning]', err));
 
   return newMember;
 }

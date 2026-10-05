@@ -45,13 +45,19 @@ async function fetchOnlineMembersFromSupabase(): Promise<WorkspaceMemberUser[]> 
   return [];
 }
 
+import crypto from 'crypto';
+
+function generateDeterministicUUID(keyString: string): string {
+  const hash = crypto.createHash('sha256').update(keyString.toLowerCase().trim()).digest('hex');
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
+
 async function persistMemberToSupabase(member: WorkspaceMemberUser) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return;
   try {
-    const cleanId = (member.id + (member.email || '') + (member.name || '')).replace(/[^a-f0-9]/gi, '').padEnd(32, '0').slice(0, 32);
-    const uuid = `${cleanId.slice(0,8)}-${cleanId.slice(8,12)}-${cleanId.slice(12,16)}-${cleanId.slice(16,20)}-${cleanId.slice(20,32)}`;
+    const uuid = generateDeterministicUUID(`member_${member.id}_${member.email}`);
     
     await fetch(`${url}/rest/v1/check_ins`, {
       method: 'POST',
@@ -243,7 +249,7 @@ export async function POST(req: Request) {
           globalServerMembersStore.unshift(member);
         }
         saveMembersToFile();
-        persistMemberToSupabase(member);
+        await persistMemberToSupabase(member);
       }
     } else if (body.action === 'DELETE') {
       const memberId = body.memberId;
@@ -253,15 +259,15 @@ export async function POST(req: Request) {
       }
     } else if (body.action === 'SYNC') {
       const members: WorkspaceMemberUser[] = body.members || [];
-      members.forEach(m => {
+      for (const m of members) {
         const idx = globalServerMembersStore.findIndex(x => x.id === m.id || x.email.toLowerCase() === m.email.toLowerCase());
         if (idx !== -1) {
           globalServerMembersStore[idx] = { ...globalServerMembersStore[idx], ...m };
         } else {
           globalServerMembersStore.unshift(m);
         }
-        persistMemberToSupabase(m);
-      });
+        await persistMemberToSupabase(m);
+      }
       saveMembersToFile();
     }
 

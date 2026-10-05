@@ -14,7 +14,7 @@ import {
   triggerPasswordReset, calculateRemainingDays, extendAdminContract, 
   AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL, sendClientWelcomeEmail,
   setSuperAdminPassword, verifySuperAdminPassword,
-  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin
+  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, syncAdminAccountOnlineAsync
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 
@@ -198,6 +198,8 @@ export default function SuperAdminPage() {
       planCode,
       durationDays,
     });
+
+    await syncAdminAccountOnlineAsync(account);
 
     const emailStatus = await sendClientWelcomeEmail({
       contactEmail,
