@@ -24,6 +24,52 @@ let globalServerMembersStore: WorkspaceMemberUser[] = [];
 const MEMBERS_DB_FILE = path.join(process.cwd(), 'data', 'server_members_db.json');
 const TMP_MEMBERS_DB_FILE = path.join(os.tmpdir(), 'server_members_db.json');
 
+async function fetchOnlineMembersFromSupabase(): Promise<WorkspaceMemberUser[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return [];
+  try {
+    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_MEMBER_SYNC&select=*`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        return rows.map(r => {
+          try { return JSON.parse(r.device_info); } catch (e) { return null; }
+        }).filter(Boolean);
+      }
+    }
+  } catch (err) {}
+  return [];
+}
+
+async function persistMemberToSupabase(member: WorkspaceMemberUser) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return;
+  try {
+    const cleanId = (member.id + (member.email || '') + (member.name || '')).replace(/[^a-f0-9]/gi, '').padEnd(32, '0').slice(0, 32);
+    const uuid = `${cleanId.slice(0,8)}-${cleanId.slice(8,12)}-${cleanId.slice(12,16)}-${cleanId.slice(16,20)}-${cleanId.slice(20,32)}`;
+    
+    await fetch(`${url}/rest/v1/check_ins`, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        id: uuid,
+        scanner_staff_name: 'SYS_MEMBER_SYNC',
+        device_info: JSON.stringify(member)
+      })
+    });
+  } catch (err) {}
+}
+
 function loadMembersFromFile() {
   try {
     const targetFile = fs.existsSync(MEMBERS_DB_FILE) 
@@ -43,7 +89,6 @@ function loadMembersFromFile() {
 function saveMembersToFile() {
   const content = JSON.stringify(globalServerMembersStore, null, 2);
 
-  // Primary: process.cwd()/data/
   try {
     const dir = path.dirname(MEMBERS_DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -56,16 +101,11 @@ function saveMembersToFile() {
       fs.copyFileSync(tempFile, MEMBERS_DB_FILE);
       if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     }
-  } catch (e) {
-    console.warn('[saveMembersToFile] Local directory write failed, falling back to OS temp', e);
-  }
+  } catch (e) {}
 
-  // Fallback: OS temp directory
   try {
     fs.writeFileSync(TMP_MEMBERS_DB_FILE, content, 'utf-8');
-  } catch (e) {
-    console.error('[saveMembersToFile Error]', e);
-  }
+  } catch (e) {}
 }
 
 loadMembersFromFile();
@@ -91,6 +131,18 @@ function isCredentialsExpired(expiresAtIso?: string): boolean {
 
 export async function GET(req: Request) {
   loadMembersFromFile();
+  
+  // Merge Online Supabase DB members
+  const onlineMembers = await fetchOnlineMembersFromSupabase();
+  onlineMembers.forEach(om => {
+    const idx = globalServerMembersStore.findIndex(m => m.id === om.id || (om.email && m.email && m.email.toLowerCase() === om.email.toLowerCase()));
+    if (idx !== -1) {
+      globalServerMembersStore[idx] = { ...globalServerMembersStore[idx], ...om };
+    } else {
+      globalServerMembersStore.unshift(om);
+    }
+  });
+
   const { searchParams } = new URL(req.url);
   const emailOrUser = searchParams.get('email') || searchParams.get('user');
   const password = searchParams.get('password');
@@ -145,6 +197,7 @@ export async function GET(req: Request) {
           };
           globalServerMembersStore.unshift(found);
           saveMembersToFile();
+          persistMemberToSupabase(found);
         }
       } catch (err) {
         console.warn('[Sync Members Route - Supabase Auth Check Warning]', err);
@@ -190,6 +243,7 @@ export async function POST(req: Request) {
           globalServerMembersStore.unshift(member);
         }
         saveMembersToFile();
+        persistMemberToSupabase(member);
       }
     } else if (body.action === 'DELETE') {
       const memberId = body.memberId;
@@ -206,6 +260,7 @@ export async function POST(req: Request) {
         } else {
           globalServerMembersStore.unshift(m);
         }
+        persistMemberToSupabase(m);
       });
       saveMembersToFile();
     }

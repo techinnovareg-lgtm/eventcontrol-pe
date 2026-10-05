@@ -92,6 +92,52 @@ let globalServerAccountsStore: AdminAccount[] = [];
 const ACCOUNTS_DB_FILE = path.join(process.cwd(), 'data', 'server_accounts_db.json');
 const TMP_ACCOUNTS_DB_FILE = path.join(os.tmpdir(), 'server_accounts_db.json');
 
+async function fetchOnlineAccountsFromSupabase(): Promise<AdminAccount[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return [];
+  try {
+    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_ACCOUNT_SYNC&select=*`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        return rows.map(r => {
+          try { return JSON.parse(r.device_info); } catch (e) { return null; }
+        }).filter(Boolean);
+      }
+    }
+  } catch (err) {}
+  return [];
+}
+
+async function persistAccountToSupabase(acc: AdminAccount) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return;
+  try {
+    const cleanId = (acc.id + (acc.contactEmail || '')).replace(/[^a-f0-9]/gi, '').padEnd(32, '0').slice(0, 32);
+    const uuid = `${cleanId.slice(0,8)}-${cleanId.slice(8,12)}-${cleanId.slice(12,16)}-${cleanId.slice(16,20)}-${cleanId.slice(20,32)}`;
+    
+    await fetch(`${url}/rest/v1/check_ins`, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        id: uuid,
+        scanner_staff_name: 'SYS_ACCOUNT_SYNC',
+        device_info: JSON.stringify(acc)
+      })
+    });
+  } catch (err) {}
+}
+
 function loadAccountsFromFile() {
   try {
     const targetFile = fs.existsSync(ACCOUNTS_DB_FILE) 
@@ -118,9 +164,6 @@ function loadAccountsFromFile() {
 
 function saveAccountsToFile() {
   const content = JSON.stringify(globalServerAccountsStore, null, 2);
-  let saved = false;
-
-  // Primary: Attempt process.cwd()/data/
   try {
     const dir = path.dirname(ACCOUNTS_DB_FILE);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -133,23 +176,29 @@ function saveAccountsToFile() {
       fs.copyFileSync(tempFile, ACCOUNTS_DB_FILE);
       if (fs.existsSync(tempFile)) fs.unlinkSync(tempFile);
     }
-    saved = true;
-  } catch (e) {
-    console.warn('[saveAccountsToFile] Local directory write failed, falling back to OS temp', e);
-  }
+  } catch (e) {}
 
-  // Fallback: Attempt OS temp directory (for read-only serverless platforms like Vercel)
   try {
     fs.writeFileSync(TMP_ACCOUNTS_DB_FILE, content, 'utf-8');
-  } catch (e) {
-    console.error('[saveAccountsToFile Error]', e);
-  }
+  } catch (e) {}
 }
 
 loadAccountsFromFile();
 
 export async function GET(req: Request) {
   loadAccountsFromFile();
+  
+  // Merge Online Supabase DB accounts
+  const onlineAccounts = await fetchOnlineAccountsFromSupabase();
+  onlineAccounts.forEach(oa => {
+    const idx = globalServerAccountsStore.findIndex(a => a.id === oa.id || a.contactEmail.toLowerCase() === oa.contactEmail.toLowerCase());
+    if (idx !== -1) {
+      globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...oa };
+    } else {
+      globalServerAccountsStore.unshift(oa);
+    }
+  });
+
   const { searchParams } = new URL(req.url);
   const email = searchParams.get('email');
   const password = searchParams.get('password');
@@ -194,6 +243,7 @@ export async function GET(req: Request) {
           };
           globalServerAccountsStore.unshift(matchedAccount);
           saveAccountsToFile();
+          persistAccountToSupabase(matchedAccount);
         } else if (sbData.error_code === 'invalid_credentials') {
           return NextResponse.json({ success: false, message: 'Contraseña incorrecta' }, { status: 401 });
         }
@@ -207,7 +257,7 @@ export async function GET(req: Request) {
         return NextResponse.json({ success: false, message: `Cuenta ${matchedAccount.status.toLowerCase()}` }, { status: 403 });
       }
 
-      const expectedPassword = matchedAccount.initialPassword || 'EventControl2026!';
+      const expectedPassword = (matchedAccount.initialPassword || 'EventControl2026!').trim();
       const isPassMatch = trimmedPass === expectedPassword;
 
       if (isPassMatch) {
@@ -246,6 +296,7 @@ export async function POST(req: Request) {
         } else {
           globalServerAccountsStore.unshift(acc);
         }
+        persistAccountToSupabase(acc);
       });
       saveAccountsToFile();
       return NextResponse.json({ success: true, accounts: globalServerAccountsStore });
@@ -259,6 +310,7 @@ export async function POST(req: Request) {
         globalServerAccountsStore.unshift(account);
       }
       saveAccountsToFile();
+      persistAccountToSupabase(account);
       return NextResponse.json({ success: true, account });
     }
 
@@ -269,6 +321,7 @@ export async function POST(req: Request) {
         acc.initialPassword = password.trim();
         acc.mustChangePassword = false;
         saveAccountsToFile();
+        persistAccountToSupabase(acc);
         return NextResponse.json({ success: true, account: acc });
       }
       return NextResponse.json({ success: false, message: 'Cuenta no encontrada' }, { status: 404 });
