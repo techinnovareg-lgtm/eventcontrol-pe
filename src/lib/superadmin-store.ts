@@ -177,7 +177,8 @@ export async function authenticateAdminAccountAsync(emailInput: string, password
         saveAccountsToStorage(store);
         return serverAccount;
       }
-    } else if (res.status === 401 || res.status === 403 || res.status === 404) {
+    } else if (res.status === 403) {
+      // Explicitly blocked: Account suspended or expired
       return null;
     }
   } catch (err) {
@@ -193,8 +194,19 @@ export async function authenticateAdminAccountAsync(emailInput: string, password
     const isDefaultInitial = expectedPassword.toLowerCase() === 'eventcontrol2026!';
     const isMatch = isDefaultInitial 
       ? trimmedPass.toLowerCase() === 'eventcontrol2026!'
-      : trimmedPass === expectedPassword;
-    if (isMatch) return matched;
+      : trimmedPass.toLowerCase() === expectedPassword.toLowerCase();
+
+    if (isMatch) {
+      // Sync account to server central DB if missing on server
+      if (typeof window !== 'undefined') {
+        fetch('/api/auth/sync-accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'UPSERT', account: matched }),
+        }).catch(() => {});
+      }
+      return matched;
+    }
   }
 
   return null;
@@ -444,6 +456,14 @@ export function createAdminAccount(data: {
   const store = getAdminAccountsStore();
   store.unshift(account);
   saveAccountsToStorage(store);
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/auth/sync-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UPSERT', account }),
+    }).catch(err => console.warn('[Sync Accounts UPSERT warning]', err));
+  }
 
   return {
     account,
