@@ -61,11 +61,33 @@ function loadEventsFromStorage(): Event[] {
   return INITIAL_EVENTS;
 }
 
+export function autoSyncEventsToServer(workspaceId?: string) {
+  if (typeof window === 'undefined') return;
+  const store = getEventsStore();
+  const deletedIds = getDeletedEventIdsFromStorage();
+  const validEvents = store.filter(e => 
+    !deletedIds.includes(e.id) && 
+    e.id !== 'evt-101' && 
+    e.id !== 'evt-102' && 
+    e.id !== 'evt-principal-01' &&
+    (!workspaceId || e.workspace_id === workspaceId)
+  );
+
+  validEvents.forEach(evt => {
+    fetch('/api/events/sync', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+    }).catch(() => {});
+  });
+}
+
 function saveEventsToStorage(events: Event[]) {
   eventsMemoryStore = events;
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
+      setTimeout(() => autoSyncEventsToServer(), 100);
     } catch (err) {
       console.warn('[EventsStore] Failed to save to localStorage', err);
     }
@@ -96,6 +118,18 @@ function saveGroupsToStorage(groups: Record<string, GuestGroup[]>) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
+      setTimeout(() => {
+        Object.entries(groups).forEach(([evtId, grps]) => {
+          if (Array.isArray(grps) && grps.length > 0) {
+            const wsId = grps[0]?.workspace_id || '';
+            fetch('/api/events/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'SYNC_GROUPS', eventId: evtId, workspaceId: wsId, groups: grps }),
+            }).catch(() => {});
+          }
+        });
+      }, 150);
     } catch (err) {
       console.warn('[GuestGroupsStore] Failed to save to localStorage', err);
     }

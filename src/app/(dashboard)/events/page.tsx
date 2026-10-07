@@ -8,7 +8,7 @@ import {
   CheckCircle, Clock, MessageSquare, ArrowRight, BarChart3, 
   Scissors, Edit3, Home, LogOut, Trash2
 } from 'lucide-react';
-import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, deleteEvent } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, updateEventAsync, deleteEvent } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 
@@ -99,25 +99,27 @@ export default function EventsCrudPage() {
     setEditStatus(evt.status);
   };
 
-  const handleSaveEditEvent = (e: React.FormEvent) => {
+  const handleSaveEditEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingEvent || !editName || !editDate) return;
 
-    updateEvent(editingEvent.id, {
+    await updateEventAsync(editingEvent.id, {
       name: editName,
       event_date: editDate,
       venue_name: editLocation,
       status: editStatus,
-    });
+    }, currentWorkspaceId);
 
-    setEvents(getWorkspaceEvents(currentWorkspaceId));
+    const updated = await getWorkspaceEventsAsync(currentWorkspaceId);
+    setEvents(updated);
     setEditingEvent(null);
   };
 
-  const handleDeleteEvent = (eventId: string, eventName: string) => {
+  const handleDeleteEvent = async (eventId: string, eventName: string) => {
     if (confirm(`¿Estás seguro de eliminar el evento "${eventName}"? Esta acción no se puede deshacer.`)) {
       deleteEvent(eventId);
-      setEvents(getWorkspaceEvents(currentWorkspaceId));
+      const updated = await getWorkspaceEventsAsync(currentWorkspaceId);
+      setEvents(updated);
     }
   };
 

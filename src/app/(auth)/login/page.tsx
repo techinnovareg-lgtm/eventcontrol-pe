@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { 
   setActiveSession, SUPER_ADMIN_EMAIL, isDeviceRemembered, rememberDevice,
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, getAllAdminAccounts,
-  verifySuperAdminPassword, authenticateAdminAccountAsync 
+  verifySuperAdminPassword, authenticateAdminAccountAsync, getAdminAccountByEmail 
 } from '@/lib/superadmin-store';
 import { authenticateWorkspaceMemberAsync, findMemberByEmail, isCredentialsExpired, formatExpirationDate } from '@/lib/workspace-users';
 import { getWorkspaceEvents, getWorkspaceEventsAsync } from '@/lib/events';
@@ -105,12 +105,13 @@ export default function LoginPage() {
     }
 
     if (authUser) {
-      const wsId = authUser.user_metadata?.workspaceId || 'ws-a-1111';
+      const matchedAccount = getAdminAccountByEmail(inputEmail);
+      const wsId = authUser.user_metadata?.workspaceId || matchedAccount?.workspaceId || 'ws-a-1111';
       setActiveSession({
         user: {
           id: authUser.id,
           email: authUser.email || inputEmail,
-          name: authUser.user_metadata?.name || 'Administrador de Evento',
+          name: authUser.user_metadata?.name || matchedAccount?.companyName || matchedAccount?.adminName || 'Administrador de Evento',
           role: 'ADMIN',
           workspaceId: wsId,
         },

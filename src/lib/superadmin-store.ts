@@ -241,6 +241,13 @@ export async function authenticateAdminAccountAsync(emailInput: string, password
   return null;
 }
 
+export function getAdminAccountByEmail(emailInput: string): AdminAccount | undefined {
+  if (!emailInput) return undefined;
+  const cleanedEmail = emailInput.trim().toLowerCase();
+  const accounts = getAllAdminAccounts();
+  return accounts.find(a => a.contactEmail.toLowerCase() === cleanedEmail);
+}
+
 // Current active session state
 let currentSession: AuthSession | null = null;
 
