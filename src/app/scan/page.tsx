@@ -247,10 +247,14 @@ export default function MobileScanCheckInPage() {
   if (matchedGroup) {
     const currentAsgns = assignments.length > 0 ? assignments : getEventTableAssignments(selectedEventId);
     const currentTbls = tables.length > 0 ? tables : getEventTables(selectedEventId);
-    const asgn = currentAsgns.find(a => a.group_id === matchedGroup.id);
-    if (asgn) {
-      const tbl = currentTbls.find(t => t.id === asgn.table_id);
-      if (tbl) matchedTableName = tbl.name;
+    const groupAsgns = currentAsgns.filter(a => a.group_id === matchedGroup.id);
+    if (groupAsgns.length > 0) {
+      const details = groupAsgns.map(asgn => {
+        const tbl = currentTbls.find(t => t.id === asgn.table_id);
+        const tableName = tbl?.name || 'Mesa';
+        return asgn.guest_name_label ? `${tableName} (${asgn.guest_name_label})` : tableName;
+      });
+      matchedTableName = Array.from(new Set(details)).join(' • ');
     }
   }
 

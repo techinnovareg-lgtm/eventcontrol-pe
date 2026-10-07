@@ -1619,17 +1619,18 @@ export default function TablesManagementPage() {
                               ) : (
                                 assignments.filter(a => a.table_id === tbl.id).map(asgn => {
                                   const grp = groups.find(g => g.id === asgn.group_id);
+                                  const displayName = asgn.guest_name_label || grp?.group_name || 'Grupo';
                                   return (
                                     <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                                      <span className="font-semibold text-slate-800 truncate max-w-[120px]">
-                                        {grp?.group_name || 'Grupo'}
+                                      <span className="font-semibold text-slate-800 truncate max-w-[120px]" title={displayName}>
+                                        {displayName}
                                       </span>
                                       <div className="flex items-center gap-1">
                                         <span className="font-bold text-[#B8860B]">{asgn.assigned_passes}p</span>
                                         <button
-                                          onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id); }}
+                                          onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id, asgn.companion_id, asgn.id); }}
                                           className="text-slate-400 hover:text-red-600 transition"
-                                          title="Desasignar"
+                                          title="Desasignar de esta mesa"
                                         >
                                           <X className="w-3 h-3" />
                                         </button>
@@ -1706,13 +1707,14 @@ export default function TablesManagementPage() {
                         ) : (
                           tblAssignments.map(asgn => {
                             const grp = groups.find(g => g.id === asgn.group_id);
+                            const displayName = asgn.guest_name_label || grp?.group_name || 'Grupo';
                             return (
                               <div key={asgn.id} className="flex items-center justify-between text-xs bg-slate-50 p-2 rounded-xl border border-slate-200">
-                                <span className="font-semibold text-slate-800">{grp?.group_name || 'Grupo'}</span>
+                                <span className="font-semibold text-slate-800" title={displayName}>{displayName}</span>
                                 <div className="flex items-center gap-2">
                                   <span className="font-bold text-[#B8860B]">{asgn.assigned_passes} pases</span>
                                   <button
-                                    onClick={() => handleUnassign(asgn.group_id)}
+                                    onClick={() => handleUnassign(asgn.group_id, asgn.companion_id, asgn.id)}
                                     className="text-slate-400 hover:text-red-600 transition"
                                     title="Quitar de mesa"
                                   >
