@@ -1306,9 +1306,24 @@ export default function TablesManagementPage() {
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
                 <Users className="w-4 h-4 text-[#B8860B]" /> Pases Sin Mesa ({unassignedGroups.length})
               </h3>
-              <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                {totalUnassignedGuests} pers.
-              </span>
+              <div className="flex items-center gap-1">
+                {unassignedGroups.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (expandedGroupIds.size > 0) {
+                        setExpandedGroupIds(new Set());
+                      } else {
+                        setExpandedGroupIds(new Set(unassignedGroups.map(g => g.id)));
+                      }
+                    }}
+                    className="text-[10px] font-bold text-[#B8860B] bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-[#DBBB6E]/50 transition cursor-pointer"
+                    title="Desglosar u ocultar todos los pases"
+                  >
+                    {expandedGroupIds.size > 0 ? 'Ocultar Todos' : 'Desglosar Todos'}
+                  </button>
+                )}
+              </div>
             </div>
 
             {groups.length === 0 ? (
@@ -1344,7 +1359,10 @@ export default function TablesManagementPage() {
                       }}
                       className="p-3 bg-white hover:bg-amber-50/60 rounded-xl border border-slate-200 hover:border-[#C5A059] shadow-sm transition flex flex-col gap-2 group"
                     >
-                      <div className="flex items-center justify-between">
+                      <div 
+                        className="flex items-center justify-between cursor-pointer select-none"
+                        onClick={() => toggleGroupExpand(grp.id)}
+                      >
                         <div>
                           <strong className="text-xs font-bold text-slate-900 block group-hover:text-[#B8860B] transition">
                             {grp.group_name}
@@ -1352,19 +1370,21 @@ export default function TablesManagementPage() {
                           <span className="text-[10px] text-slate-400 font-mono">ID: {grp.id}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          {grp.max_passes > 1 && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleGroupExpand(grp.id);
-                              }}
-                              className="text-[10px] font-bold text-[#B8860B] bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-[#DBBB6E]/50 transition flex items-center gap-1 cursor-pointer"
-                            >
-                              {isExpanded ? <ChevronUp className="w-3 h-3 text-[#B8860B]" /> : <ChevronDown className="w-3 h-3 text-[#B8860B]" />}
-                              {isExpanded ? 'Ocultar' : 'Desglosar'}
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            draggable={false}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleGroupExpand(grp.id);
+                            }}
+                            className="text-[10px] font-bold text-[#B8860B] bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-[#DBBB6E]/50 transition flex items-center gap-1 cursor-pointer z-10"
+                          >
+                            {isExpanded ? <ChevronUp className="w-3 h-3 text-[#B8860B]" /> : <ChevronDown className="w-3 h-3 text-[#B8860B]" />}
+                            {isExpanded ? 'Ocultar' : 'Desglosar'}
+                          </button>
                           <span 
                             style={{ backgroundColor: '#DBBB6E' }}
                             className="px-2 py-0.5 text-white font-extrabold text-[10px] rounded-lg shadow-sm shrink-0"
