@@ -384,23 +384,40 @@ export async function getEventTableAssignmentsAsync(eventId: string): Promise<Ta
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.assignments)) {
+        if (data.assignments.length === 0 && localAssignments.length > 0) {
+          syncTablesToServerAsync(eventId, undefined, localAssignments);
+          return localAssignments;
+        }
+
+        const mergedMap = new Map<string, TableAssignment>();
+        data.assignments.forEach((sa: TableAssignment) => {
+          const key = sa.id || `${sa.group_id}_${sa.companion_id || 'main'}`;
+          mergedMap.set(key, sa);
+        });
+
         let requiresResync = false;
-        const merged: TableAssignment[] = [...data.assignments];
         localAssignments.forEach(la => {
-          if (!merged.some(ma => ma.id === la.id)) {
-            merged.push(la);
+          const key = la.id || `${la.group_id}_${la.companion_id || 'main'}`;
+          const existing = mergedMap.get(key);
+          if (!existing) {
+            mergedMap.set(key, la);
             requiresResync = true;
+          } else {
+            if (la.companion_id || la.guest_name_label) {
+              mergedMap.set(key, { ...existing, ...la });
+            }
           }
         });
 
-        store[eventId] = merged;
+        const finalAssignments = Array.from(mergedMap.values());
+        store[eventId] = finalAssignments;
         saveAssignmentsToStorage(store);
 
-        if (requiresResync && merged.length > 0) {
-          syncTablesToServerAsync(eventId, undefined, merged);
+        if (requiresResync && finalAssignments.length > 0) {
+          syncTablesToServerAsync(eventId, undefined, finalAssignments);
         }
 
-        return merged;
+        return finalAssignments;
       }
     }
   } catch (err) {}
@@ -428,21 +445,35 @@ export function deleteEventVenueElements(eventId: string): void {
   syncVenueElementsToServerAsync(eventId);
 }
 
-export function assignGroupToTable(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): TableAssignment {
+export function assignGroupToTable(
+  eventId: string, 
+  workspaceId: string, 
+  tableId: string, 
+  groupId: string, 
+  passes: number,
+  companionId?: string,
+  guestNameLabel?: string
+): TableAssignment {
   const store = loadAssignmentsFromStorage();
   if (!store[eventId]) {
     store[eventId] = [];
   }
-  // Remove existing assignment if any
-  store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
+  
+  if (companionId) {
+    store[eventId] = store[eventId].filter(a => !(a.group_id === groupId && a.companion_id === companionId));
+  } else {
+    store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
+  }
 
   const newAsgn: TableAssignment = {
-    id: `asgn-${Date.now()}`,
+    id: `asgn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     workspace_id: workspaceId,
     event_id: eventId,
     table_id: tableId,
     group_id: groupId,
     assigned_passes: passes,
+    companion_id: companionId,
+    guest_name_label: guestNameLabel,
     created_at: new Date().toISOString(),
   };
   store[eventId].push(newAsgn);
@@ -451,28 +482,36 @@ export function assignGroupToTable(eventId: string, workspaceId: string, tableId
   return newAsgn;
 }
 
-export async function assignGroupToTableAsync(eventId: string, workspaceId: string, tableId: string, groupId: string, passes: number): Promise<TableAssignment> {
-  const asgn = assignGroupToTable(eventId, workspaceId, tableId, groupId, passes);
+export async function assignGroupToTableAsync(
+  eventId: string, 
+  workspaceId: string, 
+  tableId: string, 
+  groupId: string, 
+  passes: number,
+  companionId?: string,
+  guestNameLabel?: string
+): Promise<TableAssignment> {
+  const asgn = assignGroupToTable(eventId, workspaceId, tableId, groupId, passes, companionId, guestNameLabel);
   return asgn;
 }
 
-export function unassignGroupFromTable(eventId: string, groupId: string): void {
+export function unassignGroupFromTable(eventId: string, groupId: string, companionId?: string, assignmentId?: string): void {
   const store = loadAssignmentsFromStorage();
   if (store[eventId]) {
-    store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
+    if (assignmentId) {
+      store[eventId] = store[eventId].filter(a => a.id !== assignmentId);
+    } else if (companionId) {
+      store[eventId] = store[eventId].filter(a => !(a.group_id === groupId && a.companion_id === companionId));
+    } else {
+      store[eventId] = store[eventId].filter(a => a.group_id !== groupId);
+    }
     saveAssignmentsToStorage(store);
-  }
-  if (typeof window !== 'undefined') {
-    fetch('/api/events/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'UNASSIGN_GROUP', eventId, groupId }),
-    }).catch(() => {});
+    syncTablesToServerAsync(eventId, undefined, store[eventId]);
   }
 }
 
-export async function unassignGroupFromTableAsync(eventId: string, groupId: string): Promise<void> {
-  unassignGroupFromTable(eventId, groupId);
+export async function unassignGroupFromTableAsync(eventId: string, groupId: string, companionId?: string, assignmentId?: string): Promise<void> {
+  unassignGroupFromTable(eventId, groupId, companionId, assignmentId);
 }
 
 export function calculateTableOccupancy(eventId: string, tableId: string, capacity: number) {

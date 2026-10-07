@@ -356,34 +356,49 @@ export default function TablesManagementPage() {
     }
   };
 
-  const handleAssign = async (tableId: string, groupId: string, passes: number) => {
+  const handleAssign = async (tableId: string, groupId: string, passes: number, companionId?: string, guestNameLabel?: string) => {
     lastMutationTimeRef.current = Date.now();
     const nextAssignment: TableAssignment = {
-      id: `asgn-${Date.now()}`,
+      id: `asgn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       workspace_id: currentWorkspaceId,
       event_id: eventId,
       table_id: tableId,
       group_id: groupId,
       assigned_passes: passes,
+      companion_id: companionId,
+      guest_name_label: guestNameLabel,
       created_at: new Date().toISOString(),
     };
     setAssignments(prev => {
-      const next = [...prev.filter(a => a.group_id !== groupId), nextAssignment];
+      let next = [...prev];
+      if (companionId) {
+        next = next.filter(a => !(a.group_id === groupId && a.companion_id === companionId));
+      } else {
+        next = next.filter(a => a.group_id !== groupId);
+      }
+      next.push(nextAssignment);
       saveEventAssignmentsLocally(eventId, next);
       return next;
     });
-    await assignGroupToTableAsync(eventId, currentWorkspaceId, tableId, groupId, passes);
+    await assignGroupToTableAsync(eventId, currentWorkspaceId, tableId, groupId, passes, companionId, guestNameLabel);
     lastMutationTimeRef.current = Date.now();
   };
 
-  const handleUnassign = async (groupId: string) => {
+  const handleUnassign = async (groupId: string, companionId?: string, assignmentId?: string) => {
     lastMutationTimeRef.current = Date.now();
     setAssignments(prev => {
-      const next = prev.filter(a => a.group_id !== groupId);
+      let next = [...prev];
+      if (assignmentId) {
+        next = next.filter(a => a.id !== assignmentId);
+      } else if (companionId) {
+        next = next.filter(a => !(a.group_id === groupId && a.companion_id === companionId));
+      } else {
+        next = next.filter(a => a.group_id !== groupId);
+      }
       saveEventAssignmentsLocally(eventId, next);
       return next;
     });
-    await unassignGroupFromTableAsync(eventId, groupId);
+    await unassignGroupFromTableAsync(eventId, groupId, companionId, assignmentId);
     lastMutationTimeRef.current = Date.now();
   };
 
@@ -1050,17 +1065,18 @@ export default function TablesManagementPage() {
                           ) : (
                             validAssignments.filter(a => a.table_id === tbl.id).map(asgn => {
                               const grp = groups.find(g => g.id === asgn.group_id);
+                              const displayName = asgn.guest_name_label || grp?.group_name || 'Invitado';
                               return (
                                 <div key={asgn.id} className="flex items-center justify-between text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                                  <span className="font-semibold text-slate-800 truncate max-w-[120px]">
-                                    {grp?.group_name || 'Grupo'}
+                                  <span className="font-semibold text-slate-800 truncate max-w-[120px]" title={displayName}>
+                                    {displayName}
                                   </span>
                                   <div className="flex items-center gap-1">
                                     <span className="font-bold text-[#B8860B]">{asgn.assigned_passes}p</span>
                                     <button
-                                      onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id); }}
+                                      onClick={(e) => { e.stopPropagation(); handleUnassign(asgn.group_id, asgn.companion_id, asgn.id); }}
                                       className="text-slate-400 hover:text-red-600 transition"
-                                      title="Desasignar"
+                                      title="Desasignar invitado de esta mesa"
                                     >
                                       <X className="w-3 h-3" />
                                     </button>

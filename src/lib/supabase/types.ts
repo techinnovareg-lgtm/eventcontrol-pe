@@ -103,6 +103,8 @@ export interface TableAssignment {
   event_id: string;
   workspace_id: string;
   assigned_passes: number;
+  companion_id?: string;
+  guest_name_label?: string;
   created_at: string;
 }
 

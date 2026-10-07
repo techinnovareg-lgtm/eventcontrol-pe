@@ -12,6 +12,147 @@ function getSupabaseServerClient() {
   return createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
 }
 
+import crypto from 'crypto';
+
+function generateDeterministicUUID(keyString: string): string {
+  const hash = crypto.createHash('sha256').update(keyString.toLowerCase().trim()).digest('hex');
+  return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+}
+
+async function fetchOnlineEventsFromSupabase(workspaceId: string): Promise<Event[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key || !workspaceId) return [];
+  try {
+    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_EVENT_SYNC_${workspaceId}&select=*`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        return rows.map(r => {
+          try { return JSON.parse(r.device_info); } catch (e) { return null; }
+        }).filter(Boolean);
+      }
+    }
+  } catch (err) {}
+  return [];
+}
+
+async function persistEventToSupabase(event: Event) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key || !event || !event.workspace_id) return;
+  try {
+    const uuid = generateDeterministicUUID(`event_${event.id}`);
+    await fetch(`${url}/rest/v1/check_ins`, {
+      method: 'POST',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'resolution=merge-duplicates'
+      },
+      body: JSON.stringify({
+        id: uuid,
+        scanner_staff_name: `SYS_EVENT_SYNC_${event.workspace_id}`,
+        device_info: JSON.stringify(event)
+      })
+    });
+  } catch (err) {}
+}
+
+async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
+  tables?: Table[];
+  assignments?: TableAssignment[];
+  groups?: GuestGroup[];
+  venueElements?: VenueElement[];
+}> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key || !eventId) return {};
+  const result: any = {};
+  try {
+    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows)) {
+        rows.forEach(r => {
+          try {
+            const data = JSON.parse(r.device_info);
+            if (r.scanner_staff_name === `SYS_TABLES_${eventId}`) result.tables = data;
+            if (r.scanner_staff_name === `SYS_ASSIGNMENTS_${eventId}`) result.assignments = data;
+            if (r.scanner_staff_name === `SYS_GROUPS_${eventId}`) result.groups = data;
+            if (r.scanner_staff_name === `SYS_VENUE_${eventId}`) result.venueElements = data;
+          } catch (e) {}
+        });
+      }
+    }
+  } catch (err) {}
+  return result;
+}
+
+async function persistTablesDataToSupabase(
+  eventId: string,
+  tables?: Table[],
+  assignments?: TableAssignment[],
+  groups?: GuestGroup[],
+  venueElements?: VenueElement[]
+) {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key || !eventId) return;
+
+  const payloads: any[] = [];
+  if (tables !== undefined) {
+    payloads.push({
+      id: generateDeterministicUUID(`tables_${eventId}`),
+      scanner_staff_name: `SYS_TABLES_${eventId}`,
+      device_info: JSON.stringify(tables)
+    });
+  }
+  if (assignments !== undefined) {
+    payloads.push({
+      id: generateDeterministicUUID(`assignments_${eventId}`),
+      scanner_staff_name: `SYS_ASSIGNMENTS_${eventId}`,
+      device_info: JSON.stringify(assignments)
+    });
+  }
+  if (groups !== undefined) {
+    payloads.push({
+      id: generateDeterministicUUID(`groups_${eventId}`),
+      scanner_staff_name: `SYS_GROUPS_${eventId}`,
+      device_info: JSON.stringify(groups)
+    });
+  }
+  if (venueElements !== undefined) {
+    payloads.push({
+      id: generateDeterministicUUID(`venue_${eventId}`),
+      scanner_staff_name: `SYS_VENUE_${eventId}`,
+      device_info: JSON.stringify(venueElements)
+    });
+  }
+
+  for (const p of payloads) {
+    try {
+      await fetch(`${url}/rest/v1/check_ins`, {
+        method: 'POST',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates'
+        },
+        body: JSON.stringify(p)
+      });
+    } catch (e) {}
+  }
+}
+
 // Global central server-side memory stores for cross-device synchronization (PC <-> Mobile Phone)
 let globalServerEventsStore: Event[] = [];
 let globalServerDeletedEventsStore: string[] = [];
@@ -180,13 +321,23 @@ export async function GET(req: Request) {
     if (globalServerDeletedEventsStore.includes(eventId)) {
       return NextResponse.json({ success: false, message: 'Evento eliminado' }, { status: 404 });
     }
+    
+    // Fetch Online Supabase DB Tables, Assignments, Groups, and Venue Elements
+    const onlineData = await fetchOnlineTablesDataFromSupabase(eventId);
+
     const event = globalServerEventsStore.find(e => e.id === eventId) || null;
-    const groups = globalServerGroupsStore[eventId] || [];
-    const tables = globalServerTablesStore[eventId] || [];
-    const assignments = globalServerAssignmentsStore[eventId] || [];
+    const groups = onlineData.groups || globalServerGroupsStore[eventId] || [];
+    const tables = onlineData.tables || globalServerTablesStore[eventId] || [];
+    const assignments = onlineData.assignments || globalServerAssignmentsStore[eventId] || [];
+    const venueElements = onlineData.venueElements || globalServerVenueElementsStore[eventId] || [];
     const localCuts = globalServerCutsStore[eventId] || [];
     const checkIns = globalServerCheckInsStore[eventId] || [];
-    const venueElements = globalServerVenueElementsStore[eventId] || [];
+
+    // Sync back to memory store
+    if (onlineData.groups) globalServerGroupsStore[eventId] = onlineData.groups;
+    if (onlineData.tables) globalServerTablesStore[eventId] = onlineData.tables;
+    if (onlineData.assignments) globalServerAssignmentsStore[eventId] = onlineData.assignments;
+    if (onlineData.venueElements) globalServerVenueElementsStore[eventId] = onlineData.venueElements;
 
     // Fetch cuts from Supabase if available and merge
     let supabaseCuts: Cut[] = [];
@@ -223,6 +374,9 @@ export async function GET(req: Request) {
   }
 
   if (workspaceId) {
+    // Fetch Online Supabase DB Events
+    const onlineEvents = await fetchOnlineEventsFromSupabase(workspaceId);
+
     let supabaseEvents: Event[] = [];
     const supabase = getSupabaseServerClient();
     if (supabase) {
@@ -238,6 +392,12 @@ export async function GET(req: Request) {
 
     const localEvents = globalServerEventsStore.filter(e => e.workspace_id === workspaceId && !globalServerDeletedEventsStore.includes(e.id));
     const mergedEventsMap = new Map<string, Event>();
+
+    onlineEvents.forEach(e => {
+      if (!globalServerDeletedEventsStore.includes(e.id)) {
+        mergedEventsMap.set(e.id, e);
+      }
+    });
     supabaseEvents.forEach(e => {
       if (!globalServerDeletedEventsStore.includes(e.id)) {
         mergedEventsMap.set(e.id, e);
@@ -295,6 +455,7 @@ export async function POST(req: Request) {
         globalServerEventsStore.unshift(event);
       }
       saveDbToFile();
+      await persistEventToSupabase(event);
       return NextResponse.json({ success: true, event });
     }
 
@@ -324,6 +485,7 @@ export async function POST(req: Request) {
 
       globalServerGroupsStore[targetEvtId] = mergedGroups;
       saveDbToFile();
+      await persistTablesDataToSupabase(targetEvtId, undefined, undefined, mergedGroups, undefined);
       return NextResponse.json({ success: true, count: mergedGroups.length });
     }
 
@@ -333,6 +495,7 @@ export async function POST(req: Request) {
         globalServerAssignmentsStore[eventId] = [];
       }
       saveDbToFile();
+      await persistTablesDataToSupabase(eventId, undefined, [], [], undefined);
       return NextResponse.json({ success: true, eventId });
     }
 
@@ -359,6 +522,7 @@ export async function POST(req: Request) {
         globalServerAssignmentsStore[eventId] = globalServerAssignmentsStore[eventId].filter(a => a.table_id !== body.tableId);
       }
       saveDbToFile();
+      await persistTablesDataToSupabase(eventId, globalServerTablesStore[eventId], globalServerAssignmentsStore[eventId], undefined, undefined);
       return NextResponse.json({ success: true, tableId: body.tableId });
     }
 
@@ -367,6 +531,7 @@ export async function POST(req: Request) {
         globalServerVenueElementsStore[eventId] = globalServerVenueElementsStore[eventId].filter(ve => ve.id !== body.elementId);
       }
       saveDbToFile();
+      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, globalServerVenueElementsStore[eventId]);
       return NextResponse.json({ success: true, elementId: body.elementId });
     }
 
@@ -375,36 +540,20 @@ export async function POST(req: Request) {
         globalServerAssignmentsStore[eventId] = globalServerAssignmentsStore[eventId].filter(a => a.group_id !== body.groupId);
       }
       saveDbToFile();
+      await persistTablesDataToSupabase(eventId, undefined, globalServerAssignmentsStore[eventId], undefined, undefined);
       return NextResponse.json({ success: true, groupId: body.groupId });
     }
 
     if (action === 'SYNC_TABLES' && eventId) {
-      if (Array.isArray(tables) && tables.length > 0) {
-        if (!globalServerTablesStore[eventId]) globalServerTablesStore[eventId] = [];
-        const currentTables = globalServerTablesStore[eventId];
-        tables.forEach((t: Table) => {
-          const idx = currentTables.findIndex(x => x.id === t.id);
-          if (idx !== -1) {
-            currentTables[idx] = { ...currentTables[idx], ...t };
-          } else {
-            currentTables.push(t);
-          }
-        });
+      if (Array.isArray(tables)) {
+        globalServerTablesStore[eventId] = tables;
       }
 
-      if (Array.isArray(assignments) && assignments.length > 0) {
-        if (!globalServerAssignmentsStore[eventId]) globalServerAssignmentsStore[eventId] = [];
-        const currentAsgns = globalServerAssignmentsStore[eventId];
-        assignments.forEach((a: TableAssignment) => {
-          const idx = currentAsgns.findIndex(x => x.group_id === a.group_id);
-          if (idx !== -1) {
-            currentAsgns[idx] = { ...currentAsgns[idx], ...a };
-          } else {
-            currentAsgns.push(a);
-          }
-        });
+      if (Array.isArray(assignments)) {
+        globalServerAssignmentsStore[eventId] = assignments;
       }
       saveDbToFile();
+      await persistTablesDataToSupabase(eventId, globalServerTablesStore[eventId], globalServerAssignmentsStore[eventId], undefined, undefined);
       return NextResponse.json({ success: true });
     }
 
