@@ -114,6 +114,19 @@ export default function TablesManagementPage() {
   // INDIVIDUAL & GLOBAL TABLE COLLAPSE STATE ON 2D CANVAS
   const [collapsedTableIds, setCollapsedTableIds] = useState<Set<string>>(new Set());
   const [allTablesCollapsed, setAllTablesCollapsed] = useState<boolean>(false);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(new Set());
+
+  const toggleGroupExpand = (groupId: string) => {
+    setExpandedGroupIds(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
 
   const toggleTableCollapse = (tableId: string) => {
     setCollapsedTableIds(prev => {
@@ -790,14 +803,55 @@ export default function TablesManagementPage() {
 
   // Filter valid assignments that match existing groups
   const validAssignments = assignments.filter(a => groups.some(g => g.id === a.group_id));
-  const assignedGroupIds = new Set(validAssignments.map(a => a.group_id));
-  const unassignedGroups = groups.filter(g => !assignedGroupIds.has(g.id));
+
+  // Helper to get pass slots for individual guest seating
+  const getGroupPassSlots = (grp: GuestGroup) => {
+    const slots: Array<{ companionId: string; label: string }> = [];
+    const max = grp.max_passes || 1;
+    const companions = grp.companions || [];
+
+    for (let i = 0; i < max; i++) {
+      const comp = companions[i];
+      const companionId = comp?.id || (i === 0 ? `${grp.id}_main` : `${grp.id}_comp_${i}`);
+      let label = '';
+      if (comp?.name) {
+        label = comp.name;
+      } else if (i === 0) {
+        label = `${grp.group_name} (Titular)`;
+      } else {
+        label = `Acompañante ${i} (${grp.group_name})`;
+      }
+      slots.push({ companionId, label });
+    }
+    return slots;
+  };
+
+  const getAssignmentForSlot = (groupId: string, companionId: string) => {
+    return validAssignments.find(a => 
+      a.group_id === groupId && (
+        a.companion_id === companionId || 
+        (!a.companion_id && (a.assigned_passes || 1) >= (groups.find(g => g.id === groupId)?.max_passes || 1))
+      )
+    );
+  };
+
+  const isGroupFullyAssigned = (grp: GuestGroup) => {
+    const slots = getGroupPassSlots(grp);
+    return slots.every(slot => !!getAssignmentForSlot(grp.id, slot.companionId));
+  };
+
+  const unassignedGroups = groups.filter(g => !isGroupFullyAssigned(g));
 
   // EXACT MATHEMATICAL SEATING METRICS FOR INVITADOS (PERSONAS) + PASES (GRUPOS)
   const totalAuthorizedGuests = groups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
   const totalAuthorizedPassesCount = groups.length;
 
-  const totalUnassignedGuests = unassignedGroups.reduce((sum, g) => sum + (g.max_passes || 0), 0);
+  const totalUnassignedGuests = groups.reduce((sum, g) => {
+    const slots = getGroupPassSlots(g);
+    const unassignedCount = slots.filter(slot => !getAssignmentForSlot(g.id, slot.companionId)).length;
+    return sum + unassignedCount;
+  }, 0);
+
   const totalUnassignedPassesCount = unassignedGroups.length;
 
   const totalAssignedGuests = Math.max(0, totalAuthorizedGuests - totalUnassignedGuests);
@@ -1276,54 +1330,125 @@ export default function TablesManagementPage() {
               </div>
             ) : (
               <div className="space-y-2">
-                {unassignedGroups.map(grp => (
-                  <div
-                    key={grp.id}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('text/plain', grp.id);
-                      setDraggedGroupId(grp.id);
-                    }}
-                    className="p-3 bg-white hover:bg-amber-50/60 rounded-xl border border-slate-200 hover:border-[#C5A059] shadow-sm transition flex flex-col gap-2 group"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <strong className="text-xs font-bold text-slate-900 block group-hover:text-[#B8860B] transition">
-                          {grp.group_name}
-                        </strong>
-                        <span className="text-[10px] text-slate-400 font-mono">ID: {grp.id}</span>
-                      </div>
-                      <span 
-                        style={{ backgroundColor: '#DBBB6E' }}
-                        className="px-2.5 py-1 text-white font-extrabold text-xs rounded-lg shadow-sm shrink-0"
-                      >
-                        {grp.max_passes} p.
-                      </span>
-                    </div>
+                {unassignedGroups.map(grp => {
+                  const slots = getGroupPassSlots(grp);
+                  const isExpanded = expandedGroupIds.has(grp.id) || grp.max_passes > 1;
 
-                    {/* Quick Touch/Mobile Table Selector Dropdown */}
-                    <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5">
-                      <span className="text-[10px] text-slate-500 font-semibold shrink-0">Asignar a:</span>
-                      <select
-                        defaultValue=""
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            handleAssign(e.target.value, grp.id, grp.max_passes);
-                            e.target.value = '';
-                          }
-                        }}
-                        className="text-[10px] font-bold bg-amber-50 text-amber-950 border border-[#DBBB6E] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#C5A059] w-full cursor-pointer"
-                      >
-                        <option value="" disabled>-- Seleccionar Mesa --</option>
-                        {tables.map(tbl => (
-                          <option key={tbl.id} value={tbl.id}>
-                            {tbl.name} ({calculateTableOccupancy(eventId, tbl.id, tbl.capacity).occupancyRatio})
-                          </option>
-                        ))}
-                      </select>
+                  return (
+                    <div
+                      key={grp.id}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plain', grp.id);
+                        setDraggedGroupId(grp.id);
+                      }}
+                      className="p-3 bg-white hover:bg-amber-50/60 rounded-xl border border-slate-200 hover:border-[#C5A059] shadow-sm transition flex flex-col gap-2 group"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <strong className="text-xs font-bold text-slate-900 block group-hover:text-[#B8860B] transition">
+                            {grp.group_name}
+                          </strong>
+                          <span className="text-[10px] text-slate-400 font-mono">ID: {grp.id}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {grp.max_passes > 1 && (
+                            <button
+                              onClick={() => toggleGroupExpand(grp.id)}
+                              className="text-[10px] font-bold text-[#B8860B] bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-[#DBBB6E]/50 transition"
+                            >
+                              {expandedGroupIds.has(grp.id) ? 'Ocultar' : 'Desglosar'}
+                            </button>
+                          )}
+                          <span 
+                            style={{ backgroundColor: '#DBBB6E' }}
+                            className="px-2 py-0.5 text-white font-extrabold text-[10px] rounded-lg shadow-sm shrink-0"
+                          >
+                            {grp.max_passes} p.
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Quick Assign Full Group Dropdown */}
+                      <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between gap-1.5">
+                        <span className="text-[10px] text-slate-500 font-semibold shrink-0">Todo el grupo:</span>
+                        <select
+                          defaultValue=""
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleAssign(e.target.value, grp.id, grp.max_passes);
+                              e.target.value = '';
+                            }
+                          }}
+                          className="text-[10px] font-bold bg-amber-50 text-amber-950 border border-[#DBBB6E] rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-[#C5A059] w-full cursor-pointer"
+                        >
+                          <option value="" disabled>-- Asignar Grupo Completo --</option>
+                          {tables.map(tbl => (
+                            <option key={tbl.id} value={tbl.id}>
+                              {tbl.name} ({calculateTableOccupancy(eventId, tbl.id, tbl.capacity).occupancyRatio})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* INDIVIDUAL COMPANION / PASS SEATING SELECTOR */}
+                      {isExpanded && slots.length > 0 && (
+                        <div className="mt-1 space-y-1.5 pt-2 border-t border-slate-200/80 bg-slate-50/70 p-2 rounded-lg">
+                          <span className="text-[10px] font-bold text-slate-600 block uppercase tracking-wider">
+                            Asignación Individual por Integrante:
+                          </span>
+                          {slots.map(slot => {
+                            const asgn = getAssignmentForSlot(grp.id, slot.companionId);
+                            const assignedTable = asgn ? tables.find(t => t.id === asgn.table_id) : null;
+
+                            return (
+                              <div key={slot.companionId} className="flex flex-col gap-1 bg-white p-2 rounded border border-slate-200 text-[10px]">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-bold text-slate-800 truncate max-w-[150px]" title={slot.label}>
+                                    👤 {slot.label}
+                                  </span>
+                                  {assignedTable ? (
+                                    <span className="bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded text-[9px] flex items-center gap-1">
+                                      {assignedTable.name}
+                                      <button
+                                        onClick={() => handleUnassign(grp.id, slot.companionId, asgn?.id)}
+                                        className="text-emerald-700 hover:text-red-600 font-bold ml-1"
+                                        title="Quitar"
+                                      >
+                                        ✕
+                                      </button>
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-400 italic text-[9px]">Sin mesa</span>
+                                  )}
+                                </div>
+
+                                <select
+                                  value={asgn?.table_id || ''}
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      handleAssign(e.target.value, grp.id, 1, slot.companionId, slot.label);
+                                    } else if (asgn) {
+                                      handleUnassign(grp.id, slot.companionId, asgn.id);
+                                    }
+                                  }}
+                                  className="text-[10px] font-semibold bg-white text-slate-900 border border-slate-300 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-[#C5A059] w-full cursor-pointer mt-0.5"
+                                >
+                                  <option value="">-- Seleccionar Mesa Individual --</option>
+                                  {tables.map(tbl => (
+                                    <option key={tbl.id} value={tbl.id}>
+                                      {tbl.name} ({calculateTableOccupancy(eventId, tbl.id, tbl.capacity).occupancyRatio})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
