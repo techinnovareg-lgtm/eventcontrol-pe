@@ -1332,7 +1332,7 @@ export default function TablesManagementPage() {
               <div className="space-y-2">
                 {unassignedGroups.map(grp => {
                   const slots = getGroupPassSlots(grp);
-                  const isExpanded = expandedGroupIds.has(grp.id) || grp.max_passes > 1;
+                  const isExpanded = expandedGroupIds.has(grp.id);
 
                   return (
                     <div
@@ -1354,10 +1354,15 @@ export default function TablesManagementPage() {
                         <div className="flex items-center gap-1">
                           {grp.max_passes > 1 && (
                             <button
-                              onClick={() => toggleGroupExpand(grp.id)}
-                              className="text-[10px] font-bold text-[#B8860B] bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-[#DBBB6E]/50 transition"
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleGroupExpand(grp.id);
+                              }}
+                              className="text-[10px] font-bold text-[#B8860B] bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-[#DBBB6E]/50 transition flex items-center gap-1 cursor-pointer"
                             >
-                              {expandedGroupIds.has(grp.id) ? 'Ocultar' : 'Desglosar'}
+                              {isExpanded ? <ChevronUp className="w-3 h-3 text-[#B8860B]" /> : <ChevronDown className="w-3 h-3 text-[#B8860B]" />}
+                              {isExpanded ? 'Ocultar' : 'Desglosar'}
                             </button>
                           )}
                           <span 
