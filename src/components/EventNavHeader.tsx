@@ -100,15 +100,19 @@ export default function EventNavHeader({
           {/* ORGANIC ACTIVE EVENT BREADCRUMB BADGE (HOMOGENIZED h-11 HEIGHT) */}
           <div className="flex items-center gap-2 pl-3 border-l border-slate-200 min-w-0">
             <span className="text-slate-300 text-sm hidden sm:inline">/</span>
-            <div className="flex items-center gap-2 bg-[#FAF8F5] px-3.5 h-11 rounded-xl border border-[#C5A059]/40 shadow-2xs min-w-0">
-              <Sparkles className="w-4 h-4 text-[#B8860B] shrink-0" />
-              <span className="text-xs font-serif font-bold text-[#1A1A1A] truncate max-w-[150px] sm:max-w-[240px] md:max-w-[320px]">
+            <Link 
+              href="/events"
+              className="flex items-center gap-2 bg-[#FAF8F5] hover:bg-amber-50/90 px-3.5 h-11 rounded-xl border border-[#C5A059]/40 shadow-2xs min-w-0 transition group cursor-pointer"
+              title="Catálogo de Eventos (Ver / Cambiar Evento)"
+            >
+              <Sparkles className="w-4 h-4 text-[#B8860B] shrink-0 group-hover:scale-110 transition-transform" />
+              <span className="text-xs font-serif font-bold text-[#1A1A1A] group-hover:text-[#B8860B] transition-colors truncate max-w-[110px] xs:max-w-[150px] sm:max-w-[240px] md:max-w-[320px]">
                 {eventName}
               </span>
               <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 hidden lg:inline shrink-0 uppercase">
                 ACTIVO
               </span>
-            </div>
+            </Link>
           </div>
         </div>
 
@@ -137,10 +141,10 @@ export default function EventNavHeader({
           {/* 2. CATÁLOGO BUTTON */}
           <Link
             href="/events"
-            className="h-11 px-3.5 bg-white hover:bg-amber-50/50 text-slate-800 font-serif font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-2 shadow-2xs hidden sm:flex"
+            className="h-11 px-3.5 bg-white hover:bg-amber-50/50 text-slate-800 font-serif font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-2 shadow-2xs"
             title="Catálogo de Eventos"
           >
-            <LayoutGrid className="w-4 h-4 text-[#B8860B]" /> <span>Catálogo</span>
+            <LayoutGrid className="w-4 h-4 text-[#B8860B]" /> <span className="hidden xs:inline sm:inline">Catálogo</span>
           </Link>
 
           {/* 3. CERRAR SESIÓN BUTTON */}

@@ -216,8 +216,14 @@ export default function TablesManagementPage() {
       if (Array.isArray(data.tables)) {
         setTables(prev => {
           if (data.tables.length === 0 && prev.length > 0) return prev;
-          saveEventTablesLocally(eventId, data.tables);
-          return data.tables;
+          const merged: Table[] = [...data.tables];
+          prev.forEach(p => {
+            if (!merged.some(m => m.id === p.id)) {
+              merged.push(p);
+            }
+          });
+          saveEventTablesLocally(eventId, merged);
+          return merged;
         });
         if (data.tables.length > 0) {
           setTablePositions(prev => {
@@ -237,8 +243,20 @@ export default function TablesManagementPage() {
       if (Array.isArray(data.assignments)) {
         setAssignments(prev => {
           if (data.assignments.length === 0 && prev.length > 0) return prev;
-          saveEventAssignmentsLocally(eventId, data.assignments);
-          return data.assignments;
+          const mergedMap = new Map<string, TableAssignment>();
+          data.assignments.forEach((sa: TableAssignment) => {
+            const key = sa.id || `${sa.group_id}_${sa.companion_id || 'main'}`;
+            mergedMap.set(key, sa);
+          });
+          prev.forEach(p => {
+            const key = p.id || `${p.group_id}_${p.companion_id || 'main'}`;
+            if (!mergedMap.has(key)) {
+              mergedMap.set(key, p);
+            }
+          });
+          const merged = Array.from(mergedMap.values());
+          saveEventAssignmentsLocally(eventId, merged);
+          return merged;
         });
       }
 
@@ -249,8 +267,14 @@ export default function TablesManagementPage() {
       if (Array.isArray(data.venueElements)) {
         setVenueElements(prev => {
           if (data.venueElements.length === 0 && prev.length > 0) return prev;
-          saveEventVenueElementsLocally(eventId, data.venueElements);
-          return data.venueElements;
+          const merged: VenueElement[] = [...data.venueElements];
+          prev.forEach(p => {
+            if (!merged.some(m => m.id === p.id)) {
+              merged.push(p);
+            }
+          });
+          saveEventVenueElementsLocally(eventId, merged);
+          return merged;
         });
       }
     } catch (err) {}
