@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, updateEventAsync, deleteEvent } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
-import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
+import { getAccountForSession, getActiveSession, getAdminAccountByEmailAsync, setActiveSession } from '@/lib/superadmin-store';
 
 export default function EventsCrudPage() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
@@ -26,7 +26,7 @@ export default function EventsCrudPage() {
       return;
     }
     const contractAccount = getAccountForSession();
-    const wsId = session?.user?.workspaceId || contractAccount?.workspaceId || 'ws-a-1111';
+    let wsId = session?.user?.workspaceId || contractAccount?.workspaceId || 'ws-a-1111';
     const name = session?.user?.name || contractAccount?.adminName || contractAccount?.companyName || 'Cliente VIP';
     const email = session?.user?.email || contractAccount?.contactEmail || 'cliente@empresa.pe';
 
@@ -36,8 +36,25 @@ export default function EventsCrudPage() {
     setUserEmail(email);
     setUserInitial(name ? name.charAt(0).toUpperCase() : 'C');
 
+    if (email && email !== 'cliente@empresa.pe') {
+      getAdminAccountByEmailAsync(email).then(acc => {
+        if (acc && acc.workspaceId && acc.workspaceId !== wsId) {
+          wsId = acc.workspaceId;
+          setCurrentWorkspaceId(acc.workspaceId);
+          if (session && session.user) {
+            session.user.workspaceId = acc.workspaceId;
+            setActiveSession(session);
+          }
+          getWorkspaceEventsAsync(acc.workspaceId).then(onlineEvts => {
+            if (Array.isArray(onlineEvts)) setEvents(onlineEvts);
+          });
+        }
+      });
+    }
+
     const fetchEvents = () => {
-      getWorkspaceEventsAsync(wsId).then(onlineEvts => {
+      const activeWs = session?.user?.workspaceId || wsId;
+      getWorkspaceEventsAsync(activeWs).then(onlineEvts => {
         if (Array.isArray(onlineEvts)) {
           setEvents(onlineEvts);
         }

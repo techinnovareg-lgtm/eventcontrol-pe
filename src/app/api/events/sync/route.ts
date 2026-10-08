@@ -19,25 +19,88 @@ function generateDeterministicUUID(keyString: string): string {
   return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 }
 
-async function fetchOnlineEventsFromSupabase(workspaceId: string): Promise<Event[]> {
+async function fetchOnlineEventsFromSupabase(workspaceId?: string): Promise<Event[]> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key || !workspaceId) return [];
+  if (!url || !key) return [];
   try {
-    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_EVENT_SYNC_${workspaceId}&select=*`, {
+    let query = `${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`;
+    if (workspaceId && workspaceId !== 'ALL') {
+      query = `${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_EVENT_SYNC_${workspaceId}&select=*`;
+    }
+    const res = await fetch(query, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
       cache: 'no-store'
     });
     if (res.ok) {
       const rows = await res.json();
       if (Array.isArray(rows)) {
-        return rows.map(r => {
+        const events = rows.map(r => {
           try { return JSON.parse(r.device_info); } catch (e) { return null; }
         }).filter(Boolean);
+
+        if (workspaceId && workspaceId !== 'ALL' && events.length > 0) {
+          return events;
+        }
+
+        // If specific workspaceId returned 0, fallback to search across all SYS_EVENT_SYNC_
+        if (workspaceId && workspaceId !== 'ALL' && events.length === 0) {
+          const fallbackRes = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`, {
+            headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+            cache: 'no-store'
+          });
+          if (fallbackRes.ok) {
+            const fallbackRows = await fallbackRes.json();
+            if (Array.isArray(fallbackRows)) {
+              return fallbackRows.map(r => {
+                try { return JSON.parse(r.device_info); } catch (e) { return null; }
+              }).filter((e: Event | null) => e && e.workspace_id === workspaceId);
+            }
+          }
+        }
+
+        return events;
       }
     }
   } catch (err) {}
   return [];
+}
+
+async function fetchOnlineEventByIdFromSupabase(eventId: string): Promise<Event | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key || !eventId) return null;
+  try {
+    const uuid = generateDeterministicUUID(`event_${eventId}`);
+    const res = await fetch(`${url}/rest/v1/check_ins?id=eq.${uuid}&select=*`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+      cache: 'no-store'
+    });
+    if (res.ok) {
+      const rows = await res.json();
+      if (Array.isArray(rows) && rows[0]?.device_info) {
+        try { return JSON.parse(rows[0].device_info); } catch (e) {}
+      }
+    }
+
+    // Fallback search across all SYS_EVENT_SYNC_
+    const allRes = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`, {
+      headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+      cache: 'no-store'
+    });
+    if (allRes.ok) {
+      const allRows = await allRes.json();
+      if (Array.isArray(allRows)) {
+        for (const r of allRows) {
+          try {
+            const ev = JSON.parse(r.device_info);
+            if (ev && ev.id === eventId) return ev;
+          } catch (e) {}
+        }
+      }
+    }
+  } catch (err) {}
+  return null;
 }
 
 async function persistEventToSupabase(event: Event) {
@@ -322,10 +385,17 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: false, message: 'Evento eliminado' }, { status: 404 });
     }
     
-    // Fetch Online Supabase DB Tables, Assignments, Groups, and Venue Elements
-    const onlineData = await fetchOnlineTablesDataFromSupabase(eventId);
+    // Fetch Online Supabase DB Tables, Assignments, Groups, Venue Elements, and Event
+    const [onlineData, onlineEvent] = await Promise.all([
+      fetchOnlineTablesDataFromSupabase(eventId),
+      fetchOnlineEventByIdFromSupabase(eventId),
+    ]);
 
-    const event = globalServerEventsStore.find(e => e.id === eventId) || null;
+    const event = onlineEvent || globalServerEventsStore.find(e => e.id === eventId) || null;
+    if (event && !globalServerEventsStore.some(e => e.id === event.id)) {
+      globalServerEventsStore.unshift(event);
+    }
+
     const groups = onlineData.groups || globalServerGroupsStore[eventId] || [];
     const tables = onlineData.tables || globalServerTablesStore[eventId] || [];
     const assignments = onlineData.assignments || globalServerAssignmentsStore[eventId] || [];
@@ -429,8 +499,26 @@ export async function GET(req: Request) {
     });
   }
 
-  const activeAll = globalServerEventsStore.filter(e => !globalServerDeletedEventsStore.includes(e.id));
-  const sortedAll = [...activeAll].sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
+  // If no specific workspaceId provided, fetch all online events from Supabase
+  const onlineAll = await fetchOnlineEventsFromSupabase();
+  const mergedAllMap = new Map<string, Event>();
+
+  onlineAll.forEach(e => {
+    if (!globalServerDeletedEventsStore.includes(e.id)) {
+      mergedAllMap.set(e.id, e);
+    }
+  });
+
+  globalServerEventsStore.forEach(e => {
+    if (!globalServerDeletedEventsStore.includes(e.id)) {
+      mergedAllMap.set(e.id, e);
+    }
+  });
+
+  const sortedAll = Array.from(mergedAllMap.values()).sort(
+    (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
+  );
+
   return NextResponse.json({
     success: true,
     events: sortedAll,
@@ -511,6 +599,20 @@ export async function POST(req: Request) {
       delete globalServerCheckInsStore[eventId];
       delete globalServerVenueElementsStore[eventId];
       saveDbToFile();
+
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (url && key) {
+        const uuid = generateDeterministicUUID(`event_${eventId}`);
+        fetch(`${url}/rest/v1/check_ins?id=eq.${uuid}`, {
+          method: 'DELETE',
+          headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+        }).catch(() => {});
+        fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})`, {
+          method: 'DELETE',
+          headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+        }).catch(() => {});
+      }
       return NextResponse.json({ success: true, deletedEventId: eventId });
     }
 
@@ -606,6 +708,7 @@ export async function POST(req: Request) {
         });
       }
       saveDbToFile();
+      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, globalServerVenueElementsStore[eventId]);
       return NextResponse.json({ success: true });
     }
 

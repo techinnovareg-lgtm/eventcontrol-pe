@@ -248,6 +248,36 @@ export function getAdminAccountByEmail(emailInput: string): AdminAccount | undef
   return accounts.find(a => a.contactEmail.toLowerCase() === cleanedEmail);
 }
 
+export async function getAdminAccountByEmailAsync(emailInput: string): Promise<AdminAccount | undefined> {
+  if (!emailInput) return undefined;
+  const cleanedEmail = emailInput.trim().toLowerCase();
+  
+  // 1. Check local first
+  const local = getAdminAccountByEmail(cleanedEmail);
+  if (local) return local;
+
+  // 2. Fetch from online server / Supabase
+  try {
+    const res = await fetch(`/api/auth/sync-accounts?email=${encodeURIComponent(cleanedEmail)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.account) {
+        const store = getAdminAccountsStore();
+        const idx = store.findIndex(a => a.id === data.account.id || a.contactEmail.toLowerCase() === cleanedEmail);
+        if (idx !== -1) {
+          store[idx] = data.account;
+        } else {
+          store.unshift(data.account);
+        }
+        saveAccountsToStorage(store);
+        return data.account;
+      }
+    }
+  } catch (err) {}
+
+  return undefined;
+}
+
 // Current active session state
 let currentSession: AuthSession | null = null;
 
@@ -569,13 +599,32 @@ const SESSION_STORAGE_KEY = 'eventcontrol_active_session';
  * Get Active Auth Session (with browser storage persistence on refresh)
  */
 export function getActiveSession(): AuthSession | null {
-  if (currentSession) return currentSession;
+  if (currentSession) {
+    if (currentSession.user?.email && (!currentSession.user.workspaceId || currentSession.user.workspaceId === 'ws-a-1111')) {
+      const acc = getAdminAccountByEmail(currentSession.user.email);
+      if (acc && acc.workspaceId && acc.workspaceId !== 'ws-a-1111') {
+        currentSession.user.workspaceId = acc.workspaceId;
+        setActiveSession(currentSession);
+      }
+    }
+    return currentSession;
+  }
   if (typeof window !== 'undefined') {
     try {
       const raw = localStorage.getItem(SESSION_STORAGE_KEY) || sessionStorage.getItem(SESSION_STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && parsed.user) {
+          if (parsed.user.email && (!parsed.user.workspaceId || parsed.user.workspaceId === 'ws-a-1111')) {
+            const acc = getAdminAccountByEmail(parsed.user.email);
+            if (acc && acc.workspaceId && acc.workspaceId !== 'ws-a-1111') {
+              parsed.user.workspaceId = acc.workspaceId;
+              try {
+                localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(parsed));
+                sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(parsed));
+              } catch (e) {}
+            }
+          }
           currentSession = parsed;
           return parsed;
         }
