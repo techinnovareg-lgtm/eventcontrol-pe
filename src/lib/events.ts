@@ -173,37 +173,13 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
           e.id !== 'evt-principal-01' &&
           !updatedDeletedIds.includes(e.id)
         );
-
-        // Preserve local events for this workspace that are NOT on the server and NOT in updatedDeletedIds
-        const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
-        const unsyncedLocalEvents = localWorkspaceEvents.filter(le => {
-          const isServerMatch = serverEvents.some((se: Event) => se.id === le.id);
-          if (isServerMatch) return false;
-          if (updatedDeletedIds.includes(le.id)) return false;
-          return true;
-        });
-
-        // Re-sync unsynced local events to the server
-        unsyncedLocalEvents.forEach(evt => {
-          fetch('/api/events/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
-          }).catch(() => {});
-        });
-
         // Keep local events from other workspaces
         const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !updatedDeletedIds.includes(e.id));
         
-        // Final merged list for local storage
-        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents].sort(
-          (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
-        );
-
-        const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
+        const finalMerged = [...otherWorkspaceEvents, ...serverEvents];
         saveEventsToStorage(finalMerged);
 
-        return mergedWorkspaceEvents;
+        return serverEvents;
       }
     }
   } catch (err) {
@@ -422,14 +398,9 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
           return localGroups;
         }
 
-        // Monotonic Max-Merge Server Groups with Local Groups (checked_in_count never decreases)
-        let requiresResync = false;
         const merged: GuestGroup[] = data.groups.map((serverG: GuestGroup) => {
           const localG = localGroups.find(lg => lg.id === serverG.id);
           const maxCount = Math.max(serverG.checked_in_count || 0, localG ? (localG.checked_in_count || 0) : 0);
-          if (localG && (localG.checked_in_count || 0) > (serverG.checked_in_count || 0)) {
-            requiresResync = true;
-          }
           return {
             ...serverG,
             checked_in_count: maxCount,
@@ -437,25 +408,8 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
           };
         });
 
-        // Preserve any local groups that might not exist on server yet
-        localGroups.forEach(lg => {
-          if (!merged.some(mg => mg.id === lg.id)) {
-            merged.push(lg);
-            requiresResync = true;
-          }
-        });
-
         localStore[eventId] = merged;
         saveGroupsToStorage(localStore);
-
-        if (requiresResync && merged.length > 0) {
-          const workspaceId = merged[0]?.workspace_id || '';
-          fetch('/api/events/sync', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: merged }),
-          }).catch(() => {});
-        }
 
         return merged;
       }
