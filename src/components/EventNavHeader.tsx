@@ -8,6 +8,7 @@ import {
   Clock, Scissors, UtensilsCrossed, ShieldCheck, ArrowLeft, LogOut, LayoutGrid, Radio, AlertTriangle, Sparkles, Calendar, User, Users
 } from 'lucide-react';
 import { calculateRemainingDays, getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
+import { setLastActiveEventId } from '@/lib/events';
 
 interface EventNavHeaderProps {
   currentTab: 'dashboard' | 'import' | 'tables' | 'qr' | 'whatsapp' | 'cuts' | 'reports' | 'team' | 'scan';
@@ -23,6 +24,8 @@ export default function EventNavHeader({
 
   const activeTabRef = useRef<HTMLAnchorElement | null>(null);
 
+  const safeEventId = (eventId && eventId.trim() !== '' && eventId !== 'undefined' && eventId !== 'null') ? eventId : '';
+
   useEffect(() => {
     if (activeTabRef.current) {
       activeTabRef.current.scrollIntoView({
@@ -33,7 +36,11 @@ export default function EventNavHeader({
     }
   }, [currentTab]);
 
-  const safeEventId = (eventId && eventId.trim() !== '' && eventId !== 'undefined' && eventId !== 'null') ? eventId : '';
+  useEffect(() => {
+    if (safeEventId) {
+      setLastActiveEventId(safeEventId);
+    }
+  }, [safeEventId]);
 
   // Dynamic contract account & active session check
   const contractAccount = getAccountForSession();
@@ -55,7 +62,7 @@ export default function EventNavHeader({
     { id: 'cuts', label: 'Cortes & Catering', icon: UtensilsCrossed, href: safeEventId ? `/events/${safeEventId}/cuts` : '/events' },
     { id: 'team', label: 'Colaboradores & PIN', icon: Users, href: safeEventId ? `/events/${safeEventId}/team` : '/events' },
     { id: 'reports', label: 'Reportes & Métricas', icon: Clock, href: safeEventId ? `/events/${safeEventId}/reports` : '/events' },
-    { id: 'scan', label: 'Escáner PWA', icon: QrCode, href: `/scan` },
+    { id: 'scan', label: 'Escáner PWA', icon: QrCode, href: safeEventId ? `/scan?event=${safeEventId}` : '/scan' },
   ];
 
   return (
@@ -81,7 +88,7 @@ export default function EventNavHeader({
         
         {/* Brand Logo & Active Event Breadcrumb / Context Selector */}
         <div className="flex items-center gap-3 min-w-0">
-          <Link href="/dashboard" className="flex items-center gap-2.5 group shrink-0">
+          <Link href={safeEventId ? `/dashboard?eventId=${encodeURIComponent(safeEventId)}` : '/dashboard'} className="flex items-center gap-2.5 group shrink-0">
             <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 group-hover:scale-105 transition-transform bg-white p-0.5">
               <Image 
                 src="/logo-eventcontrol.jpg" 

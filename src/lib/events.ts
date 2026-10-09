@@ -183,6 +183,28 @@ export function autoSyncEventsToServer(workspaceId?: string) {
   syncAllWorkspaceLocalDataToServerAsync(workspaceId);
 }
 
+const LAST_ACTIVE_EVENT_STORAGE_KEY = 'eventcontrol_last_active_event_id';
+
+export function getLastActiveEventId(workspaceId?: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const key = workspaceId ? `${LAST_ACTIVE_EVENT_STORAGE_KEY}_${workspaceId}` : LAST_ACTIVE_EVENT_STORAGE_KEY;
+    const id = localStorage.getItem(key) || localStorage.getItem(LAST_ACTIVE_EVENT_STORAGE_KEY);
+    return id && id.trim() !== '' ? id : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setLastActiveEventId(eventId: string, workspaceId?: string): void {
+  if (typeof window === 'undefined' || !eventId) return;
+  try {
+    const key = workspaceId ? `${LAST_ACTIVE_EVENT_STORAGE_KEY}_${workspaceId}` : LAST_ACTIVE_EVENT_STORAGE_KEY;
+    localStorage.setItem(key, eventId);
+    localStorage.setItem(LAST_ACTIVE_EVENT_STORAGE_KEY, eventId);
+  } catch (e) {}
+}
+
 function saveEventsToStorage(events: Event[]) {
   eventsMemoryStore = events;
   if (typeof window !== 'undefined') {

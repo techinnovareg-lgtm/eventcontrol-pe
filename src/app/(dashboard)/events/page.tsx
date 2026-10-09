@@ -8,7 +8,7 @@ import {
   CheckCircle, Clock, MessageSquare, ArrowRight, BarChart3, 
   Scissors, Edit3, Home, LogOut, Trash2
 } from 'lucide-react';
-import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, updateEventAsync, deleteEvent, autoSyncEventsToServer } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, updateEventAsync, deleteEvent, autoSyncEventsToServer, getLastActiveEventId, setLastActiveEventId } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 import { getAccountForSession, getActiveSession, getAdminAccountByEmailAsync, setActiveSession } from '@/lib/superadmin-store';
 
@@ -18,6 +18,7 @@ export default function EventsCrudPage() {
   const [userName, setUserName] = useState<string>('Cliente VIP');
   const [userEmail, setUserEmail] = useState<string>('cliente@empresa.pe');
   const [userInitial, setUserInitial] = useState<string>('C');
+  const [lastActiveId, setLastActiveId] = useState<string>('');
 
   useEffect(() => {
     const session = getActiveSession();
@@ -42,6 +43,7 @@ export default function EventsCrudPage() {
     setUserName(name);
     setUserEmail(email);
     setUserInitial(name ? name.charAt(0).toUpperCase() : 'C');
+    setLastActiveId(getLastActiveEventId(wsId) || '');
 
     // Auto-sync any existing local events immediately on mount
     autoSyncEventsToServer(wsId);
@@ -110,7 +112,7 @@ export default function EventsCrudPage() {
     e.preventDefault();
     if (!name || !date) return;
 
-    await createEventAsync({
+    const newEvt = await createEventAsync({
       workspace_id: currentWorkspaceId,
       name,
       event_type: 'Boda / Gala',
@@ -118,6 +120,11 @@ export default function EventsCrudPage() {
       venue_name: location,
       status: 'BORRADOR',
     });
+
+    if (newEvt && newEvt.id) {
+      setLastActiveEventId(newEvt.id, currentWorkspaceId);
+      setLastActiveId(newEvt.id);
+    }
 
     const updatedEvents = await getWorkspaceEventsAsync(currentWorkspaceId);
     setEvents(updatedEvents);
@@ -216,7 +223,10 @@ export default function EventsCrudPage() {
             </Link>
 
             <Link 
-              href={events.length > 0 ? `/dashboard?eventId=${events[0].id}` : '/dashboard'} 
+              href={(() => {
+                const target = (lastActiveId && events.find(e => e.id === lastActiveId)) || events[0];
+                return target ? `/dashboard?eventId=${encodeURIComponent(target.id)}` : '/dashboard';
+              })()} 
               className="text-xs gold-button font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm"
               title="Ir al Dashboard Activo"
             >
@@ -273,105 +283,137 @@ export default function EventsCrudPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {events.map((evt) => (
-              <div key={evt.id} className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col justify-between space-y-4 hover-lift">
-                <div className="space-y-3">
-                  {/* Header Row: Status Badge & Edit Button */}
-                  <div className="flex items-center justify-between">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      evt.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                      evt.status === 'FINALIZADO' ? 'bg-slate-200 text-slate-700' :
-                      'bg-amber-100 text-amber-900 border border-amber-300'
-                    }`}>
-                      {evt.status}
-                    </span>
+            {events.map((evt) => {
+              const isEventActive = evt.id === lastActiveId;
+              const handleSelectEvent = () => {
+                setLastActiveEventId(evt.id, currentWorkspaceId);
+                setLastActiveId(evt.id);
+              };
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        onClick={() => handleOpenEditModal(evt)}
-                        className="p-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] rounded-lg border border-[#C5A059]/30 transition"
-                        title="Editar Propiedades del Evento"
-                      >
-                        <Edit3 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteEvent(evt.id, evt.name)}
-                        className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition"
-                        title="Eliminar Evento"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+              return (
+                <div 
+                  key={evt.id} 
+                  className={`card-luxury p-6 border shadow-md flex flex-col justify-between space-y-4 hover-lift transition-all relative ${
+                    isEventActive 
+                      ? 'border-[#B8860B] ring-2 ring-[#C5A059]/40 bg-gradient-to-b from-amber-50/20 to-white' 
+                      : 'border-[#C5A059]/30 hover:border-[#C5A059]'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    {/* Header Row: Status Badge & Edit Button */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          evt.status === 'ACTIVO' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                          evt.status === 'FINALIZADO' ? 'bg-slate-200 text-slate-700' :
+                          'bg-amber-100 text-amber-900 border border-amber-300'
+                        }`}>
+                          {evt.status}
+                        </span>
+                        {isEventActive && (
+                          <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider bg-[#B8860B] text-white shadow-xs">
+                            Activo
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenEditModal(evt)}
+                          className="p-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] rounded-lg border border-[#C5A059]/30 transition"
+                          title="Editar Propiedades del Evento"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEvent(evt.id, evt.name)}
+                          className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition"
+                          title="Eliminar Evento"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
+
+                    {/* CLICKABLE EVENT TITLE & HEADER */}
+                    <Link 
+                      href={`/dashboard?eventId=${evt.id}`} 
+                      onClick={handleSelectEvent}
+                      className="block group"
+                    >
+                      <h3 className="text-lg font-serif font-bold text-[#1A1A1A] group-hover:text-[#B8860B] transition">
+                        {evt.name}
+                      </h3>
+                      <div className="space-y-1 text-xs text-slate-600 mt-2">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
+                          <span>{evt.event_date}</span>
+                        </div>
+                        {evt.venue_name && (
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-3.5 h-3.5 text-purple-600" />
+                            <span>{evt.venue_name}</span>
+                          </div>
+                        )}
+                      </div>
+                    </Link>
+
+                    {/* PRIMARY ENTER EVENT BUTTON */}
+                    <Link
+                      href={`/dashboard?eventId=${evt.id}`}
+                      onClick={handleSelectEvent}
+                      className="w-full py-2.5 gold-button font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
+                    >
+                      <BarChart3 className="w-4 h-4" /> Ingresar al Evento (Dashboard) <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
 
-                  {/* CLICKABLE EVENT TITLE & HEADER */}
-                  <Link href={`/dashboard?eventId=${evt.id}`} className="block group">
-                    <h3 className="text-lg font-serif font-bold text-[#1A1A1A] group-hover:text-[#B8860B] transition">
-                      {evt.name}
-                    </h3>
-                    <div className="space-y-1 text-xs text-slate-600 mt-2">
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
-                        <span>{evt.event_date}</span>
-                      </div>
-                      {evt.venue_name && (
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-3.5 h-3.5 text-purple-600" />
-                          <span>{evt.venue_name}</span>
-                        </div>
-                      )}
-                    </div>
-                  </Link>
-
-                  {/* PRIMARY ENTER EVENT BUTTON */}
-                  <Link
-                    href={`/dashboard?eventId=${evt.id}`}
-                    className="w-full py-2.5 gold-button font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-2 transition"
-                  >
-                    <BarChart3 className="w-4 h-4" /> Ingresar al Evento (Dashboard) <ArrowRight className="w-3.5 h-3.5" />
-                  </Link>
+                  {/* Quick Sub-feature Actions Footer */}
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 pt-3 border-t border-slate-100 text-center text-[11px]">
+                    <Link
+                      href={`/events/${evt.id}/tables`}
+                      onClick={handleSelectEvent}
+                      className="py-1.5 px-1 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-purple-200"
+                      title="Plano de Mesas"
+                    >
+                      <MapPin className="w-3.5 h-3.5 mb-0.5" /> Mesas
+                    </Link>
+                    <Link
+                      href={`/events/${evt.id}/qr`}
+                      onClick={handleSelectEvent}
+                      className="py-1.5 px-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-indigo-200"
+                      title="Pases & QR"
+                    >
+                      <Users className="w-3.5 h-3.5 mb-0.5" /> QR
+                    </Link>
+                    <Link
+                      href={`/events/${evt.id}/whatsapp`}
+                      onClick={handleSelectEvent}
+                      className="py-1.5 px-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-emerald-200"
+                      title="WhatsApp"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5 mb-0.5" /> WhatsApp
+                    </Link>
+                    <Link
+                      href={`/events/${evt.id}/import`}
+                      onClick={handleSelectEvent}
+                      className="py-1.5 px-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-lg transition flex flex-col items-center justify-center border border-[#C5A059]/30"
+                      title="Importar Excel"
+                    >
+                      <FileSpreadsheet className="w-3.5 h-3.5 mb-0.5" /> Excel
+                    </Link>
+                    <Link
+                      href={`/events/${evt.id}/reports`}
+                      onClick={handleSelectEvent}
+                      className="py-1.5 px-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition flex flex-col items-center justify-center shadow-sm"
+                      title="Reportes"
+                    >
+                      <Clock className="w-3.5 h-3.5 mb-0.5" /> Reportes
+                    </Link>
+                  </div>
                 </div>
-
-                {/* Quick Sub-feature Actions Footer */}
-                <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5 pt-3 border-t border-slate-100 text-center text-[11px]">
-                  <Link
-                    href={`/events/${evt.id}/tables`}
-                    className="py-1.5 px-1 bg-purple-50 hover:bg-purple-100 text-purple-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-purple-200"
-                    title="Plano de Mesas"
-                  >
-                    <MapPin className="w-3.5 h-3.5 mb-0.5" /> Mesas
-                  </Link>
-                  <Link
-                    href={`/events/${evt.id}/qr`}
-                    className="py-1.5 px-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-indigo-200"
-                    title="Pases & QR"
-                  >
-                    <Users className="w-3.5 h-3.5 mb-0.5" /> QR
-                  </Link>
-                  <Link
-                    href={`/events/${evt.id}/whatsapp`}
-                    className="py-1.5 px-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg transition flex flex-col items-center justify-center border border-emerald-200"
-                    title="WhatsApp"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 mb-0.5" /> WhatsApp
-                  </Link>
-                  <Link
-                    href={`/events/${evt.id}/import`}
-                    className="py-1.5 px-1 bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold rounded-lg transition flex flex-col items-center justify-center border border-[#C5A059]/30"
-                    title="Importar Excel"
-                  >
-                    <FileSpreadsheet className="w-3.5 h-3.5 mb-0.5" /> Excel
-                  </Link>
-                  <Link
-                    href={`/events/${evt.id}/reports`}
-                    className="py-1.5 px-1 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-lg transition flex flex-col items-center justify-center shadow-sm"
-                    title="Reportes"
-                  >
-                    <Clock className="w-3.5 h-3.5 mb-0.5" /> Reportes
-                  </Link>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

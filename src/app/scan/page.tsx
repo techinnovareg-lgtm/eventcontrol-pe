@@ -16,7 +16,8 @@ import {
 } from '@/lib/offline-db';
 import { 
   getEventGuestGroups, getWorkspaceEvents, getEventById,
-  getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync 
+  getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync,
+  getLastActiveEventId, setLastActiveEventId
 } from '@/lib/events';
 import { 
   getEventTableAssignments, getEventTables,
@@ -66,11 +67,11 @@ export default function MobileScanCheckInPage() {
       if (!isMounted) return;
       setWorkspaceEvents(events);
 
-      // Pre-select priority event: 1) URL event param, 2) first available event
+      // Pre-select priority event: 1) URL event/eventId param, 2) Last remembered active event, 3) first available event
       let targetId = selectedEventId;
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
-        const urlEvt = params.get('event');
+        const urlEvt = params.get('event') || params.get('eventId');
         const urlToken = params.get('token');
 
         if (urlEvt && events.some(e => e.id === urlEvt)) {
@@ -86,12 +87,18 @@ export default function MobileScanCheckInPage() {
       }
 
       if (!targetId || !events.some(e => e.id === targetId)) {
-        if (events.length > 0) {
+        const rememberedId = getLastActiveEventId(currentWorkspaceId);
+        if (rememberedId && events.some(e => e.id === rememberedId)) {
+          targetId = rememberedId;
+        } else if (events.length > 0) {
           targetId = events[0].id;
         }
       }
 
-      setSelectedEventId(targetId);
+      if (targetId) {
+        setSelectedEventId(targetId);
+        setLastActiveEventId(targetId, currentWorkspaceId);
+      }
     }
 
     loadEventsAsync();
@@ -472,7 +479,10 @@ export default function MobileScanCheckInPage() {
               </div>
             </div>
           ) : (
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <Link 
+              href={selectedEventId ? `/dashboard?eventId=${encodeURIComponent(selectedEventId)}` : '/dashboard'} 
+              className="flex items-center gap-2"
+            >
               <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-[#C5A059]/40">
                 <Image src="/logo-eventcontrol.jpg" alt="Logo" fill className="object-cover" />
               </div>
@@ -545,6 +555,7 @@ export default function MobileScanCheckInPage() {
               value={selectedEventId}
               onChange={(e) => {
                 setSelectedEventId(e.target.value);
+                setLastActiveEventId(e.target.value, currentWorkspaceId);
                 setScannedInput('');
                 setMatchedGroup(null);
                 setSelectedTokenHash('');

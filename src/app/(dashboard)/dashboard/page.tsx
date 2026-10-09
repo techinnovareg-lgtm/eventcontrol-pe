@@ -11,7 +11,7 @@ import {
 import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed, getHourlyCheckInBreakdown } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
-import { getWorkspaceEvents, getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync, autoSyncEventsToServer } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync, autoSyncEventsToServer, getLastActiveEventId, setLastActiveEventId } from '@/lib/events';
 import { getEventTablesAsync, getEventTableAssignmentsAsync } from '@/lib/tables';
 import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 import { Calendar } from 'lucide-react';
@@ -88,11 +88,27 @@ export default function RealtimeDashboardPage() {
       }
 
       setHasNoEvents(false);
+
+      // Prioritize: 1) URL param, 2) Last remembered active event, 3) First available event
+      if (!selectedId) {
+        const rememberedId = getLastActiveEventId(wsId);
+        if (rememberedId && userEvents.some(e => e.id === rememberedId)) {
+          selectedId = rememberedId;
+        }
+      }
+
       const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
       const activeEvtId = activeEvt?.id || '';
 
       if (activeEvtId) {
         setEventId(activeEvtId);
+        setLastActiveEventId(activeEvtId, wsId);
+        if (typeof window !== 'undefined') {
+          try {
+            const newUrl = `/dashboard?eventId=${encodeURIComponent(activeEvtId)}`;
+            window.history.replaceState({}, '', newUrl);
+          } catch (e) {}
+        }
         await refreshDashboardData(activeEvtId, wsId);
       }
       setIsInitialLoading(false);
@@ -114,10 +130,17 @@ export default function RealtimeDashboardPage() {
             const urlParams = new URLSearchParams(window.location.search);
             selectedId = urlParams.get('eventId') || '';
           }
+          if (!selectedId) {
+            const rememberedId = getLastActiveEventId(currentWorkspaceId);
+            if (rememberedId && userEvents.some(e => e.id === rememberedId)) {
+              selectedId = rememberedId;
+            }
+          }
         }
         const activeEvt = userEvents.find(e => e.id === selectedId) || userEvents[0];
         if (activeEvt) {
           setEventId(activeEvt.id);
+          setLastActiveEventId(activeEvt.id, currentWorkspaceId);
           await refreshDashboardData(activeEvt.id, currentWorkspaceId);
         }
       } else {

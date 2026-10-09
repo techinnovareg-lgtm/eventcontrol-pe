@@ -13,7 +13,7 @@ import { testCrossWorkspaceIsolation } from '@/lib/workspace';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
 import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
-import { getWorkspaceEvents, getWorkspaceEventsAsync } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, getLastActiveEventId } from '@/lib/events';
 
 export default function AccountProfilePage() {
   const session = getActiveSession();
@@ -152,7 +152,10 @@ export default function AccountProfilePage() {
       {/* Top Navbar Header */}
       <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
+          <Link href={(() => {
+            const lastId = getLastActiveEventId(currentWorkspaceId);
+            return lastId ? `/dashboard?eventId=${encodeURIComponent(lastId)}` : '/dashboard';
+          })()} className="flex items-center gap-3 group">
             <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 group-hover:scale-105 transition-transform bg-white p-0.5">
               <Image 
                 src="/logo-eventcontrol.jpg" 
@@ -187,7 +190,10 @@ export default function AccountProfilePage() {
               </div>
             </div>
 
-            <Link href="/dashboard" className="text-xs text-[#B8860B] hover:underline font-bold flex items-center gap-1 bg-amber-50 px-3 py-2 rounded-xl border border-[#C5A059]/30">
+            <Link href={(() => {
+              const lastId = getLastActiveEventId(currentWorkspaceId);
+              return lastId ? `/dashboard?eventId=${encodeURIComponent(lastId)}` : '/dashboard';
+            })()} className="text-xs text-[#B8860B] hover:underline font-bold flex items-center gap-1 bg-amber-50 px-3 py-2 rounded-xl border border-[#C5A059]/30">
               <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
             </Link>
           </div>

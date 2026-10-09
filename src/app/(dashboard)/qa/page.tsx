@@ -8,6 +8,8 @@ import {
   Layers, Lock, Cpu, Smartphone, Download, Zap
 } from 'lucide-react';
 import { runFullQASuite, QATestResult } from '@/lib/qa-runner';
+import { getLastActiveEventId } from '@/lib/events';
+import { getActiveSession } from '@/lib/superadmin-store';
 
 export default function QACenterPage() {
   const [running, setRunning] = useState(false);
@@ -30,7 +32,11 @@ export default function QACenterPage() {
       {/* Top Navbar */}
       <header className="border-b border-[#C5A059]/20 bg-white/90 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-3 group">
+          <Link href={(() => {
+            const wsId = getActiveSession()?.user?.workspaceId;
+            const lastId = getLastActiveEventId(wsId);
+            return lastId ? `/dashboard?eventId=${encodeURIComponent(lastId)}` : '/dashboard';
+          })()} className="flex items-center gap-3 group">
             <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/30 group-hover:scale-105 transition-transform">
               <Image 
                 src="/logo-eventcontrol.jpg" 
@@ -49,7 +55,11 @@ export default function QACenterPage() {
             </div>
           </Link>
 
-          <Link href="/dashboard" className="text-xs text-slate-600 hover:text-[#C5A059] font-bold flex items-center gap-1">
+          <Link href={(() => {
+            const wsId = getActiveSession()?.user?.workspaceId;
+            const lastId = getLastActiveEventId(wsId);
+            return lastId ? `/dashboard?eventId=${encodeURIComponent(lastId)}` : '/dashboard';
+          })()} className="text-xs text-slate-600 hover:text-[#C5A059] font-bold flex items-center gap-1">
             <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
           </Link>
         </div>
