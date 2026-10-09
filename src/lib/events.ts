@@ -160,7 +160,7 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         }
         const updatedDeletedIds = getDeletedEventIdsFromStorage();
 
-        const serverEvents = data.events.filter((e: Event) => 
+        const serverEvents: Event[] = data.events.filter((e: Event) => 
           e.id !== 'evt-101' && 
           e.id !== 'evt-102' && 
           e.id !== 'evt-principal-01' &&
@@ -173,13 +173,36 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
           e.id !== 'evt-principal-01' &&
           !updatedDeletedIds.includes(e.id)
         );
+
         // Keep local events from other workspaces
         const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !updatedDeletedIds.includes(e.id));
         
-        const finalMerged = [...otherWorkspaceEvents, ...serverEvents];
+        // Find local events for this workspace that are not yet on the server, and sync them
+        const localWorkspaceEvents = localStore.filter(e => (e.workspace_id === workspaceId || !workspaceId) && !updatedDeletedIds.includes(e.id));
+        
+        const mergedWorkspaceMap = new Map<string, Event>();
+        serverEvents.forEach((se: Event) => mergedWorkspaceMap.set(se.id, se));
+        
+        localWorkspaceEvents.forEach((le: Event) => {
+          if (!mergedWorkspaceMap.has(le.id)) {
+            mergedWorkspaceMap.set(le.id, le);
+            // Re-sync local event to server & Supabase
+            fetch('/api/events/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'SYNC_EVENT', event: le }),
+            }).catch(() => {});
+          }
+        });
+
+        const mergedWorkspaceEvents = Array.from(mergedWorkspaceMap.values()).sort(
+          (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
+        );
+
+        const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
         saveEventsToStorage(finalMerged);
 
-        return serverEvents;
+        return mergedWorkspaceEvents;
       }
     }
   } catch (err) {
