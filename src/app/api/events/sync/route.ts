@@ -464,18 +464,108 @@ export async function GET(req: Request) {
       globalServerEventsStore.unshift(event);
     }
 
-    const groups = onlineData.groups || globalServerGroupsStore[eventId] || [];
-    const tables = onlineData.tables || globalServerTablesStore[eventId] || [];
-    const assignments = onlineData.assignments || globalServerAssignmentsStore[eventId] || [];
-    const venueElements = onlineData.venueElements || globalServerVenueElementsStore[eventId] || [];
+    // Intelligent Merge: Tables between Online Supabase DB and Server Store
+    const localTables = globalServerTablesStore[eventId] || [];
+    const onlineTables = onlineData.tables || [];
+    const tablesMap = new Map<string, Table>();
+    onlineTables.forEach(t => tablesMap.set(t.id, t));
+    let serverHasNewerTables = false;
+    localTables.forEach(t => {
+      const existing = tablesMap.get(t.id);
+      if (!existing) {
+        tablesMap.set(t.id, t);
+        serverHasNewerTables = true;
+      } else {
+        const timeServer = new Date(t.created_at || 0).getTime();
+        const timeOnline = new Date(existing.created_at || 0).getTime();
+        if (timeServer >= timeOnline) {
+          tablesMap.set(t.id, t);
+        }
+      }
+    });
+    const tables = Array.from(tablesMap.values());
+    globalServerTablesStore[eventId] = tables;
+
+    // Intelligent Merge: Assignments between Online Supabase DB and Server Store
+    const localAssignments = globalServerAssignmentsStore[eventId] || [];
+    const onlineAssignments = onlineData.assignments || [];
+    const assignmentsMap = new Map<string, TableAssignment>();
+    onlineAssignments.forEach(a => {
+      const key = `${a.group_id}_${a.companion_id || ''}`;
+      assignmentsMap.set(key, a);
+    });
+    let serverHasNewerAssignments = false;
+    localAssignments.forEach(a => {
+      const key = `${a.group_id}_${a.companion_id || ''}`;
+      const existing = assignmentsMap.get(key);
+      if (!existing) {
+        assignmentsMap.set(key, a);
+        serverHasNewerAssignments = true;
+      } else {
+        const timeServer = new Date(a.created_at || 0).getTime();
+        const timeOnline = new Date(existing.created_at || 0).getTime();
+        if (timeServer >= timeOnline) {
+          assignmentsMap.set(key, a);
+        }
+      }
+    });
+    const assignments = Array.from(assignmentsMap.values());
+    globalServerAssignmentsStore[eventId] = assignments;
+
+    // Intelligent Merge: Venue Elements between Online Supabase DB and Server Store
+    const localVenue = globalServerVenueElementsStore[eventId] || [];
+    const onlineVenue = onlineData.venueElements || [];
+    const venueMap = new Map<string, VenueElement>();
+    onlineVenue.forEach(ve => venueMap.set(ve.id, ve));
+    let serverHasNewerVenue = false;
+    localVenue.forEach(ve => {
+      const existing = venueMap.get(ve.id);
+      if (!existing) {
+        venueMap.set(ve.id, ve);
+        serverHasNewerVenue = true;
+      } else {
+        const timeServer = new Date(ve.created_at || 0).getTime();
+        const timeOnline = new Date(existing.created_at || 0).getTime();
+        if (timeServer >= timeOnline) {
+          venueMap.set(ve.id, ve);
+        }
+      }
+    });
+    const venueElements = Array.from(venueMap.values());
+    globalServerVenueElementsStore[eventId] = venueElements;
+
+    // Intelligent Merge: Groups between Online Supabase DB and Server Store
+    const localGroups = globalServerGroupsStore[eventId] || [];
+    const onlineGroups = onlineData.groups || [];
+    const groupsMap = new Map<string, GuestGroup>();
+    onlineGroups.forEach(g => groupsMap.set(g.id, g));
+    localGroups.forEach(g => {
+      const existing = groupsMap.get(g.id);
+      if (!existing) {
+        groupsMap.set(g.id, g);
+      } else {
+        const maxCheckedIn = Math.max(g.checked_in_count || 0, existing.checked_in_count || 0);
+        existing.checked_in_count = maxCheckedIn;
+        existing.status = maxCheckedIn >= existing.max_passes ? 'COMPLETO' : maxCheckedIn > 0 ? 'PARCIAL' : 'PENDIENTE';
+        groupsMap.set(g.id, existing);
+      }
+    });
+    const groups = Array.from(groupsMap.values());
+    globalServerGroupsStore[eventId] = groups;
+
     const localCuts = globalServerCutsStore[eventId] || [];
     const checkIns = globalServerCheckInsStore[eventId] || [];
 
-    // Sync back to memory store
-    if (onlineData.groups) globalServerGroupsStore[eventId] = onlineData.groups;
-    if (onlineData.tables) globalServerTablesStore[eventId] = onlineData.tables;
-    if (onlineData.assignments) globalServerAssignmentsStore[eventId] = onlineData.assignments;
-    if (onlineData.venueElements) globalServerVenueElementsStore[eventId] = onlineData.venueElements;
+    // Background push back to Supabase if server store has items missing online
+    if (serverHasNewerTables || serverHasNewerAssignments || serverHasNewerVenue) {
+      persistTablesDataToSupabase(
+        eventId,
+        serverHasNewerTables ? tables : undefined,
+        serverHasNewerAssignments ? assignments : undefined,
+        undefined,
+        serverHasNewerVenue ? venueElements : undefined
+      ).catch(() => {});
+    }
 
     // Fetch cuts from Supabase if available and merge
     let supabaseCuts: Cut[] = [];
@@ -729,21 +819,31 @@ export async function POST(req: Request) {
 
       if (Array.isArray(tables)) {
         if (tables.length === 0 && existingTables.length > 0) {
-          // Protect existing tables from being wiped by an empty client sync
           finalTables = existingTables;
         } else {
-          finalTables = tables;
-          globalServerTablesStore[eventId] = tables;
+          const tblMap = new Map<string, Table>();
+          existingTables.forEach(et => tblMap.set(et.id, et));
+          tables.forEach(nt => tblMap.set(nt.id, nt));
+          finalTables = Array.from(tblMap.values());
+          globalServerTablesStore[eventId] = finalTables;
         }
       }
 
       if (Array.isArray(assignments)) {
         if (assignments.length === 0 && existingAssignments.length > 0) {
-          // Protect existing assignments from being wiped by an empty client sync
           finalAssignments = existingAssignments;
         } else {
-          finalAssignments = assignments;
-          globalServerAssignmentsStore[eventId] = assignments;
+          const asgnMap = new Map<string, TableAssignment>();
+          existingAssignments.forEach(ea => {
+            const key = `${ea.group_id}_${ea.companion_id || ''}`;
+            asgnMap.set(key, ea);
+          });
+          assignments.forEach(na => {
+            const key = `${na.group_id}_${na.companion_id || ''}`;
+            asgnMap.set(key, na);
+          });
+          finalAssignments = Array.from(asgnMap.values());
+          globalServerAssignmentsStore[eventId] = finalAssignments;
         }
       }
 
@@ -798,10 +898,13 @@ export async function POST(req: Request) {
       let finalElements = venueElements;
 
       if (venueElements.length === 0 && existingElements.length > 0) {
-        // Protect existing venue elements from being wiped by an empty client sync
         finalElements = existingElements;
       } else {
-        globalServerVenueElementsStore[eventId] = venueElements;
+        const veMap = new Map<string, VenueElement>();
+        existingElements.forEach(ve => veMap.set(ve.id, ve));
+        venueElements.forEach(ve => veMap.set(ve.id, ve));
+        finalElements = Array.from(veMap.values());
+        globalServerVenueElementsStore[eventId] = finalElements;
       }
 
       saveDbToFile();

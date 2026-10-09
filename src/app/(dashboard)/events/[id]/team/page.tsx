@@ -13,7 +13,7 @@ import { getEventById, getEventByIdAsync, updateEvent, updateEventAsync } from '
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { 
-  getEventMembers, getEventMembersAsync, createWorkspaceMember, updateWorkspaceMember, deleteWorkspaceMember,
+  getEventMembers, getEventMembersAsync, createWorkspaceMember, createWorkspaceMemberAsync, updateWorkspaceMember, deleteWorkspaceMember,
   WorkspaceMemberUser, WorkspaceUserRole, isCredentialsExpired, formatExpirationDate, syncWorkspaceMemberOnlineAsync
 } from '@/lib/workspace-users';
 
@@ -119,7 +119,7 @@ export default function EventTeamPage() {
     if (!newMemberName.trim() || !newMemberEmail.trim()) return;
 
     const pass = newMemberPassword.trim() || 'puerta2026';
-    const created = createWorkspaceMember({
+    const created = await createWorkspaceMemberAsync({
       workspaceId: currentWorkspaceId,
       eventId,
       name: newMemberName,
@@ -128,8 +128,6 @@ export default function EventTeamPage() {
       role: newMemberRole,
       credentialsExpiresAt: newMemberExpiresAt ? newMemberExpiresAt.trim() : undefined,
     });
-
-    await syncWorkspaceMemberOnlineAsync(created);
 
     setTeamMembers(getEventMembers(eventId, currentWorkspaceId));
     setCreatedMemberSuccess({ member: created, rawPass: pass });

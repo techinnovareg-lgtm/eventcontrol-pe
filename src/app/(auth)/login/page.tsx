@@ -12,7 +12,7 @@ import {
   verifySuperAdminPassword, authenticateAdminAccountAsync, getAdminAccountByEmail,
   getAdminAccountByEmailAsync 
 } from '@/lib/superadmin-store';
-import { authenticateWorkspaceMemberAsync, findMemberByEmail, isCredentialsExpired, formatExpirationDate } from '@/lib/workspace-users';
+import { authenticateWorkspaceMemberAsync, findMemberByEmail, findMemberByEmailAsync, isCredentialsExpired, formatExpirationDate } from '@/lib/workspace-users';
 import { getWorkspaceEvents, getWorkspaceEventsAsync } from '@/lib/events';
 
 export default function LoginPage() {
@@ -186,7 +186,7 @@ export default function LoginPage() {
     }
 
     // Check if sub-user exists but credentials expired or status is inactive
-    const existingMember = findMemberByEmail(inputEmail);
+    const existingMember = (await findMemberByEmailAsync(inputEmail)) || findMemberByEmail(inputEmail);
     if (existingMember) {
       if (existingMember.status === 'INACTIVO') {
         setErrorMsg('Acceso denegado: Su cuenta de colaborador se encuentra inactiva. Contacte a su administrador.');

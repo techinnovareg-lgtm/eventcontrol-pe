@@ -59,7 +59,7 @@ async function persistMemberToSupabase(member: WorkspaceMemberUser) {
   try {
     const uuid = generateDeterministicUUID(`member_${member.id}_${member.email}`);
     
-    await fetch(`${url}/rest/v1/check_ins`, {
+    const res = await fetch(`${url}/rest/v1/check_ins`, {
       method: 'POST',
       headers: {
         'apikey': key,
@@ -73,6 +73,25 @@ async function persistMemberToSupabase(member: WorkspaceMemberUser) {
         device_info: JSON.stringify(member)
       })
     });
+    if (!res.ok) {
+      await fetch(`${url}/rest/v1/check_ins?id=eq.${uuid}`, {
+        method: 'DELETE',
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }).catch(() => {});
+      await fetch(`${url}/rest/v1/check_ins`, {
+        method: 'POST',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: uuid,
+          scanner_staff_name: 'SYS_MEMBER_SYNC',
+          device_info: JSON.stringify(member)
+        })
+      });
+    }
   } catch (err) {}
 }
 

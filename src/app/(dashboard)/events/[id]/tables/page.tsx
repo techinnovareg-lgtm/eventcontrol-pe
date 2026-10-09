@@ -60,38 +60,108 @@ export default function TablesManagementPage() {
               if (Array.isArray(data.groups)) {
                 setGroups(prev => (data.groups.length === 0 && prev.length > 0 ? prev : data.groups));
               }
-              if (Array.isArray(data.tables) && data.tables.length > 0) {
-                cacheEventTablesLocally(eventId, data.tables);
-                setTables(data.tables);
-                setTablePositions(prev => {
-                  const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-                  data.tables.forEach((t: Table, i: number) => {
-                    const posX = typeof t.pos_x === 'number' && !isNaN(t.pos_x) ? t.pos_x : (140 + (i % 4) * 280);
-                    const posY = typeof t.pos_y === 'number' && !isNaN(t.pos_y) ? t.pos_y : (140 + Math.floor(i / 4) * 200);
-                    updatedPos[t.id] = {
-                      x: posX,
-                      y: posY,
-                      shape: updatedPos[t.id]?.shape || 'ROUND',
-                    };
-                  });
-                  return updatedPos;
+              if (Array.isArray(data.tables)) {
+                const localTbls = getEventTables(eventId);
+                const tblMap = new Map<string, Table>();
+                data.tables.forEach((st: Table) => tblMap.set(st.id, st));
+                let localHadNewer = false;
+                localTbls.forEach(lt => {
+                  const st = tblMap.get(lt.id);
+                  if (!st) {
+                    tblMap.set(lt.id, lt);
+                    localHadNewer = true;
+                  } else {
+                    const timeLocal = new Date(lt.created_at || 0).getTime();
+                    const timeServer = new Date(st.created_at || 0).getTime();
+                    if (timeLocal > timeServer) {
+                      tblMap.set(lt.id, lt);
+                      localHadNewer = true;
+                    }
+                  }
                 });
-              } else if (getEventTables(eventId).length > 0) {
-                syncTablesToServerAsync(eventId, getEventTables(eventId));
+                const mergedTbls = Array.from(tblMap.values());
+                if (mergedTbls.length > 0) {
+                  cacheEventTablesLocally(eventId, mergedTbls);
+                  setTables(mergedTbls);
+                  setTablePositions(prev => {
+                    const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+                    mergedTbls.forEach((t: Table, i: number) => {
+                      const posX = typeof t.pos_x === 'number' && !isNaN(t.pos_x) ? t.pos_x : (140 + (i % 4) * 280);
+                      const posY = typeof t.pos_y === 'number' && !isNaN(t.pos_y) ? t.pos_y : (140 + Math.floor(i / 4) * 200);
+                      updatedPos[t.id] = {
+                        x: posX,
+                        y: posY,
+                        shape: updatedPos[t.id]?.shape || 'ROUND',
+                      };
+                    });
+                    return updatedPos;
+                  });
+                  if (localHadNewer) {
+                    syncTablesToServerAsync(eventId, mergedTbls);
+                  }
+                }
               }
 
-              if (Array.isArray(data.assignments) && data.assignments.length > 0) {
-                cacheEventAssignmentsLocally(eventId, data.assignments);
-                setAssignments(data.assignments);
-              } else if (getEventTableAssignments(eventId).length > 0) {
-                syncTablesToServerAsync(eventId, undefined, getEventTableAssignments(eventId));
+              if (Array.isArray(data.assignments)) {
+                const localAsgns = getEventTableAssignments(eventId);
+                const asgnMap = new Map<string, TableAssignment>();
+                data.assignments.forEach((sa: TableAssignment) => {
+                  const key = `${sa.group_id}_${sa.companion_id || ''}`;
+                  asgnMap.set(key, sa);
+                });
+                let localHadNewer = false;
+                localAsgns.forEach(la => {
+                  const key = `${la.group_id}_${la.companion_id || ''}`;
+                  const sa = asgnMap.get(key);
+                  if (!sa) {
+                    asgnMap.set(key, la);
+                    localHadNewer = true;
+                  } else {
+                    const timeLocal = new Date(la.created_at || 0).getTime();
+                    const timeServer = new Date(sa.created_at || 0).getTime();
+                    if (timeLocal > timeServer) {
+                      asgnMap.set(key, la);
+                      localHadNewer = true;
+                    }
+                  }
+                });
+                const mergedAsgns = Array.from(asgnMap.values());
+                if (mergedAsgns.length > 0) {
+                  cacheEventAssignmentsLocally(eventId, mergedAsgns);
+                  setAssignments(mergedAsgns);
+                  if (localHadNewer) {
+                    syncTablesToServerAsync(eventId, undefined, mergedAsgns);
+                  }
+                }
               }
 
-              if (Array.isArray(data.venueElements) && data.venueElements.length > 0) {
-                cacheEventVenueElementsLocally(eventId, data.venueElements);
-                setVenueElements(data.venueElements);
-              } else if (getEventVenueElements(eventId).length > 0) {
-                syncVenueElementsToServerAsync(eventId, getEventVenueElements(eventId));
+              if (Array.isArray(data.venueElements)) {
+                const localVenue = getEventVenueElements(eventId);
+                const veMap = new Map<string, VenueElement>();
+                data.venueElements.forEach((se: VenueElement) => veMap.set(se.id, se));
+                let localHadNewer = false;
+                localVenue.forEach(le => {
+                  const se = veMap.get(le.id);
+                  if (!se) {
+                    veMap.set(le.id, le);
+                    localHadNewer = true;
+                  } else {
+                    const timeLocal = new Date(le.created_at || 0).getTime();
+                    const timeServer = new Date(se.created_at || 0).getTime();
+                    if (timeLocal > timeServer) {
+                      veMap.set(le.id, le);
+                      localHadNewer = true;
+                    }
+                  }
+                });
+                const mergedVenue = Array.from(veMap.values());
+                if (mergedVenue.length > 0) {
+                  cacheEventVenueElementsLocally(eventId, mergedVenue);
+                  setVenueElements(mergedVenue);
+                  if (localHadNewer) {
+                    syncVenueElementsToServerAsync(eventId, mergedVenue);
+                  }
+                }
               }
             }
           }
@@ -214,12 +284,31 @@ export default function TablesManagementPage() {
       }
 
       if (Array.isArray(data.tables)) {
-        if (data.tables.length > 0) {
-          cacheEventTablesLocally(eventId, data.tables);
-          setTables(data.tables);
+        const localTbls = getEventTables(eventId);
+        const tblMap = new Map<string, Table>();
+        data.tables.forEach((st: Table) => tblMap.set(st.id, st));
+        let localHadNewer = false;
+        localTbls.forEach(lt => {
+          const st = tblMap.get(lt.id);
+          if (!st) {
+            tblMap.set(lt.id, lt);
+            localHadNewer = true;
+          } else {
+            const timeLocal = new Date(lt.created_at || 0).getTime();
+            const timeServer = new Date(st.created_at || 0).getTime();
+            if (timeLocal > timeServer) {
+              tblMap.set(lt.id, lt);
+              localHadNewer = true;
+            }
+          }
+        });
+        const mergedTbls = Array.from(tblMap.values());
+        if (mergedTbls.length > 0) {
+          cacheEventTablesLocally(eventId, mergedTbls);
+          setTables(mergedTbls);
           setTablePositions(prev => {
             const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-            data.tables.forEach((t: Table, i: number) => {
+            mergedTbls.forEach((t: Table, i: number) => {
               const posX = typeof t.pos_x === 'number' && !isNaN(t.pos_x) ? t.pos_x : (140 + (i % 4) * 280);
               const posY = typeof t.pos_y === 'number' && !isNaN(t.pos_y) ? t.pos_y : (140 + Math.floor(i / 4) * 200);
               updatedPos[t.id] = {
@@ -230,17 +319,42 @@ export default function TablesManagementPage() {
             });
             return updatedPos;
           });
-        } else if (getEventTables(eventId).length > 0) {
-          syncTablesToServerAsync(eventId, getEventTables(eventId));
+          if (localHadNewer) {
+            syncTablesToServerAsync(eventId, mergedTbls);
+          }
         }
       }
 
       if (Array.isArray(data.assignments)) {
-        if (data.assignments.length > 0) {
-          cacheEventAssignmentsLocally(eventId, data.assignments);
-          setAssignments(data.assignments);
-        } else if (getEventTableAssignments(eventId).length > 0) {
-          syncTablesToServerAsync(eventId, undefined, getEventTableAssignments(eventId));
+        const localAsgns = getEventTableAssignments(eventId);
+        const asgnMap = new Map<string, TableAssignment>();
+        data.assignments.forEach((sa: TableAssignment) => {
+          const key = `${sa.group_id}_${sa.companion_id || ''}`;
+          asgnMap.set(key, sa);
+        });
+        let localHadNewer = false;
+        localAsgns.forEach(la => {
+          const key = `${la.group_id}_${la.companion_id || ''}`;
+          const sa = asgnMap.get(key);
+          if (!sa) {
+            asgnMap.set(key, la);
+            localHadNewer = true;
+          } else {
+            const timeLocal = new Date(la.created_at || 0).getTime();
+            const timeServer = new Date(sa.created_at || 0).getTime();
+            if (timeLocal > timeServer) {
+              asgnMap.set(key, la);
+              localHadNewer = true;
+            }
+          }
+        });
+        const mergedAsgns = Array.from(asgnMap.values());
+        if (mergedAsgns.length > 0) {
+          cacheEventAssignmentsLocally(eventId, mergedAsgns);
+          setAssignments(mergedAsgns);
+          if (localHadNewer) {
+            syncTablesToServerAsync(eventId, undefined, mergedAsgns);
+          }
         }
       }
 
@@ -249,11 +363,31 @@ export default function TablesManagementPage() {
       }
 
       if (Array.isArray(data.venueElements)) {
-        if (data.venueElements.length > 0) {
-          cacheEventVenueElementsLocally(eventId, data.venueElements);
-          setVenueElements(data.venueElements);
-        } else if (getEventVenueElements(eventId).length > 0) {
-          syncVenueElementsToServerAsync(eventId, getEventVenueElements(eventId));
+        const localVenue = getEventVenueElements(eventId);
+        const veMap = new Map<string, VenueElement>();
+        data.venueElements.forEach((se: VenueElement) => veMap.set(se.id, se));
+        let localHadNewer = false;
+        localVenue.forEach(le => {
+          const se = veMap.get(le.id);
+          if (!se) {
+            veMap.set(le.id, le);
+            localHadNewer = true;
+          } else {
+            const timeLocal = new Date(le.created_at || 0).getTime();
+            const timeServer = new Date(se.created_at || 0).getTime();
+            if (timeLocal > timeServer) {
+              veMap.set(le.id, le);
+              localHadNewer = true;
+            }
+          }
+        });
+        const mergedVenue = Array.from(veMap.values());
+        if (mergedVenue.length > 0) {
+          cacheEventVenueElementsLocally(eventId, mergedVenue);
+          setVenueElements(mergedVenue);
+          if (localHadNewer) {
+            syncVenueElementsToServerAsync(eventId, mergedVenue);
+          }
         }
       }
     } catch (err) {}
@@ -374,47 +508,15 @@ export default function TablesManagementPage() {
 
   const handleAssign = async (tableId: string, groupId: string, passes: number, companionId?: string, guestNameLabel?: string) => {
     lastMutationTimeRef.current = Date.now();
-    const nextAssignment: TableAssignment = {
-      id: `asgn-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      workspace_id: currentWorkspaceId,
-      event_id: eventId,
-      table_id: tableId,
-      group_id: groupId,
-      assigned_passes: passes,
-      companion_id: companionId,
-      guest_name_label: guestNameLabel,
-      created_at: new Date().toISOString(),
-    };
-    setAssignments(prev => {
-      let next = [...prev];
-      if (companionId) {
-        next = next.filter(a => !(a.group_id === groupId && a.companion_id === companionId));
-      } else {
-        next = next.filter(a => a.group_id !== groupId);
-      }
-      next.push(nextAssignment);
-      saveEventAssignmentsLocally(eventId, next);
-      return next;
-    });
     await assignGroupToTableAsync(eventId, currentWorkspaceId, tableId, groupId, passes, companionId, guestNameLabel);
+    setAssignments(getEventTableAssignments(eventId));
     lastMutationTimeRef.current = Date.now();
   };
 
   const handleUnassign = async (groupId: string, companionId?: string, assignmentId?: string) => {
     lastMutationTimeRef.current = Date.now();
-    setAssignments(prev => {
-      let next = [...prev];
-      if (assignmentId) {
-        next = next.filter(a => a.id !== assignmentId);
-      } else if (companionId) {
-        next = next.filter(a => !(a.group_id === groupId && a.companion_id === companionId));
-      } else {
-        next = next.filter(a => a.group_id !== groupId);
-      }
-      saveEventAssignmentsLocally(eventId, next);
-      return next;
-    });
     await unassignGroupFromTableAsync(eventId, groupId, companionId, assignmentId);
+    setAssignments(getEventTableAssignments(eventId));
     lastMutationTimeRef.current = Date.now();
   };
 

@@ -47,20 +47,26 @@ export default function MobileScanCheckInPage() {
       }
 
       const operatorEventId = activeSession?.user?.eventId;
-      let events: Event[] = await getWorkspaceEventsAsync(currentWorkspaceId);
 
-      // If operator event ID is set and not present in workspace events, attempt to fetch it
-      if (operatorEventId && !events.some(e => e.id === operatorEventId)) {
-        const opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
-        if (opEvt) {
-          events = [opEvt, ...events];
+      // Strict Event Isolation: If operator or collaborator is assigned to a specific event, isolate completely
+      if (operatorEventId) {
+        let opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
+        if (!opEvt) {
+          const allEvts = await getWorkspaceEventsAsync(currentWorkspaceId);
+          opEvt = allEvts.find(e => e.id === operatorEventId) || undefined;
         }
+        if (!isMounted) return;
+        setWorkspaceEvents(opEvt ? [opEvt] : []);
+        setSelectedEventId(operatorEventId);
+        return;
       }
+
+      let events: Event[] = await getWorkspaceEventsAsync(currentWorkspaceId);
 
       if (!isMounted) return;
       setWorkspaceEvents(events);
 
-      // Pre-select priority event: 1) URL event param, 2) operator assigned event, 3) first available event
+      // Pre-select priority event: 1) URL event param, 2) first available event
       let targetId = selectedEventId;
       if (typeof window !== 'undefined') {
         const params = new URLSearchParams(window.location.search);
@@ -80,9 +86,7 @@ export default function MobileScanCheckInPage() {
       }
 
       if (!targetId || !events.some(e => e.id === targetId)) {
-        if (operatorEventId && events.some(e => e.id === operatorEventId)) {
-          targetId = operatorEventId;
-        } else if (events.length > 0) {
+        if (events.length > 0) {
           targetId = events[0].id;
         }
       }
@@ -516,12 +520,27 @@ export default function MobileScanCheckInPage() {
           </div>
         </div>
 
-        {/* Dynamic Event Selector */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1">
-          <label className="block text-[10px] font-bold text-[#C5A059] uppercase tracking-wider">
-            🍷 EVENTO ACTIVO DE CONTROL:
-          </label>
-          {workspaceEvents.length > 0 ? (
+        {/* Dynamic Event Selector / Locked Event Badge for Collaborators */}
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 space-y-1.5">
+          <div className="flex items-center justify-between">
+            <label className="text-[10px] font-bold text-[#C5A059] uppercase tracking-wider flex items-center gap-1.5">
+              {session?.user?.eventId ? <Lock className="w-3 h-3 text-emerald-400" /> : <span>🍷</span>}
+              {session?.user?.eventId ? 'EVENTO EXCLUSIVO ASIGNADO:' : 'EVENTO ACTIVO DE CONTROL:'}
+            </label>
+            {session?.user?.eventId && (
+              <span className="text-[9px] bg-emerald-950/80 text-emerald-400 font-bold px-2 py-0.5 rounded-full border border-emerald-800/50">
+                ACCESO AUTORIZADO
+              </span>
+            )}
+          </div>
+          {session?.user?.eventId ? (
+            <div className="w-full bg-slate-950 border border-slate-800 text-white text-xs py-2 px-3 rounded-xl flex items-center justify-between font-bold">
+              <span className="truncate text-slate-100">{activeEvent?.name || 'Evento Asignado'}</span>
+              <span className="text-[10px] text-slate-400 font-normal shrink-0 ml-2">
+                {activeEvent?.event_date || 'Sin fecha'}
+              </span>
+            </div>
+          ) : workspaceEvents.length > 0 ? (
             <select
               value={selectedEventId}
               onChange={(e) => {

@@ -384,15 +384,34 @@ export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.tables)) {
-        if (data.tables.length > 0) {
-          store[eventId] = data.tables;
-          saveTablesToStorage(store);
-          return data.tables;
-        } else if (existingLocal.length > 0) {
-          // Preserve local tables and push up to server to repair missing server cache
-          syncTablesToServerAsync(eventId, existingLocal);
-          return existingLocal;
+        const serverTables: Table[] = data.tables;
+        const mergedMap = new Map<string, Table>();
+        serverTables.forEach(st => mergedMap.set(st.id, st));
+
+        let localHadNewer = false;
+        existingLocal.forEach(lt => {
+          const st = mergedMap.get(lt.id);
+          if (!st) {
+            mergedMap.set(lt.id, lt);
+            localHadNewer = true;
+          } else {
+            const timeLocal = new Date(lt.created_at || 0).getTime();
+            const timeServer = new Date(st.created_at || 0).getTime();
+            if (timeLocal > timeServer) {
+              mergedMap.set(lt.id, lt);
+              localHadNewer = true;
+            }
+          }
+        });
+
+        const merged = Array.from(mergedMap.values());
+        store[eventId] = merged;
+        saveTablesToStorage(store);
+
+        if (localHadNewer) {
+          syncTablesToServerAsync(eventId, merged);
         }
+        return merged;
       }
     }
   } catch (err) {}
@@ -413,15 +432,38 @@ export async function getEventTableAssignmentsAsync(eventId: string): Promise<Ta
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.assignments)) {
-        if (data.assignments.length > 0) {
-          store[eventId] = data.assignments;
-          saveAssignmentsToStorage(store);
-          return data.assignments;
-        } else if (existingLocal.length > 0) {
-          // Preserve local assignments and push up to server
-          syncTablesToServerAsync(eventId, undefined, existingLocal);
-          return existingLocal;
+        const serverAssignments: TableAssignment[] = data.assignments;
+        const mergedMap = new Map<string, TableAssignment>();
+        serverAssignments.forEach(sa => {
+          const key = `${sa.group_id}_${sa.companion_id || ''}`;
+          mergedMap.set(key, sa);
+        });
+
+        let localHadNewer = false;
+        existingLocal.forEach(la => {
+          const key = `${la.group_id}_${la.companion_id || ''}`;
+          const sa = mergedMap.get(key);
+          if (!sa) {
+            mergedMap.set(key, la);
+            localHadNewer = true;
+          } else {
+            const timeLocal = new Date(la.created_at || 0).getTime();
+            const timeServer = new Date(sa.created_at || 0).getTime();
+            if (timeLocal > timeServer) {
+              mergedMap.set(key, la);
+              localHadNewer = true;
+            }
+          }
+        });
+
+        const merged = Array.from(mergedMap.values());
+        store[eventId] = merged;
+        saveAssignmentsToStorage(store);
+
+        if (localHadNewer) {
+          syncTablesToServerAsync(eventId, undefined, merged);
         }
+        return merged;
       }
     }
   } catch (err) {}
@@ -496,6 +538,8 @@ export async function assignGroupToTableAsync(
   guestNameLabel?: string
 ): Promise<TableAssignment> {
   const asgn = assignGroupToTable(eventId, workspaceId, tableId, groupId, passes, companionId, guestNameLabel);
+  const store = loadAssignmentsFromStorage();
+  await syncTablesToServerAsync(eventId, undefined, store[eventId]);
   return asgn;
 }
 
@@ -516,6 +560,8 @@ export function unassignGroupFromTable(eventId: string, groupId: string, compani
 
 export async function unassignGroupFromTableAsync(eventId: string, groupId: string, companionId?: string, assignmentId?: string): Promise<void> {
   unassignGroupFromTable(eventId, groupId, companionId, assignmentId);
+  const store = loadAssignmentsFromStorage();
+  await syncTablesToServerAsync(eventId, undefined, store[eventId] || []);
 }
 
 export function calculateTableOccupancy(eventId: string, tableId: string, capacity: number) {
@@ -550,15 +596,34 @@ export async function getEventVenueElementsAsync(eventId: string): Promise<Venue
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.venueElements)) {
-        if (data.venueElements.length > 0) {
-          store[eventId] = data.venueElements;
-          saveVenueElementsToStorage(store);
-          return data.venueElements;
-        } else if (existingLocal.length > 0) {
-          // Preserve local venue elements and push up to server
-          syncVenueElementsToServerAsync(eventId, existingLocal);
-          return existingLocal;
+        const serverElements: VenueElement[] = data.venueElements;
+        const mergedMap = new Map<string, VenueElement>();
+        serverElements.forEach(se => mergedMap.set(se.id, se));
+
+        let localHadNewer = false;
+        existingLocal.forEach(le => {
+          const se = mergedMap.get(le.id);
+          if (!se) {
+            mergedMap.set(le.id, le);
+            localHadNewer = true;
+          } else {
+            const timeLocal = new Date(le.created_at || 0).getTime();
+            const timeServer = new Date(se.created_at || 0).getTime();
+            if (timeLocal > timeServer) {
+              mergedMap.set(le.id, le);
+              localHadNewer = true;
+            }
+          }
+        });
+
+        const merged = Array.from(mergedMap.values());
+        store[eventId] = merged;
+        saveVenueElementsToStorage(store);
+
+        if (localHadNewer) {
+          syncVenueElementsToServerAsync(eventId, merged);
         }
+        return merged;
       }
     }
   } catch (err) {}

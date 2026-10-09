@@ -185,7 +185,7 @@ export function createWorkspaceMember(data: {
   if (!expiresAt) {
     const adminAccounts = getAllAdminAccounts();
     const mainAccount = adminAccounts.find(a => a.workspaceId === data.workspaceId);
-    if (mainAccount && mainAccount.contractEndDate) {
+    if (mainAccount && mainAccount.contractEndDate && new Date(mainAccount.contractEndDate).getTime() > Date.now() + 86400000) {
       expiresAt = mainAccount.contractEndDate;
     } else {
       expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
@@ -213,6 +213,20 @@ export function createWorkspaceMember(data: {
   syncWorkspaceMemberOnlineAsync(newMember).catch(err => console.warn('[Sync API dispatch warning]', err));
 
   return newMember;
+}
+
+export async function createWorkspaceMemberAsync(data: {
+  workspaceId: string;
+  eventId?: string;
+  name: string;
+  email: string;
+  password?: string;
+  role: WorkspaceUserRole;
+  credentialsExpiresAt?: string;
+}): Promise<WorkspaceMemberUser> {
+  const member = createWorkspaceMember(data);
+  await syncWorkspaceMemberOnlineAsync(member);
+  return member;
 }
 
 export function updateWorkspaceMember(
@@ -406,4 +420,30 @@ export function findMemberByEmail(email: string): WorkspaceMemberUser | undefine
   const store = getStore();
   const clean = email.trim().toLowerCase();
   return store.find(m => (m.email || '').trim().toLowerCase() === clean);
+}
+
+export async function findMemberByEmailAsync(email: string): Promise<WorkspaceMemberUser | undefined> {
+  const local = findMemberByEmail(email);
+  if (local) return local;
+
+  try {
+    const clean = email.trim().toLowerCase();
+    const res = await fetch(`/api/auth/sync-members?email=${encodeURIComponent(clean)}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && data.member) {
+        const serverMember: WorkspaceMemberUser = data.member;
+        const store = getStore();
+        const idx = store.findIndex(m => m.id === serverMember.id || m.email.toLowerCase() === serverMember.email.toLowerCase());
+        if (idx !== -1) {
+          store[idx] = serverMember;
+        } else {
+          store.unshift(serverMember);
+        }
+        saveMembersToStorage(store);
+        return serverMember;
+      }
+    }
+  } catch (err) {}
+  return undefined;
 }

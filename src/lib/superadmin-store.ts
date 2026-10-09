@@ -73,7 +73,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 987 654 321',
     planCode: 'STARTER',
     contractStartDate: '2026-08-01T00:00:00.000Z',
-    contractEndDate: '2026-09-08T23:59:59.000Z', // 6 days remaining for expiration alert
+    contractEndDate: '2027-12-31T23:59:59.000Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
