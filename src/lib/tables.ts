@@ -60,8 +60,16 @@ export async function syncTablesToServerAsync(eventId: string, explicitTables?: 
     if (explicitTables === undefined && explicitAssignments === undefined) {
       const allTables = loadTablesFromStorage();
       const allAssignments = loadAssignmentsFromStorage();
-      payload.tables = allTables[eventId] || [];
-      payload.assignments = allAssignments[eventId] || [];
+      const localTables = allTables[eventId] || [];
+      const localAssignments = allAssignments[eventId] || [];
+
+      // Avoid wiping server if client hasn't loaded any local data yet
+      if (localTables.length === 0 && localAssignments.length === 0) {
+        return;
+      }
+
+      payload.tables = localTables;
+      payload.assignments = localAssignments;
     }
 
     await fetch('/api/events/sync', {
@@ -76,7 +84,12 @@ export async function syncVenueElementsToServerAsync(eventId: string, explicitEl
   if (typeof window === 'undefined' || !eventId) return;
   try {
     const allVenueElements = loadVenueElementsFromStorage();
-    const venueElements = explicitElements || allVenueElements[eventId] || [];
+    const venueElements = explicitElements !== undefined ? explicitElements : (allVenueElements[eventId] || []);
+
+    // Avoid wiping server if client has no elements to sync
+    if (explicitElements === undefined && venueElements.length === 0) {
+      return;
+    }
 
     await fetch('/api/events/sync', {
       method: 'POST',
@@ -287,6 +300,8 @@ export function createTable(eventId: string, workspaceId: string, name: string, 
 
 export async function createTableAsync(eventId: string, workspaceId: string, name: string, capacity: number, posX = 440, posY = 220): Promise<Table> {
   const newTbl = createTable(eventId, workspaceId, name, capacity, posX, posY);
+  const store = loadTablesFromStorage();
+  await syncTablesToServerAsync(eventId, store[eventId]);
   return newTbl;
 }
 
@@ -329,6 +344,8 @@ export function updateTablePosition(eventId: string, tableId: string, posX: numb
 
 export async function updateTablePositionAsync(eventId: string, tableId: string, posX: number, posY: number): Promise<void> {
   updateTablePosition(eventId, tableId, posX, posY);
+  const store = loadTablesFromStorage();
+  await syncTablesToServerAsync(eventId, store[eventId]);
 }
 
 export function updateTable(eventId: string, tableId: string, name: string, capacity: number): Table | null {
@@ -348,6 +365,8 @@ export function updateTable(eventId: string, tableId: string, name: string, capa
 
 export async function updateTableAsync(eventId: string, tableId: string, name: string, capacity: number): Promise<Table | null> {
   const res = updateTable(eventId, tableId, name, capacity);
+  const store = loadTablesFromStorage();
+  await syncTablesToServerAsync(eventId, store[eventId]);
   return res;
 }
 
@@ -358,15 +377,22 @@ export function getEventTables(eventId: string): Table[] {
 
 export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
   const store = loadTablesFromStorage();
+  const existingLocal = store[eventId] || [];
 
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.tables)) {
-        store[eventId] = data.tables;
-        saveTablesToStorage(store);
-        return data.tables;
+        if (data.tables.length > 0) {
+          store[eventId] = data.tables;
+          saveTablesToStorage(store);
+          return data.tables;
+        } else if (existingLocal.length > 0) {
+          // Preserve local tables and push up to server to repair missing server cache
+          syncTablesToServerAsync(eventId, existingLocal);
+          return existingLocal;
+        }
       }
     }
   } catch (err) {}
@@ -380,15 +406,22 @@ export function getEventTableAssignments(eventId: string): TableAssignment[] {
 
 export async function getEventTableAssignmentsAsync(eventId: string): Promise<TableAssignment[]> {
   const store = loadAssignmentsFromStorage();
+  const existingLocal = store[eventId] || [];
 
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.assignments)) {
-        store[eventId] = data.assignments;
-        saveAssignmentsToStorage(store);
-        return data.assignments;
+        if (data.assignments.length > 0) {
+          store[eventId] = data.assignments;
+          saveAssignmentsToStorage(store);
+          return data.assignments;
+        } else if (existingLocal.length > 0) {
+          // Preserve local assignments and push up to server
+          syncTablesToServerAsync(eventId, undefined, existingLocal);
+          return existingLocal;
+        }
       }
     }
   } catch (err) {}
@@ -510,15 +543,22 @@ export function getEventVenueElements(eventId: string): VenueElement[] {
 
 export async function getEventVenueElementsAsync(eventId: string): Promise<VenueElement[]> {
   const store = loadVenueElementsFromStorage();
+  const existingLocal = store[eventId] || [];
 
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.venueElements)) {
-        store[eventId] = data.venueElements;
-        saveVenueElementsToStorage(store);
-        return data.venueElements;
+        if (data.venueElements.length > 0) {
+          store[eventId] = data.venueElements;
+          saveVenueElementsToStorage(store);
+          return data.venueElements;
+        } else if (existingLocal.length > 0) {
+          // Preserve local venue elements and push up to server
+          syncVenueElementsToServerAsync(eventId, existingLocal);
+          return existingLocal;
+        }
       }
     }
   } catch (err) {}
@@ -577,6 +617,8 @@ export async function createVenueElementAsync(
   posY = 320
 ): Promise<VenueElement> {
   const newElem = createVenueElement(eventId, workspaceId, type, label, size, orientation, shape, posX, posY);
+  const store = loadVenueElementsFromStorage();
+  await syncVenueElementsToServerAsync(eventId, store[eventId]);
   return newElem;
 }
 
@@ -595,6 +637,8 @@ export function updateVenueElementPosition(eventId: string, elementId: string, p
 
 export async function updateVenueElementPositionAsync(eventId: string, elementId: string, posX: number, posY: number): Promise<void> {
   updateVenueElementPosition(eventId, elementId, posX, posY);
+  const store = loadVenueElementsFromStorage();
+  await syncVenueElementsToServerAsync(eventId, store[eventId]);
 }
 
 export function updateVenueElement(
@@ -631,6 +675,8 @@ export async function updateVenueElementAsync(
   data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>
 ): Promise<VenueElement | null> {
   const res = updateVenueElement(eventId, elementId, data);
+  const store = loadVenueElementsFromStorage();
+  await syncVenueElementsToServerAsync(eventId, store[eventId]);
   return res;
 }
 

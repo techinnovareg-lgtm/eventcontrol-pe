@@ -76,14 +76,22 @@ export default function TablesManagementPage() {
                   });
                   return updatedPos;
                 });
+              } else if (getEventTables(eventId).length > 0) {
+                syncTablesToServerAsync(eventId, getEventTables(eventId));
               }
+
               if (Array.isArray(data.assignments) && data.assignments.length > 0) {
                 cacheEventAssignmentsLocally(eventId, data.assignments);
                 setAssignments(data.assignments);
+              } else if (getEventTableAssignments(eventId).length > 0) {
+                syncTablesToServerAsync(eventId, undefined, getEventTableAssignments(eventId));
               }
+
               if (Array.isArray(data.venueElements) && data.venueElements.length > 0) {
                 cacheEventVenueElementsLocally(eventId, data.venueElements);
                 setVenueElements(data.venueElements);
+              } else if (getEventVenueElements(eventId).length > 0) {
+                syncVenueElementsToServerAsync(eventId, getEventVenueElements(eventId));
               }
             }
           }
@@ -222,21 +230,31 @@ export default function TablesManagementPage() {
             });
             return updatedPos;
           });
+        } else if (getEventTables(eventId).length > 0) {
+          syncTablesToServerAsync(eventId, getEventTables(eventId));
         }
       }
 
-      if (Array.isArray(data.assignments) && data.assignments.length > 0) {
-        cacheEventAssignmentsLocally(eventId, data.assignments);
-        setAssignments(data.assignments);
+      if (Array.isArray(data.assignments)) {
+        if (data.assignments.length > 0) {
+          cacheEventAssignmentsLocally(eventId, data.assignments);
+          setAssignments(data.assignments);
+        } else if (getEventTableAssignments(eventId).length > 0) {
+          syncTablesToServerAsync(eventId, undefined, getEventTableAssignments(eventId));
+        }
       }
 
       if (Array.isArray(data.groups)) {
         setGroups(prev => (data.groups.length === 0 && prev.length > 0 ? prev : data.groups));
       }
 
-      if (Array.isArray(data.venueElements) && data.venueElements.length > 0) {
-        cacheEventVenueElementsLocally(eventId, data.venueElements);
-        setVenueElements(data.venueElements);
+      if (Array.isArray(data.venueElements)) {
+        if (data.venueElements.length > 0) {
+          cacheEventVenueElementsLocally(eventId, data.venueElements);
+          setVenueElements(data.venueElements);
+        } else if (getEventVenueElements(eventId).length > 0) {
+          syncVenueElementsToServerAsync(eventId, getEventVenueElements(eventId));
+        }
       }
     } catch (err) {}
   };

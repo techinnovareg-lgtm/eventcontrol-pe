@@ -115,6 +115,25 @@ export default function AccountProfilePage() {
     setNewMemberRole('OPERATOR');
   };
 
+  // Resend WhatsApp Modal State
+  const [resendWhatsAppMember, setResendWhatsAppMember] = useState<{ member: WorkspaceMemberUser; rawPass?: string } | null>(null);
+  const [resendPhone, setResendPhone] = useState<string>('');
+
+  const getResendWhatsAppLink = () => {
+    if (!resendWhatsAppMember) return '#';
+    const pass = resendWhatsAppMember.rawPass || resendWhatsAppMember.member.initialPassword || 'puerta2026';
+    const text = encodeURIComponent(
+      `Hola ${resendWhatsAppMember.member.name}, te recordamos tus credenciales de acceso a la plataforma EventControl.pe (${contractInfo.companyName}).\n\n` +
+      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `📧 Usuario/Correo: ${resendWhatsAppMember.member.email}\n` +
+      `🔑 Contraseña: ${pass}\n` +
+      `👤 Rol Asignado: ${resendWhatsAppMember.member.roleLabel}\n\n` +
+      `Al ingresar podrás coordinar y gestionar los eventos asignados.`
+    );
+    const phoneCleaned = resendPhone.replace(/[^0-9]/g, '');
+    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+  };
+
   const getWhatsAppDispatchLink = () => {
     if (!createdMemberSuccess) return '#';
     const text = encodeURIComponent(
@@ -457,6 +476,7 @@ export default function AccountProfilePage() {
                       <th className="py-3 px-4">Rol Asignado</th>
                       <th className="py-3 px-4">Alcance de Permisos</th>
                       <th className="py-3 px-4">Estado</th>
+                      <th className="py-3 px-4 text-right">Acciones</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -481,6 +501,18 @@ export default function AccountProfilePage() {
                           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-full font-bold text-[10px]">
                             {m.status}
                           </span>
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <button
+                            onClick={() => {
+                              setResendWhatsAppMember({ member: m });
+                              setResendPhone('');
+                            }}
+                            className="px-2.5 py-1 text-xs font-bold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition inline-flex items-center gap-1 shadow-2xs"
+                            title="Reenviar credenciales por WhatsApp"
+                          >
+                            <MessageSquare className="w-3 h-3 text-emerald-600" /> WhatsApp
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -661,6 +693,70 @@ export default function AccountProfilePage() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA REENVIAR CREDENCIALES POR WHATSAPP (EQUIPO WORKSPACE) */}
+      {resendWhatsAppMember && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border-2 border-emerald-500 shadow-2xl space-y-5 relative">
+            <button
+              onClick={() => setResendWhatsAppMember(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-300 flex items-center justify-center mx-auto shadow-sm">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <h2 className="text-xl font-serif font-bold text-[#1A1A1A]">Reenviar Acceso por WhatsApp</h2>
+              <p className="text-xs text-slate-500">
+                Envía las credenciales oficiales de acceso a <strong className="text-slate-800">{resendWhatsAppMember.member.name}</strong>.
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-1.5 font-mono">
+              <p><strong>Colaborador:</strong> {resendWhatsAppMember.member.name}</p>
+              <p><strong>Correo:</strong> {resendWhatsAppMember.member.email}</p>
+              <p><strong>Contraseña:</strong> {resendWhatsAppMember.rawPass || resendWhatsAppMember.member.initialPassword || 'puerta2026'}</p>
+              <p><strong>Rol:</strong> {resendWhatsAppMember.member.roleLabel}</p>
+              <p><strong>Empresa:</strong> {contractInfo.companyName}</p>
+            </div>
+
+            <div className="space-y-1.5 text-xs text-left">
+              <label className="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                Número de WhatsApp (con código de país ej: +51 o 9 dígitos)
+              </label>
+              <input
+                type="text"
+                value={resendPhone}
+                onChange={(e) => setResendPhone(e.target.value)}
+                placeholder="Ej. +51 987654321 o dejar en blanco para abrir WhatsApp Web"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <a
+                href={getResendWhatsAppLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setResendWhatsAppMember(null)}
+                className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20ba5a] text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md transition"
+              >
+                <MessageSquare className="w-4 h-4" /> Abrir WhatsApp y Enviar Credenciales
+              </a>
+
+              <button
+                onClick={() => setResendWhatsAppMember(null)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

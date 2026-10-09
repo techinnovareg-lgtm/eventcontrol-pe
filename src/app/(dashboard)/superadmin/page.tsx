@@ -7,7 +7,7 @@ import {
   ShieldCheck, Plus, Calendar, Clock, Mail, Phone, Lock, 
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
   Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles,
-  Copy, Check, Send, ExternalLink, Eye, EyeOff, Info, MessageSquare, Search, Filter
+  Copy, Check, Send, ExternalLink, Eye, EyeOff, Info, MessageSquare, Search, Filter, X
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
@@ -73,6 +73,30 @@ export default function SuperAdminPage() {
   const [contactPhone, setContactPhone] = useState('');
   const [planCode, setPlanCode] = useState<PlanCode>('PROFESSIONAL');
   const [durationDays, setDurationDays] = useState(365);
+
+  // WhatsApp Resend Modal State
+  const [resendWhatsAppAccount, setResendWhatsAppAccount] = useState<{ account: AdminAccount; rawPass?: string } | null>(null);
+  const [superadminWhatsAppPhone, setSuperadminWhatsAppPhone] = useState<string>('');
+
+  const getSuperadminWhatsAppLink = () => {
+    if (!resendWhatsAppAccount) return '#';
+    const acc = resendWhatsAppAccount.account;
+    const pass = resendWhatsAppAccount.rawPass || acc.initialPassword || 'EventControl2026!';
+    const planName = acc.planCode === 'BUSINESS' ? 'Business' : acc.planCode === 'STARTER' ? 'Starter' : 'Professional';
+    const endDateFormatted = new Date(acc.contractEndDate).toLocaleDateString('es-PE');
+
+    const text = encodeURIComponent(
+      `🎉 ¡Hola ${acc.adminName}! Te recordamos las credenciales de acceso para "${acc.companyName}" en EventControl.pe:\n\n` +
+      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `📧 Usuario: ${acc.contactEmail}\n` +
+      `🔑 Contraseña Inicial: ${pass}\n` +
+      `📦 Plan: Plan ${planName}\n` +
+      `📅 Vigencia de Contrato: ${endDateFormatted}\n\n` +
+      `Por seguridad, te recomendamos cambiar tu clave al ingresar si aún no lo has hecho.`
+    );
+    const phoneCleaned = superadminWhatsAppPhone.replace(/[^0-9]/g, '');
+    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+  };
 
   if (!isAuthorized) {
     return (
@@ -564,6 +588,17 @@ export default function SuperAdminPage() {
                       {/* Acciones */}
                       <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
                         <button
+                          onClick={() => {
+                            setResendWhatsAppAccount({ account: acc });
+                            setSuperadminWhatsAppPhone(acc.contactPhone || '');
+                          }}
+                          className="px-2.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-emerald-800 font-bold rounded-lg border border-[#25D366]/40 transition text-[11px] inline-flex items-center gap-1 shadow-2xs"
+                          title="Enviar o Re-enviar Credenciales por WhatsApp"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
+                        </button>
+
+                        <button
                           onClick={() => handleResendEmail(acc)}
                           disabled={isSubmitting}
                           className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition text-[11px] inline-flex items-center gap-1"
@@ -1013,6 +1048,19 @@ export default function SuperAdminPage() {
                 />
               </div>
 
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResendWhatsAppAccount({ account: editingAccount });
+                    setSuperadminWhatsAppPhone(editingAccount.contactPhone || '');
+                  }}
+                  className="w-full py-2.5 px-3 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-emerald-800 font-bold border border-[#25D366]/40 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-2xs"
+                >
+                  <MessageSquare className="w-4 h-4 text-emerald-600" /> Reenviar Credenciales por WhatsApp
+                </button>
+              </div>
+
               <div className="flex gap-2 pt-2">
                 <button
                   type="button"
@@ -1206,6 +1254,71 @@ export default function SuperAdminPage() {
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA ENVIAR / REENVIAR CREDENCIALES POR WHATSAPP (SUPERADMIN) */}
+      {resendWhatsAppAccount && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 border-2 border-emerald-500 shadow-2xl space-y-5 relative">
+            <button
+              onClick={() => setResendWhatsAppAccount(null)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-700 p-1.5 rounded-full hover:bg-slate-100 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="text-center space-y-1">
+              <div className="w-12 h-12 bg-emerald-50 text-emerald-700 rounded-2xl border border-emerald-300 flex items-center justify-center mx-auto shadow-sm">
+                <MessageSquare className="w-6 h-6" />
+              </div>
+              <h2 className="text-xl font-serif font-bold text-[#1A1A1A]">Enviar Acceso por WhatsApp</h2>
+              <p className="text-xs text-slate-500">
+                Envía las credenciales oficiales de acceso a <strong className="text-slate-800">{resendWhatsAppAccount.account.adminName}</strong> ({resendWhatsAppAccount.account.companyName}).
+              </p>
+            </div>
+
+            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-1.5 font-mono">
+              <p><strong>Empresa:</strong> {resendWhatsAppAccount.account.companyName}</p>
+              <p><strong>Administrador:</strong> {resendWhatsAppAccount.account.adminName}</p>
+              <p><strong>Correo:</strong> {resendWhatsAppAccount.account.contactEmail}</p>
+              <p><strong>Contraseña:</strong> {resendWhatsAppAccount.rawPass || resendWhatsAppAccount.account.initialPassword || 'EventControl2026!'}</p>
+              <p><strong>Plan:</strong> Plan {resendWhatsAppAccount.account.planCode}</p>
+              <p><strong>Vigencia:</strong> {new Date(resendWhatsAppAccount.account.contractEndDate).toLocaleDateString('es-PE')}</p>
+            </div>
+
+            <div className="space-y-1.5 text-xs text-left">
+              <label className="block font-bold text-slate-700 uppercase tracking-wider text-[11px]">
+                Número de WhatsApp (con código de país ej: +51 o 9 dígitos)
+              </label>
+              <input
+                type="text"
+                value={superadminWhatsAppPhone}
+                onChange={(e) => setSuperadminWhatsAppPhone(e.target.value)}
+                placeholder="Ej. +51 987654321 o dejar en blanco para abrir WhatsApp Web"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+            </div>
+
+            <div className="space-y-2 pt-1">
+              <a
+                href={getSuperadminWhatsAppLink()}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => setResendWhatsAppAccount(null)}
+                className="w-full py-3.5 px-4 bg-[#25D366] hover:bg-[#20ba5a] text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-2 shadow-md transition"
+              >
+                <MessageSquare className="w-4 h-4" /> Abrir WhatsApp y Enviar Credenciales
+              </a>
+
+              <button
+                onClick={() => setResendWhatsAppAccount(null)}
+                className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}

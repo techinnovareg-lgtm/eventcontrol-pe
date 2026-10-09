@@ -156,7 +156,13 @@ async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
   if (!url || !key || !eventId) return {};
   const result: any = {};
   try {
-    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*&order=scanned_at.desc`, {
+    const uuidTables = generateDeterministicUUID(`tables_${eventId}`);
+    const uuidAssignments = generateDeterministicUUID(`assignments_${eventId}`);
+    const uuidGroups = generateDeterministicUUID(`groups_${eventId}`);
+    const uuidVenue = generateDeterministicUUID(`venue_${eventId}`);
+
+    // Primary: Direct indexed query by Primary Key UUIDs
+    const res = await fetch(`${url}/rest/v1/check_ins?id=in.(${uuidTables},${uuidAssignments},${uuidGroups},${uuidVenue})&select=*`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
       cache: 'no-store'
     });
@@ -172,6 +178,28 @@ async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
             if (r.scanner_staff_name === `SYS_VENUE_${eventId}` && !result.venueElements) result.venueElements = data;
           } catch (e) {}
         });
+      }
+    }
+
+    // Secondary fallback: Query by scanner_staff_name pattern if any missing
+    if (!result.tables || !result.assignments || !result.groups || !result.venueElements) {
+      const patternRes = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_%25_${eventId}&select=*&order=scanned_at.desc`, {
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+        cache: 'no-store'
+      });
+      if (patternRes.ok) {
+        const pRows = await patternRes.json();
+        if (Array.isArray(pRows)) {
+          pRows.forEach(r => {
+            try {
+              const data = JSON.parse(r.device_info);
+              if (r.scanner_staff_name === `SYS_TABLES_${eventId}` && !result.tables) result.tables = data;
+              if (r.scanner_staff_name === `SYS_ASSIGNMENTS_${eventId}` && !result.assignments) result.assignments = data;
+              if (r.scanner_staff_name === `SYS_GROUPS_${eventId}` && !result.groups) result.groups = data;
+              if (r.scanner_staff_name === `SYS_VENUE_${eventId}` && !result.venueElements) result.venueElements = data;
+            } catch (e) {}
+          });
+        }
       }
     }
   } catch (err) {}
@@ -190,32 +218,38 @@ async function persistTablesDataToSupabase(
   if (!url || !key || !eventId) return;
 
   const payloads: any[] = [];
+  const nowIso = new Date().toISOString();
+
   if (tables !== undefined) {
     payloads.push({
       id: generateDeterministicUUID(`tables_${eventId}`),
       scanner_staff_name: `SYS_TABLES_${eventId}`,
-      device_info: JSON.stringify(tables)
+      device_info: JSON.stringify(tables),
+      scanned_at: nowIso
     });
   }
   if (assignments !== undefined) {
     payloads.push({
       id: generateDeterministicUUID(`assignments_${eventId}`),
       scanner_staff_name: `SYS_ASSIGNMENTS_${eventId}`,
-      device_info: JSON.stringify(assignments)
+      device_info: JSON.stringify(assignments),
+      scanned_at: nowIso
     });
   }
   if (groups !== undefined) {
     payloads.push({
       id: generateDeterministicUUID(`groups_${eventId}`),
       scanner_staff_name: `SYS_GROUPS_${eventId}`,
-      device_info: JSON.stringify(groups)
+      device_info: JSON.stringify(groups),
+      scanned_at: nowIso
     });
   }
   if (venueElements !== undefined) {
     payloads.push({
       id: generateDeterministicUUID(`venue_${eventId}`),
       scanner_staff_name: `SYS_VENUE_${eventId}`,
-      device_info: JSON.stringify(venueElements)
+      device_info: JSON.stringify(venueElements),
+      scanned_at: nowIso
     });
   }
 
@@ -687,22 +721,41 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_TABLES' && eventId) {
+      const existingTables = globalServerTablesStore[eventId] || [];
+      const existingAssignments = globalServerAssignmentsStore[eventId] || [];
+
+      let finalTables: Table[] | undefined = undefined;
+      let finalAssignments: TableAssignment[] | undefined = undefined;
+
       if (Array.isArray(tables)) {
-        globalServerTablesStore[eventId] = tables;
+        if (tables.length === 0 && existingTables.length > 0) {
+          // Protect existing tables from being wiped by an empty client sync
+          finalTables = existingTables;
+        } else {
+          finalTables = tables;
+          globalServerTablesStore[eventId] = tables;
+        }
       }
 
       if (Array.isArray(assignments)) {
-        globalServerAssignmentsStore[eventId] = assignments;
+        if (assignments.length === 0 && existingAssignments.length > 0) {
+          // Protect existing assignments from being wiped by an empty client sync
+          finalAssignments = existingAssignments;
+        } else {
+          finalAssignments = assignments;
+          globalServerAssignmentsStore[eventId] = assignments;
+        }
       }
+
       saveDbToFile();
       await persistTablesDataToSupabase(
         eventId,
-        Array.isArray(tables) ? tables : undefined,
-        Array.isArray(assignments) ? assignments : undefined,
+        finalTables,
+        finalAssignments,
         undefined,
         undefined
       );
-      return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true, preservedTables: existingTables.length, preservedAssignments: existingAssignments.length });
     }
 
     if (action === 'SYNC_CUTS' && eventId && Array.isArray(cuts)) {
@@ -741,10 +794,19 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_VENUE_ELEMENTS' && eventId && Array.isArray(venueElements)) {
-      globalServerVenueElementsStore[eventId] = venueElements;
+      const existingElements = globalServerVenueElementsStore[eventId] || [];
+      let finalElements = venueElements;
+
+      if (venueElements.length === 0 && existingElements.length > 0) {
+        // Protect existing venue elements from being wiped by an empty client sync
+        finalElements = existingElements;
+      } else {
+        globalServerVenueElementsStore[eventId] = venueElements;
+      }
+
       saveDbToFile();
-      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, venueElements);
-      return NextResponse.json({ success: true });
+      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, finalElements);
+      return NextResponse.json({ success: true, count: finalElements.length });
     }
 
     return NextResponse.json({ success: false, message: 'Acción no válida' }, { status: 400 });
