@@ -47,12 +47,11 @@ export default function MobileScanCheckInPage() {
       }
 
       const operatorEventId = activeSession?.user?.eventId;
-      const wsId = activeSession?.user?.workspaceId || currentWorkspaceId;
-      let events: Event[] = await getWorkspaceEventsAsync(wsId);
+      let events: Event[] = await getWorkspaceEventsAsync(currentWorkspaceId);
 
       // If operator event ID is set and not present in workspace events, attempt to fetch it
       if (operatorEventId && !events.some(e => e.id === operatorEventId)) {
-        const opEvt = await getEventByIdAsync(operatorEventId, wsId);
+        const opEvt = await getEventByIdAsync(operatorEventId, currentWorkspaceId);
         if (opEvt) {
           events = [opEvt, ...events];
         }
@@ -62,46 +61,39 @@ export default function MobileScanCheckInPage() {
       setWorkspaceEvents(events);
 
       // Pre-select priority event: 1) URL event param, 2) operator assigned event, 3) first available event
-      setSelectedEventId(prev => {
-        if (typeof window !== 'undefined') {
-          const params = new URLSearchParams(window.location.search);
-          const urlEvt = params.get('event');
-          const urlToken = params.get('token');
+      let targetId = selectedEventId;
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const urlEvt = params.get('event');
+        const urlToken = params.get('token');
 
-          if (urlEvt && events.some(e => e.id === urlEvt)) {
-            return urlEvt;
-          }
-          if (urlToken) {
-            setScannedInput(urlToken);
-            try {
-              const cleanUrl = window.location.pathname + (urlEvt ? `?event=${encodeURIComponent(urlEvt)}` : '');
-              window.history.replaceState({}, '', cleanUrl);
-            } catch (e) {}
-          }
+        if (urlEvt && events.some(e => e.id === urlEvt)) {
+          targetId = urlEvt;
         }
-
-        if (prev && events.some(e => e.id === prev)) {
-          return prev;
+        if (urlToken) {
+          setScannedInput(urlToken);
+          try {
+            const cleanUrl = window.location.pathname + (urlEvt ? `?event=${encodeURIComponent(urlEvt)}` : '');
+            window.history.replaceState({}, '', cleanUrl);
+          } catch (e) {}
         }
+      }
 
+      if (!targetId || !events.some(e => e.id === targetId)) {
         if (operatorEventId && events.some(e => e.id === operatorEventId)) {
-          return operatorEventId;
+          targetId = operatorEventId;
+        } else if (events.length > 0) {
+          targetId = events[0].id;
         }
+      }
 
-        return events[0]?.id || '';
-      });
+      setSelectedEventId(targetId);
     }
 
     loadEventsAsync();
 
-    // Regular polling for newly created events in workspace
-    const eventsTimer = setInterval(() => {
-      loadEventsAsync();
-    }, 1500);
-
     return () => {
       isMounted = false;
-      clearInterval(eventsTimer);
     };
   }, [currentWorkspaceId, isOperator, session?.user?.eventId]);
 
@@ -157,11 +149,11 @@ export default function MobileScanCheckInPage() {
     reloadEventData();
 
     // Subscribe to instant BroadcastChannel notifications for 0ms cross-tab sync
-    const unsubscribe = checkInRealtimeChannel.subscribe(() => {
+    const unsubscribe = checkInRealtimeChannel.subscribe((data) => {
       reloadEventData();
     });
 
-    // Auto-sync polling every 1.5s to catch online sync from other doors or PC
+    // Auto-sync polling every 5s to catch online sync from other doors or PC
     const timer = setInterval(() => {
       if (selectedEventId) {
         getEventByIdAsync(selectedEventId, currentWorkspaceId).then(evt => {
@@ -194,7 +186,7 @@ export default function MobileScanCheckInPage() {
           if (aList && aList.length > 0) setAssignments(aList);
         });
       }
-    }, 1500);
+    }, 5000);
 
     return () => {
       clearInterval(timer);

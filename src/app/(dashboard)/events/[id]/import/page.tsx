@@ -16,7 +16,6 @@ import { getEventById, getEventByIdAsync, saveEventGuestGroups, saveEventGuestGr
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { GuestGroup, Event } from '@/lib/supabase/types';
 import EventNavHeader from '@/components/EventNavHeader';
-import { checkInRealtimeChannel } from '@/lib/realtime';
 
 type WizardStep = 1 | 2 | 3;
 
@@ -37,6 +36,7 @@ export default function ExcelImportWizardPage() {
       const account = getAccountForSession();
       const wsId = session?.user?.workspaceId || account?.workspaceId || 'ws-a-1111';
       setCurrentWorkspaceId(wsId);
+      setExistingGroups(getEventGuestGroups(eventId));
 
       if (eventId) {
         const [evt, grps] = await Promise.all([
@@ -44,23 +44,10 @@ export default function ExcelImportWizardPage() {
           getEventGuestGroupsAsync(eventId),
         ]);
         if (evt) setEvent(evt);
-        if (grps && grps.length > 0) setExistingGroups(grps);
+        if (grps) setExistingGroups(grps);
       }
     }
     loadOnlineData();
-
-    const unsub = checkInRealtimeChannel.subscribe(() => {
-      loadOnlineData();
-    });
-
-    const timer = setInterval(() => {
-      loadOnlineData();
-    }, 1500);
-
-    return () => {
-      unsub();
-      clearInterval(timer);
-    };
   }, [eventId]);
 
   const refreshGuestGroups = () => {

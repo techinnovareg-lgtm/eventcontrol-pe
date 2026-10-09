@@ -24,25 +24,42 @@ async function fetchOnlineEventsFromSupabase(workspaceId?: string): Promise<Even
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return [];
   try {
-    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`, {
+    let query = `${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`;
+    if (workspaceId && workspaceId !== 'ALL') {
+      query = `${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_EVENT_SYNC_${workspaceId}&select=*`;
+    }
+    const res = await fetch(query, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
       cache: 'no-store'
     });
     if (res.ok) {
       const rows = await res.json();
       if (Array.isArray(rows)) {
-        const eventsMap = new Map<string, Event>();
-        rows.forEach(r => {
-          try {
-            const ev = JSON.parse(r.device_info);
-            if (ev && ev.id) {
-              if (!workspaceId || workspaceId === 'ALL' || ev.workspace_id === workspaceId || r.scanner_staff_name === `SYS_EVENT_SYNC_${workspaceId}`) {
-                eventsMap.set(ev.id, ev);
-              }
+        const events = rows.map(r => {
+          try { return JSON.parse(r.device_info); } catch (e) { return null; }
+        }).filter(Boolean);
+
+        if (workspaceId && workspaceId !== 'ALL' && events.length > 0) {
+          return events;
+        }
+
+        // If specific workspaceId returned 0, fallback to search across all SYS_EVENT_SYNC_
+        if (workspaceId && workspaceId !== 'ALL' && events.length === 0) {
+          const fallbackRes = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`, {
+            headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
+            cache: 'no-store'
+          });
+          if (fallbackRes.ok) {
+            const fallbackRows = await fallbackRes.json();
+            if (Array.isArray(fallbackRows)) {
+              return fallbackRows.map(r => {
+                try { return JSON.parse(r.device_info); } catch (e) { return null; }
+              }).filter((e: Event | null) => e && e.workspace_id === workspaceId);
             }
-          } catch (e) {}
-        });
-        return Array.from(eventsMap.values());
+          }
+        }
+
+        return events;
       }
     }
   } catch (err) {}
@@ -120,15 +137,13 @@ async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
   if (!url || !key || !eventId) return {};
   const result: any = {};
   try {
-    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*`, {
+    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*&order=created_at.desc`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
       cache: 'no-store'
     });
     if (res.ok) {
       const rows = await res.json();
       if (Array.isArray(rows)) {
-        // Sort descending by scanned_at if available
-        rows.sort((a, b) => new Date(b.scanned_at || 0).getTime() - new Date(a.scanned_at || 0).getTime());
         rows.forEach(r => {
           try {
             const data = JSON.parse(r.device_info);

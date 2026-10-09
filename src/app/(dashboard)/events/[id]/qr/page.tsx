@@ -10,7 +10,6 @@ import { getEventById, getEventByIdAsync, getEventGuestGroups, getEventGuestGrou
 import { getOrCreateGroupQRToken, revokeAndRegenerateQRToken } from '@/lib/qr-engine';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { Event, GuestCompanion } from '@/lib/supabase/types';
-import { checkInRealtimeChannel } from '@/lib/realtime';
 
 export default function QRManagementPage() {
   const params = useParams();
@@ -32,23 +31,10 @@ export default function QRManagementPage() {
           getEventGuestGroupsAsync(eventId),
         ]);
         if (evt) setEvent(evt);
-        if (grps && grps.length > 0) setGroups(grps);
+        if (grps) setGroups(grps);
       }
     }
     loadOnlineData();
-
-    const unsub = checkInRealtimeChannel.subscribe(() => {
-      loadOnlineData();
-    });
-
-    const timer = setInterval(() => {
-      loadOnlineData();
-    }, 1500);
-
-    return () => {
-      unsub();
-      clearInterval(timer);
-    };
   }, [eventId]);
 
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);

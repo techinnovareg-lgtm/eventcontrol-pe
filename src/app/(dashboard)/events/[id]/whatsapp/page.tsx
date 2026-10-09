@@ -23,7 +23,6 @@ import {
   DEFAULT_WHATSAPP_TEMPLATE, FIRST_GREETING_SAFE_TEMPLATE, formatWhatsAppMessage,
   generateWhatsAppLink, recordWhatsAppSent, getWhatsAppSentLogMap, WALogItem
 } from '@/lib/whatsapp';
-import { checkInRealtimeChannel } from '@/lib/realtime';
 
 export default function WhatsAppMessagingPage() {
   const params = useParams();
@@ -73,24 +72,11 @@ export default function WhatsAppMessagingPage() {
           getEventGuestGroupsAsync(eventId),
         ]);
         if (evt) setEvent(evt);
-        if (grps && grps.length > 0) setGroups(grps);
+        if (grps) setGroups(grps);
         setSentLogs(getWhatsAppSentLogMap(eventId));
       }
     }
     loadOnlineData();
-
-    const unsub = checkInRealtimeChannel.subscribe(() => {
-      loadOnlineData();
-    });
-
-    const timer = setInterval(() => {
-      loadOnlineData();
-    }, 1500);
-
-    return () => {
-      unsub();
-      clearInterval(timer);
-    };
   }, [eventId]);
 
   // Anti-Spam Cooldown Countdown (1 sec ticker)

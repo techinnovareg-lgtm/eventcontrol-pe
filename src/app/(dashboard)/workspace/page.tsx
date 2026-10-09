@@ -12,9 +12,8 @@ import {
 import { testCrossWorkspaceIsolation } from '@/lib/workspace';
 import { PLAN_LIMITS } from '@/lib/plans';
 import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
-import { getWorkspaceMembers, getWorkspaceMembersAsync, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
+import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
 import { getWorkspaceEvents, getWorkspaceEventsAsync } from '@/lib/events';
-import { checkInRealtimeChannel } from '@/lib/realtime';
 
 export default function AccountProfilePage() {
   const session = getActiveSession();
@@ -31,27 +30,11 @@ export default function AccountProfilePage() {
   const [activeEventsCount, setActiveEventsCount] = useState<number>(0);
 
   useEffect(() => {
-    const refreshData = async () => {
-      const [members, evts] = await Promise.all([
-        getWorkspaceMembersAsync(currentWorkspaceId),
-        getWorkspaceEventsAsync(currentWorkspaceId),
-      ]);
-      if (Array.isArray(members)) setTeamMembers(members);
-      if (Array.isArray(evts)) setActiveEventsCount(evts.length);
-    };
-
-    refreshData();
-
-    const unsub = checkInRealtimeChannel.subscribe(() => {
-      refreshData();
+    setTeamMembers(getWorkspaceMembers(currentWorkspaceId));
+    setActiveEventsCount(getWorkspaceEvents(currentWorkspaceId).length);
+    getWorkspaceEventsAsync(currentWorkspaceId).then(evts => {
+      setActiveEventsCount(evts.length);
     });
-
-    const timer = setInterval(refreshData, 2000);
-
-    return () => {
-      unsub();
-      clearInterval(timer);
-    };
   }, [currentWorkspaceId]);
 
   // Change Password Form State

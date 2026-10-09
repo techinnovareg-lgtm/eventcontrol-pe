@@ -160,7 +160,7 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         }
         const updatedDeletedIds = getDeletedEventIdsFromStorage();
 
-        const serverEvents: Event[] = data.events.filter((e: Event) => 
+        const serverEvents = data.events.filter((e: Event) => 
           e.id !== 'evt-101' && 
           e.id !== 'evt-102' && 
           e.id !== 'evt-principal-01' &&
@@ -174,28 +174,29 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
           !updatedDeletedIds.includes(e.id)
         );
 
+        // Preserve local events for this workspace that are NOT on the server and NOT in updatedDeletedIds
+        const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
+        const unsyncedLocalEvents = localWorkspaceEvents.filter(le => {
+          const isServerMatch = serverEvents.some((se: Event) => se.id === le.id);
+          if (isServerMatch) return false;
+          if (updatedDeletedIds.includes(le.id)) return false;
+          return true;
+        });
+
+        // Re-sync unsynced local events to the server
+        unsyncedLocalEvents.forEach(evt => {
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+          }).catch(() => {});
+        });
+
         // Keep local events from other workspaces
         const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !updatedDeletedIds.includes(e.id));
         
-        // Find local events for this workspace that are not yet on the server, and sync them
-        const localWorkspaceEvents = localStore.filter(e => (e.workspace_id === workspaceId || !workspaceId) && !updatedDeletedIds.includes(e.id));
-        
-        const mergedWorkspaceMap = new Map<string, Event>();
-        serverEvents.forEach((se: Event) => mergedWorkspaceMap.set(se.id, se));
-        
-        localWorkspaceEvents.forEach((le: Event) => {
-          if (!mergedWorkspaceMap.has(le.id)) {
-            mergedWorkspaceMap.set(le.id, le);
-            // Re-sync local event to server & Supabase
-            fetch('/api/events/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'SYNC_EVENT', event: le }),
-            }).catch(() => {});
-          }
-        });
-
-        const mergedWorkspaceEvents = Array.from(mergedWorkspaceMap.values()).sort(
+        // Final merged list for local storage
+        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents].sort(
           (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
         );
 
@@ -421,9 +422,14 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
           return localGroups;
         }
 
+        // Monotonic Max-Merge Server Groups with Local Groups (checked_in_count never decreases)
+        let requiresResync = false;
         const merged: GuestGroup[] = data.groups.map((serverG: GuestGroup) => {
           const localG = localGroups.find(lg => lg.id === serverG.id);
           const maxCount = Math.max(serverG.checked_in_count || 0, localG ? (localG.checked_in_count || 0) : 0);
+          if (localG && (localG.checked_in_count || 0) > (serverG.checked_in_count || 0)) {
+            requiresResync = true;
+          }
           return {
             ...serverG,
             checked_in_count: maxCount,
@@ -431,8 +437,25 @@ export async function getEventGuestGroupsAsync(eventId: string): Promise<GuestGr
           };
         });
 
+        // Preserve any local groups that might not exist on server yet
+        localGroups.forEach(lg => {
+          if (!merged.some(mg => mg.id === lg.id)) {
+            merged.push(lg);
+            requiresResync = true;
+          }
+        });
+
         localStore[eventId] = merged;
         saveGroupsToStorage(localStore);
+
+        if (requiresResync && merged.length > 0) {
+          const workspaceId = merged[0]?.workspace_id || '';
+          fetch('/api/events/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'SYNC_GROUPS', eventId, workspaceId, groups: merged }),
+          }).catch(() => {});
+        }
 
         return merged;
       }

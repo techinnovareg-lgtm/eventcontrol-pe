@@ -138,14 +138,13 @@ export default function EventNavHeader({
             </div>
           </Link>
 
-          {/* 2. CATÁLOGO / TODOS LOS EVENTOS BUTTON */}
+          {/* 2. CATÁLOGO BUTTON */}
           <Link
             href="/events"
-            className="h-11 px-3 sm:px-3.5 bg-white hover:bg-amber-50/50 text-slate-800 font-serif font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-1.5 sm:gap-2 shadow-2xs"
-            title="Catálogo de Todos los Eventos"
+            className="h-11 px-3.5 bg-white hover:bg-amber-50/50 text-slate-800 font-serif font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-2 shadow-2xs"
+            title="Catálogo de Eventos"
           >
-            <LayoutGrid className="w-4 h-4 text-[#B8860B] shrink-0" />
-            <span className="font-bold text-xs">Eventos</span>
+            <LayoutGrid className="w-4 h-4 text-[#B8860B]" /> <span className="hidden xs:inline sm:inline">Catálogo</span>
           </Link>
 
           {/* 3. CERRAR SESIÓN BUTTON */}
