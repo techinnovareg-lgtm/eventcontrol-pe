@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config';
 
 export interface WorkspaceMemberUser {
   id: string;
@@ -25,8 +26,8 @@ const MEMBERS_DB_FILE = path.join(process.cwd(), 'data', 'server_members_db.json
 const TMP_MEMBERS_DB_FILE = path.join(os.tmpdir(), 'server_members_db.json');
 
 async function fetchOnlineMembersFromSupabase(): Promise<WorkspaceMemberUser[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
   if (!url || !key) return [];
   try {
     const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_MEMBER_SYNC&select=*`, {
@@ -53,8 +54,8 @@ function generateDeterministicUUID(keyString: string): string {
 }
 
 async function persistMemberToSupabase(member: WorkspaceMemberUser) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
   if (!url || !key) return;
   try {
     const uuid = generateDeterministicUUID(`member_${member.id}_${member.email}`);
@@ -192,13 +193,15 @@ export async function GET(req: Request) {
     });
 
     // Fallback: If member not in local memory, check Supabase Auth Authority
-    if (!found && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+    if (!found && sbUrl && sbKey) {
       try {
-        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
+        const url = `${sbUrl}/auth/v1/token?grant_type=password`;
         const sbRes = await fetch(url, {
           method: 'POST',
           headers: {
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            'apikey': sbKey,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ email: cleanedInput, password: trimmedPass })

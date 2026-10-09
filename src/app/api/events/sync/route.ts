@@ -2,12 +2,21 @@ import { NextResponse } from 'next/server';
 import { Event, GuestGroup, Table, TableAssignment, Cut, CheckIn } from '@/lib/supabase/types';
 import { VenueElement } from '@/lib/tables';
 import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config';
 import fs from 'fs';
 import path from 'path';
 
+function getSupabaseUrl(): string {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+}
+
+function getSupabaseAnonKey(): string {
+  return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+}
+
 function getSupabaseServerClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabaseUrl = getSupabaseUrl();
+  const supabaseAnonKey = getSupabaseAnonKey();
   if (!supabaseUrl || !supabaseAnonKey) return null;
   return createClient(supabaseUrl, supabaseAnonKey, { auth: { persistSession: false } });
 }
@@ -20,8 +29,8 @@ function generateDeterministicUUID(keyString: string): string {
 }
 
 async function fetchOnlineEventsFromSupabase(workspaceId?: string): Promise<Event[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key) return [];
   try {
     let query = `${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`;
@@ -85,8 +94,8 @@ async function fetchOnlineEventsFromSupabase(workspaceId?: string): Promise<Even
 }
 
 async function fetchOnlineEventByIdFromSupabase(eventId: string): Promise<Event | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key || !eventId) return null;
   try {
     const uuid = generateDeterministicUUID(`event_${eventId}`);
@@ -122,8 +131,8 @@ async function fetchOnlineEventByIdFromSupabase(eventId: string): Promise<Event 
 }
 
 async function persistEventToSupabase(event: Event) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key || !event || !event.workspace_id) return;
   try {
     const uuid = generateDeterministicUUID(`event_${event.id}`);
@@ -165,8 +174,8 @@ async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
   groups?: GuestGroup[];
   venueElements?: VenueElement[];
 }> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key || !eventId) return {};
   const result: any = {};
   try {
@@ -227,8 +236,8 @@ async function persistTablesDataToSupabase(
   groups?: GuestGroup[],
   venueElements?: VenueElement[]
 ) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
   if (!url || !key || !eventId) return;
 
   const payloads: any[] = [];
@@ -313,111 +322,166 @@ const TEMP_DB_FILE = path.join(process.cwd(), 'data', 'server_events_db.json.tmp
 
 let isDbLoaded = false;
 
+const INITIAL_SERVER_EVENTS: Event[] = [
+  {
+    id: 'evt-weddingsco-01',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Valentina & Sebastián - Gala Imperial',
+    event_type: 'Boda / Gala',
+    event_date: '2026-11-20',
+    venue_name: 'Hotel Westin Lima & Convention Center',
+    status: 'ACTIVO',
+    created_at: '2026-09-08T10:00:00.000Z',
+    updated_at: '2026-09-08T10:00:00.000Z'
+  },
+  {
+    id: 'evt-weddingsco-02',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Camila & Mateo - Recepción Campestre',
+    event_type: 'Boda / Gala',
+    event_date: '2026-12-12',
+    venue_name: 'Hacienda Villa Hermosa - Cieneguilla',
+    status: 'ACTIVO',
+    created_at: '2026-09-10T14:30:00.000Z',
+    updated_at: '2026-09-10T14:30:00.000Z'
+  },
+  {
+    id: 'evt-weddingsco-03',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Civil & Fiesta Íntima Sofía & Diego',
+    event_type: 'Boda / Gala',
+    event_date: '2027-01-15',
+    venue_name: 'Terraza Mirador Costa Verde',
+    status: 'ACTIVO',
+    created_at: '2026-09-15T16:00:00.000Z',
+    updated_at: '2026-09-15T16:00:00.000Z'
+  },
+  {
+    id: 'evt-weddingsco-04',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Religiosa & Cóctel VIP Lucía & Gabriel',
+    event_type: 'Boda / Gala',
+    event_date: '2027-02-20',
+    venue_name: 'Salón Bellavista & Jardines de San Francisco',
+    status: 'BORRADOR',
+    created_at: '2026-09-20T18:00:00.000Z',
+    updated_at: '2026-09-20T18:00:00.000Z'
+  }
+];
+
 function loadDbFromFile() {
   if (isDbLoaded) return;
   try {
     if (fs.existsSync(DB_FILE)) {
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
-      if (!raw || raw.trim().length === 0) return; // Skip if file is empty mid-write
-      const parsed = JSON.parse(raw);
-      if (parsed) {
-        isDbLoaded = true;
-        if (Array.isArray(parsed.deletedEventIds)) {
-          globalServerDeletedEventsStore = parsed.deletedEventIds;
-        }
-        if (Array.isArray(parsed.events)) {
-          const fileEvents = parsed.events.filter((e: Event) => 
-            e.id !== 'evt-101' && 
-            e.id !== 'evt-102' && 
-            e.id !== 'evt-principal-01' &&
-            !globalServerDeletedEventsStore.includes(e.id)
-          );
-          fileEvents.forEach((fe: Event) => {
-            const idx = globalServerEventsStore.findIndex(e => e.id === fe.id);
-            if (idx !== -1) {
-              globalServerEventsStore[idx] = { ...fe, ...globalServerEventsStore[idx] };
-            } else {
-              globalServerEventsStore.push(fe);
-            }
-          });
-        }
-        if (parsed.groups && typeof parsed.groups === 'object') {
-          delete parsed.groups['evt-101'];
-          delete parsed.groups['evt-102'];
-          delete parsed.groups['evt-principal-01'];
-          Object.entries(parsed.groups).forEach(([evtId, grps]) => {
-            if (Array.isArray(grps) && grps.length > 0) {
-              globalServerGroupsStore[evtId] = grps as GuestGroup[];
-            } else if (!globalServerGroupsStore[evtId]) {
-              globalServerGroupsStore[evtId] = [];
-            }
-          });
-        }
-        if (parsed.tables && typeof parsed.tables === 'object') {
-          delete parsed.tables['evt-101'];
-          delete parsed.tables['evt-102'];
-          delete parsed.tables['evt-principal-01'];
-          Object.entries(parsed.tables).forEach(([evtId, tbls]) => {
-            if (Array.isArray(tbls) && tbls.length > 0) {
-              globalServerTablesStore[evtId] = tbls as Table[];
-            } else if (!globalServerTablesStore[evtId]) {
-              globalServerTablesStore[evtId] = [];
-            }
-          });
-        }
-        if (parsed.assignments && typeof parsed.assignments === 'object') {
-          delete parsed.assignments['evt-101'];
-          delete parsed.assignments['evt-102'];
-          delete parsed.assignments['evt-principal-01'];
-          Object.entries(parsed.assignments).forEach(([evtId, asgns]) => {
-            if (Array.isArray(asgns) && asgns.length > 0) {
-              globalServerAssignmentsStore[evtId] = asgns as TableAssignment[];
-            } else if (!globalServerAssignmentsStore[evtId]) {
-              globalServerAssignmentsStore[evtId] = [];
-            }
-          });
-        }
-        if (parsed.cuts && typeof parsed.cuts === 'object') {
-          delete parsed.cuts['evt-101'];
-          delete parsed.cuts['evt-102'];
-          delete parsed.cuts['evt-principal-01'];
-          Object.entries(parsed.cuts).forEach(([evtId, cts]) => {
-            if (Array.isArray(cts) && cts.length > 0) {
-              globalServerCutsStore[evtId] = cts as Cut[];
-            } else if (!globalServerCutsStore[evtId]) {
-              globalServerCutsStore[evtId] = [];
-            }
-          });
-        }
-        if (parsed.checkIns && typeof parsed.checkIns === 'object') {
-          delete parsed.checkIns['evt-101'];
-          delete parsed.checkIns['evt-102'];
-          delete parsed.checkIns['evt-principal-01'];
-          Object.entries(parsed.checkIns).forEach(([evtId, chks]) => {
-            if (Array.isArray(chks) && chks.length > 0) {
-              globalServerCheckInsStore[evtId] = chks as CheckIn[];
-            } else if (!globalServerCheckInsStore[evtId]) {
-              globalServerCheckInsStore[evtId] = [];
-            }
-          });
-        }
-        if (parsed.venueElements && typeof parsed.venueElements === 'object') {
-          delete parsed.venueElements['evt-101'];
-          delete parsed.venueElements['evt-102'];
-          delete parsed.venueElements['evt-principal-01'];
-          Object.entries(parsed.venueElements).forEach(([evtId, elems]) => {
-            if (Array.isArray(elems) && elems.length > 0) {
-              globalServerVenueElementsStore[evtId] = elems as VenueElement[];
-            } else if (!globalServerVenueElementsStore[evtId]) {
-              globalServerVenueElementsStore[evtId] = [];
-            }
-          });
+      if (raw && raw.trim().length > 0) {
+        const parsed = JSON.parse(raw);
+        if (parsed) {
+          isDbLoaded = true;
+          if (Array.isArray(parsed.deletedEventIds)) {
+            globalServerDeletedEventsStore = parsed.deletedEventIds;
+          }
+          if (Array.isArray(parsed.events)) {
+            const fileEvents = parsed.events.filter((e: Event) => 
+              e.id !== 'evt-101' && 
+              e.id !== 'evt-102' && 
+              e.id !== 'evt-principal-01' &&
+              !globalServerDeletedEventsStore.includes(e.id)
+            );
+            fileEvents.forEach((fe: Event) => {
+              const idx = globalServerEventsStore.findIndex(e => e.id === fe.id);
+              if (idx !== -1) {
+                globalServerEventsStore[idx] = { ...fe, ...globalServerEventsStore[idx] };
+              } else {
+                globalServerEventsStore.push(fe);
+              }
+            });
+          }
+          if (parsed.groups && typeof parsed.groups === 'object') {
+            delete parsed.groups['evt-101'];
+            delete parsed.groups['evt-102'];
+            delete parsed.groups['evt-principal-01'];
+            Object.entries(parsed.groups).forEach(([evtId, grps]) => {
+              if (Array.isArray(grps) && grps.length > 0) {
+                globalServerGroupsStore[evtId] = grps as GuestGroup[];
+              } else if (!globalServerGroupsStore[evtId]) {
+                globalServerGroupsStore[evtId] = [];
+              }
+            });
+          }
+          if (parsed.tables && typeof parsed.tables === 'object') {
+            delete parsed.tables['evt-101'];
+            delete parsed.tables['evt-102'];
+            delete parsed.tables['evt-principal-01'];
+            Object.entries(parsed.tables).forEach(([evtId, tbls]) => {
+              if (Array.isArray(tbls) && tbls.length > 0) {
+                globalServerTablesStore[evtId] = tbls as Table[];
+              } else if (!globalServerTablesStore[evtId]) {
+                globalServerTablesStore[evtId] = [];
+              }
+            });
+          }
+          if (parsed.assignments && typeof parsed.assignments === 'object') {
+            delete parsed.assignments['evt-101'];
+            delete parsed.assignments['evt-102'];
+            delete parsed.assignments['evt-principal-01'];
+            Object.entries(parsed.assignments).forEach(([evtId, asgns]) => {
+              if (Array.isArray(asgns) && asgns.length > 0) {
+                globalServerAssignmentsStore[evtId] = asgns as TableAssignment[];
+              } else if (!globalServerAssignmentsStore[evtId]) {
+                globalServerAssignmentsStore[evtId] = [];
+              }
+            });
+          }
+          if (parsed.cuts && typeof parsed.cuts === 'object') {
+            delete parsed.cuts['evt-101'];
+            delete parsed.cuts['evt-102'];
+            delete parsed.cuts['evt-principal-01'];
+            Object.entries(parsed.cuts).forEach(([evtId, cts]) => {
+              if (Array.isArray(cts) && cts.length > 0) {
+                globalServerCutsStore[evtId] = cts as Cut[];
+              } else if (!globalServerCutsStore[evtId]) {
+                globalServerCutsStore[evtId] = [];
+              }
+            });
+          }
+          if (parsed.checkIns && typeof parsed.checkIns === 'object') {
+            delete parsed.checkIns['evt-101'];
+            delete parsed.checkIns['evt-102'];
+            delete parsed.checkIns['evt-principal-01'];
+            Object.entries(parsed.checkIns).forEach(([evtId, chks]) => {
+              if (Array.isArray(chks) && chks.length > 0) {
+                globalServerCheckInsStore[evtId] = chks as CheckIn[];
+              } else if (!globalServerCheckInsStore[evtId]) {
+                globalServerCheckInsStore[evtId] = [];
+              }
+            });
+          }
+          if (parsed.venueElements && typeof parsed.venueElements === 'object') {
+            delete parsed.venueElements['evt-101'];
+            delete parsed.venueElements['evt-102'];
+            delete parsed.venueElements['evt-principal-01'];
+            Object.entries(parsed.venueElements).forEach(([evtId, elems]) => {
+              if (Array.isArray(elems) && elems.length > 0) {
+                globalServerVenueElementsStore[evtId] = elems as VenueElement[];
+              } else if (!globalServerVenueElementsStore[evtId]) {
+                globalServerVenueElementsStore[evtId] = [];
+              }
+            });
+          }
         }
       }
     }
   } catch (e) {
     console.warn('[Server DB Load Warning - Retrying on next request]', e);
   }
+
+  // Ensure default server events are always available even on fresh container start
+  INITIAL_SERVER_EVENTS.forEach(initEvt => {
+    if (!globalServerDeletedEventsStore.includes(initEvt.id) && !globalServerEventsStore.some(e => e.id === initEvt.id)) {
+      globalServerEventsStore.push(initEvt);
+    }
+  });
 }
 
 function saveDbToFile() {
@@ -810,8 +874,8 @@ export async function POST(req: Request) {
       delete globalServerVenueElementsStore[eventId];
       saveDbToFile();
 
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const url = getSupabaseUrl();
+      const key = getSupabaseAnonKey();
       if (url && key) {
         const uuid = generateDeterministicUUID(`event_${eventId}`);
         fetch(`${url}/rest/v1/check_ins?id=eq.${uuid}`, {

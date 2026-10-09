@@ -35,7 +35,52 @@ export function registerDeletedEventId(eventId?: string, serverDeletedIds?: stri
   } catch (e) {}
 }
 
-const INITIAL_EVENTS: Event[] = [];
+const INITIAL_EVENTS: Event[] = [
+  {
+    id: 'evt-weddingsco-01',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Valentina & Sebastián - Gala Imperial',
+    event_type: 'Boda / Gala',
+    event_date: '2026-11-20',
+    venue_name: 'Hotel Westin Lima & Convention Center',
+    status: 'ACTIVO',
+    created_at: '2026-09-08T10:00:00.000Z',
+    updated_at: '2026-09-08T10:00:00.000Z'
+  },
+  {
+    id: 'evt-weddingsco-02',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Camila & Mateo - Recepción Campestre',
+    event_type: 'Boda / Gala',
+    event_date: '2026-12-12',
+    venue_name: 'Hacienda Villa Hermosa - Cieneguilla',
+    status: 'ACTIVO',
+    created_at: '2026-09-10T14:30:00.000Z',
+    updated_at: '2026-09-10T14:30:00.000Z'
+  },
+  {
+    id: 'evt-weddingsco-03',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Civil & Fiesta Íntima Sofía & Diego',
+    event_type: 'Boda / Gala',
+    event_date: '2027-01-15',
+    venue_name: 'Terraza Mirador Costa Verde',
+    status: 'ACTIVO',
+    created_at: '2026-09-15T16:00:00.000Z',
+    updated_at: '2026-09-15T16:00:00.000Z'
+  },
+  {
+    id: 'evt-weddingsco-04',
+    workspace_id: 'ws-weddingsco-appqsop',
+    name: 'Boda Religiosa & Cóctel VIP Lucía & Gabriel',
+    event_type: 'Boda / Gala',
+    event_date: '2027-02-20',
+    venue_name: 'Salón Bellavista & Jardines de San Francisco',
+    status: 'BORRADOR',
+    created_at: '2026-09-20T18:00:00.000Z',
+    updated_at: '2026-09-20T18:00:00.000Z'
+  }
+];
 
 const INITIAL_GROUPS: Record<string, GuestGroup[]> = {};
 

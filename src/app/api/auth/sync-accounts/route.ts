@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config';
 
 export interface AdminAccount {
   id: string;
@@ -125,8 +126,8 @@ const ACCOUNTS_DB_FILE = path.join(process.cwd(), 'data', 'server_accounts_db.js
 const TMP_ACCOUNTS_DB_FILE = path.join(os.tmpdir(), 'server_accounts_db.json');
 
 async function fetchOnlineAccountsFromSupabase(): Promise<AdminAccount[]> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
   if (!url || !key) return [];
   try {
     const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_ACCOUNT_SYNC&select=*`, {
@@ -153,8 +154,8 @@ function generateDeterministicUUID(keyString: string): string {
 }
 
 async function persistAccountToSupabase(acc: AdminAccount) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
   if (!url || !key) return;
   try {
     const uuid = generateDeterministicUUID(`acc_${acc.id}_${acc.contactEmail}`);
@@ -248,13 +249,15 @@ export async function GET(req: Request) {
     let matchedAccount = globalServerAccountsStore.find(acc => acc.contactEmail.toLowerCase() === cleanedEmail);
 
     // Fallback: If not in local memory, check Supabase Auth Authority
-    if (!matchedAccount && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    const sbUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || SUPABASE_URL;
+    const sbKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_ANON_KEY;
+    if (!matchedAccount && sbUrl && sbKey) {
       try {
-        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`;
+        const url = `${sbUrl}/auth/v1/token?grant_type=password`;
         const sbRes = await fetch(url, {
           method: 'POST',
           headers: {
-            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+            'apikey': sbKey,
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({ email: cleanedEmail, password: trimmedPass })
