@@ -624,7 +624,13 @@ export async function POST(req: Request) {
         globalServerAssignmentsStore[eventId] = globalServerAssignmentsStore[eventId].filter(a => a.table_id !== body.tableId);
       }
       saveDbToFile();
-      await persistTablesDataToSupabase(eventId, globalServerTablesStore[eventId], globalServerAssignmentsStore[eventId], undefined, undefined);
+      await persistTablesDataToSupabase(
+        eventId,
+        globalServerTablesStore[eventId] || [],
+        globalServerAssignmentsStore[eventId] || [],
+        undefined,
+        undefined
+      );
       return NextResponse.json({ success: true, tableId: body.tableId });
     }
 
@@ -633,7 +639,7 @@ export async function POST(req: Request) {
         globalServerVenueElementsStore[eventId] = globalServerVenueElementsStore[eventId].filter(ve => ve.id !== body.elementId);
       }
       saveDbToFile();
-      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, globalServerVenueElementsStore[eventId]);
+      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, globalServerVenueElementsStore[eventId] || []);
       return NextResponse.json({ success: true, elementId: body.elementId });
     }
 
@@ -642,7 +648,7 @@ export async function POST(req: Request) {
         globalServerAssignmentsStore[eventId] = globalServerAssignmentsStore[eventId].filter(a => a.group_id !== body.groupId);
       }
       saveDbToFile();
-      await persistTablesDataToSupabase(eventId, undefined, globalServerAssignmentsStore[eventId], undefined, undefined);
+      await persistTablesDataToSupabase(eventId, undefined, globalServerAssignmentsStore[eventId] || [], undefined, undefined);
       return NextResponse.json({ success: true, groupId: body.groupId });
     }
 
@@ -655,7 +661,13 @@ export async function POST(req: Request) {
         globalServerAssignmentsStore[eventId] = assignments;
       }
       saveDbToFile();
-      await persistTablesDataToSupabase(eventId, globalServerTablesStore[eventId], globalServerAssignmentsStore[eventId], undefined, undefined);
+      await persistTablesDataToSupabase(
+        eventId,
+        Array.isArray(tables) ? tables : undefined,
+        Array.isArray(assignments) ? assignments : undefined,
+        undefined,
+        undefined
+      );
       return NextResponse.json({ success: true });
     }
 

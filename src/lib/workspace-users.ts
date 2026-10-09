@@ -68,7 +68,6 @@ export function autoSyncMembersToServer() {
 function getStore(): WorkspaceMemberUser[] {
   if (!membersMemoryStore) {
     membersMemoryStore = loadMembersFromStorage();
-    setTimeout(() => autoSyncMembersToServer(), 100);
   }
   return membersMemoryStore;
 }

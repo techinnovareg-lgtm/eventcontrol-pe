@@ -87,7 +87,6 @@ function saveEventsToStorage(events: Event[]) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
-      setTimeout(() => autoSyncEventsToServer(), 100);
     } catch (err) {
       console.warn('[EventsStore] Failed to save to localStorage', err);
     }
@@ -118,18 +117,6 @@ function saveGroupsToStorage(groups: Record<string, GuestGroup[]>) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(GROUPS_STORAGE_KEY, JSON.stringify(groups));
-      setTimeout(() => {
-        Object.entries(groups).forEach(([evtId, grps]) => {
-          if (Array.isArray(grps) && grps.length > 0) {
-            const wsId = grps[0]?.workspace_id || '';
-            fetch('/api/events/sync', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'SYNC_GROUPS', eventId: evtId, workspaceId: wsId, groups: grps }),
-            }).catch(() => {});
-          }
-        });
-      }, 150);
     } catch (err) {
       console.warn('[GuestGroupsStore] Failed to save to localStorage', err);
     }
@@ -216,17 +203,6 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         const finalMerged = [...otherWorkspaceEvents, ...mergedWorkspaceEvents];
         saveEventsToStorage(finalMerged);
 
-        // Trigger deep background auto-sync for all local events in this workspace (tables, venue elements, cuts, members)
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            autoSyncMembersToServer();
-            mergedWorkspaceEvents.forEach(evt => {
-              autoSyncTablesToServer(evt.id);
-              getEventCutsAsync(evt.id).catch(() => {});
-            });
-          }, 150);
-        }
-
         return mergedWorkspaceEvents;
       }
     }
@@ -277,15 +253,6 @@ export async function getEventByIdAsync(eventId: string, workspaceId?: string): 
           });
           gStore[eventId] = merged;
           saveGroupsToStorage(gStore);
-        }
-
-        // Trigger deep background auto-sync for tables, venue elements, cuts, and members
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            autoSyncMembersToServer();
-            autoSyncTablesToServer(eventId);
-            getEventCutsAsync(eventId).catch(() => {});
-          }, 150);
         }
 
         return data.event;

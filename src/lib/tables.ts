@@ -194,27 +194,42 @@ function saveVenueElementsToStorage(data: Record<string, VenueElement[]>) {
   }
 }
 
-export function saveEventTablesLocally(eventId: string, tables: Table[]) {
+export function cacheEventTablesLocally(eventId: string, tables: Table[]) {
   if (!eventId) return;
   const store = loadTablesFromStorage();
   store[eventId] = tables;
   saveTablesToStorage(store);
+}
+
+export function cacheEventAssignmentsLocally(eventId: string, assignments: TableAssignment[]) {
+  if (!eventId) return;
+  const store = loadAssignmentsFromStorage();
+  store[eventId] = assignments;
+  saveAssignmentsToStorage(store);
+}
+
+export function cacheEventVenueElementsLocally(eventId: string, venueElements: VenueElement[]) {
+  if (!eventId) return;
+  const store = loadVenueElementsFromStorage();
+  store[eventId] = venueElements;
+  saveVenueElementsToStorage(store);
+}
+
+export function saveEventTablesLocally(eventId: string, tables: Table[]) {
+  if (!eventId) return;
+  cacheEventTablesLocally(eventId, tables);
   syncTablesToServerAsync(eventId, tables);
 }
 
 export function saveEventAssignmentsLocally(eventId: string, assignments: TableAssignment[]) {
   if (!eventId) return;
-  const store = loadAssignmentsFromStorage();
-  store[eventId] = assignments;
-  saveAssignmentsToStorage(store);
+  cacheEventAssignmentsLocally(eventId, assignments);
   syncTablesToServerAsync(eventId, undefined, assignments);
 }
 
 export function saveEventVenueElementsLocally(eventId: string, venueElements: VenueElement[]) {
   if (!eventId) return;
-  const store = loadVenueElementsFromStorage();
-  store[eventId] = venueElements;
-  saveVenueElementsToStorage(store);
+  cacheEventVenueElementsLocally(eventId, venueElements);
   syncVenueElementsToServerAsync(eventId, venueElements);
 }
 

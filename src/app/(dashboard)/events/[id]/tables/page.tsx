@@ -20,7 +20,8 @@ import {
   getEventVenueElements, getEventVenueElementsAsync, createVenueElement, createVenueElementAsync, updateVenueElement, updateVenueElementAsync, updateVenueElementPosition, updateVenueElementPositionAsync,
   deleteVenueElement, deleteVenueElementAsync, VenueElement, VenueElementType, ElementSize, computeElementDimensions,
   autoSyncTablesToServer, autoSyncTablesToServerAsync, syncTablesToServerAsync, syncVenueElementsToServerAsync,
-  saveEventTablesLocally, saveEventAssignmentsLocally, saveEventVenueElementsLocally
+  saveEventTablesLocally, saveEventAssignmentsLocally, saveEventVenueElementsLocally,
+  cacheEventTablesLocally, cacheEventAssignmentsLocally, cacheEventVenueElementsLocally
 } from '@/lib/tables';
 
 import { checkInRealtimeChannel } from '@/lib/realtime';
@@ -62,7 +63,7 @@ export default function TablesManagementPage() {
               if (Array.isArray(data.tables)) {
                 setTables(prev => {
                   if (data.tables.length === 0 && prev.length > 0) return prev;
-                  saveEventTablesLocally(eventId, data.tables);
+                  cacheEventTablesLocally(eventId, data.tables);
                   return data.tables;
                 });
                 if (data.tables.length > 0) {
@@ -82,14 +83,14 @@ export default function TablesManagementPage() {
               if (Array.isArray(data.assignments)) {
                 setAssignments(prev => {
                   if (data.assignments.length === 0 && prev.length > 0) return prev;
-                  saveEventAssignmentsLocally(eventId, data.assignments);
+                  cacheEventAssignmentsLocally(eventId, data.assignments);
                   return data.assignments;
                 });
               }
               if (Array.isArray(data.venueElements)) {
                 setVenueElements(prev => {
                   if (data.venueElements.length === 0 && prev.length > 0) return prev;
-                  saveEventVenueElementsLocally(eventId, data.venueElements);
+                  cacheEventVenueElementsLocally(eventId, data.venueElements);
                   return data.venueElements;
                 });
               }
@@ -222,7 +223,7 @@ export default function TablesManagementPage() {
               merged.push(p);
             }
           });
-          saveEventTablesLocally(eventId, merged);
+          cacheEventTablesLocally(eventId, merged);
           return merged;
         });
         if (data.tables.length > 0) {
@@ -255,7 +256,7 @@ export default function TablesManagementPage() {
             }
           });
           const merged = Array.from(mergedMap.values());
-          saveEventAssignmentsLocally(eventId, merged);
+          cacheEventAssignmentsLocally(eventId, merged);
           return merged;
         });
       }
@@ -273,7 +274,7 @@ export default function TablesManagementPage() {
               merged.push(p);
             }
           });
-          saveEventVenueElementsLocally(eventId, merged);
+          cacheEventVenueElementsLocally(eventId, merged);
           return merged;
         });
       }
