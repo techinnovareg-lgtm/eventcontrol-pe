@@ -26,7 +26,11 @@ async function fetchOnlineEventsFromSupabase(workspaceId?: string): Promise<Even
   try {
     let query = `${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_EVENT_SYNC_%25&select=*`;
     if (workspaceId && workspaceId !== 'ALL') {
-      query = `${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_EVENT_SYNC_${workspaceId}&select=*`;
+      if (workspaceId === 'ws-weddingsco-appqsop') {
+        query = `${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_EVENT_SYNC_ws-weddingsco-appqsop,SYS_EVENT_SYNC_ws-appqsopgmailcom)&select=*`;
+      } else {
+        query = `${url}/rest/v1/check_ins?scanner_staff_name=eq.SYS_EVENT_SYNC_${workspaceId}&select=*`;
+      }
     }
     const res = await fetch(query, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
@@ -36,7 +40,13 @@ async function fetchOnlineEventsFromSupabase(workspaceId?: string): Promise<Even
       const rows = await res.json();
       if (Array.isArray(rows)) {
         const events = rows.map(r => {
-          try { return JSON.parse(r.device_info); } catch (e) { return null; }
+          try { 
+            const parsed = JSON.parse(r.device_info); 
+            if (parsed && workspaceId && workspaceId === 'ws-weddingsco-appqsop') {
+              parsed.workspace_id = 'ws-weddingsco-appqsop';
+            }
+            return parsed;
+          } catch (e) { return null; }
         }).filter(Boolean);
 
         if (workspaceId && workspaceId !== 'ALL' && events.length > 0) {
@@ -54,7 +64,15 @@ async function fetchOnlineEventsFromSupabase(workspaceId?: string): Promise<Even
             if (Array.isArray(fallbackRows)) {
               return fallbackRows.map(r => {
                 try { return JSON.parse(r.device_info); } catch (e) { return null; }
-              }).filter((e: Event | null) => e && e.workspace_id === workspaceId);
+              }).filter((e: Event | null) => {
+                if (!e) return false;
+                if (e.workspace_id === workspaceId) return true;
+                if (workspaceId === 'ws-weddingsco-appqsop' && (e.workspace_id === 'ws-appqsopgmailcom' || e.workspace_id === 'ws-a-1111')) {
+                  e.workspace_id = 'ws-weddingsco-appqsop';
+                  return true;
+                }
+                return false;
+              });
             }
           }
         }
@@ -124,19 +142,15 @@ async function persistEventToSupabase(event: Event) {
       })
     });
     if (!res.ok) {
+      // Safe fallback: use PATCH to update record without risking deletion
       await fetch(`${url}/rest/v1/check_ins?id=eq.${uuid}`, {
-        method: 'DELETE',
-        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
-      }).catch(() => {});
-      await fetch(`${url}/rest/v1/check_ins`, {
-        method: 'POST',
+        method: 'PATCH',
         headers: {
           'apikey': key,
           'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          id: uuid,
           scanner_staff_name: `SYS_EVENT_SYNC_${event.workspace_id}`,
           device_info: JSON.stringify(event)
         })
@@ -445,8 +459,17 @@ loadDbFromFile();
 export async function GET(req: Request) {
   loadDbFromFile();
   const { searchParams } = new URL(req.url);
-  const workspaceId = searchParams.get('workspaceId');
+  let workspaceId = searchParams.get('workspaceId');
   const eventId = searchParams.get('eventId');
+  const email = searchParams.get('email');
+
+  if (!workspaceId && email) {
+    if (email.toLowerCase() === 'appqsop@gmail.com') {
+      workspaceId = 'ws-weddingsco-appqsop';
+    } else if (email.toLowerCase().includes('moral.17')) {
+      workspaceId = 'ws-moral17-2026';
+    }
+  }
 
   if (eventId) {
     if (globalServerDeletedEventsStore.includes(eventId)) {
@@ -618,21 +641,33 @@ export async function GET(req: Request) {
       }
     }
 
-    const localEvents = globalServerEventsStore.filter(e => e.workspace_id === workspaceId && !globalServerDeletedEventsStore.includes(e.id));
+    const isWeddingsCo = workspaceId === 'ws-weddingsco-appqsop';
+    const localEvents = globalServerEventsStore.filter(e => {
+      if (globalServerDeletedEventsStore.includes(e.id)) return false;
+      if (e.workspace_id === workspaceId) return true;
+      if (isWeddingsCo && (e.workspace_id === 'ws-appqsopgmailcom' || e.workspace_id === 'ws-a-1111')) {
+        e.workspace_id = 'ws-weddingsco-appqsop';
+        return true;
+      }
+      return false;
+    });
     const mergedEventsMap = new Map<string, Event>();
 
     onlineEvents.forEach(e => {
       if (!globalServerDeletedEventsStore.includes(e.id)) {
+        if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
         mergedEventsMap.set(e.id, e);
       }
     });
     supabaseEvents.forEach(e => {
       if (!globalServerDeletedEventsStore.includes(e.id)) {
+        if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
         mergedEventsMap.set(e.id, e);
       }
     });
     localEvents.forEach(e => {
       if (!globalServerDeletedEventsStore.includes(e.id)) {
+        if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
         mergedEventsMap.set(e.id, e);
       }
     });
@@ -689,6 +724,23 @@ export async function POST(req: Request) {
     loadDbFromFile();
     const body = await req.json();
     const { action, event, eventId, workspaceId, groups, tables, assignments, cuts, checkIn, venueElements } = body;
+
+    if (action === 'SYNC_ALL_EVENTS' && Array.isArray(body.events)) {
+      const incomingEvents: Event[] = body.events;
+      for (const ev of incomingEvents) {
+        if (!globalServerDeletedEventsStore.includes(ev.id)) {
+          const idx = globalServerEventsStore.findIndex(e => e.id === ev.id);
+          if (idx !== -1) {
+            globalServerEventsStore[idx] = { ...globalServerEventsStore[idx], ...ev };
+          } else {
+            globalServerEventsStore.unshift(ev);
+          }
+          await persistEventToSupabase(ev);
+        }
+      }
+      saveDbToFile();
+      return NextResponse.json({ success: true, count: incomingEvents.length });
+    }
 
     if (action === 'SYNC_EVENT' && event) {
       if (globalServerDeletedEventsStore.includes(event.id)) {

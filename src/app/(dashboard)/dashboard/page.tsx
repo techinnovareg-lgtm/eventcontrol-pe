@@ -11,7 +11,7 @@ import {
 import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed, getHourlyCheckInBreakdown } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
 
-import { getWorkspaceEvents, getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, getEventByIdAsync, getEventGuestGroupsAsync, autoSyncEventsToServer } from '@/lib/events';
 import { getEventTablesAsync, getEventTableAssignmentsAsync } from '@/lib/tables';
 import { getAccountForSession, getActiveSession } from '@/lib/superadmin-store';
 import { Calendar } from 'lucide-react';
@@ -54,10 +54,17 @@ export default function RealtimeDashboardPage() {
         return;
       }
       const contract = getAccountForSession();
-      const wsId = session?.user?.workspaceId || contract?.workspaceId || 'ws-a-1111';
+      let wsId = session?.user?.workspaceId || contract?.workspaceId || 'ws-a-1111';
+      const email = session?.user?.email || contract?.contactEmail;
+      if (email?.toLowerCase() === 'appqsop@gmail.com' && wsId !== 'ws-weddingsco-appqsop') {
+        wsId = 'ws-weddingsco-appqsop';
+      }
       setCurrentWorkspaceId(wsId);
 
-      let userEvents = await getWorkspaceEventsAsync(wsId);
+      // Trigger cloud sync
+      autoSyncEventsToServer(wsId);
+
+      let userEvents = await getWorkspaceEventsAsync(wsId, email);
 
       let selectedId = '';
       if (typeof window !== 'undefined') {

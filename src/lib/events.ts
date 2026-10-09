@@ -42,6 +42,8 @@ const INITIAL_GROUPS: Record<string, GuestGroup[]> = {};
 let eventsMemoryStore: Event[] | null = null;
 let guestGroupsMemoryStore: Record<string, GuestGroup[]> | null = null;
 
+let autoSyncTimer: NodeJS.Timeout | null = null;
+
 function loadEventsFromStorage(): Event[] {
   if (typeof window === 'undefined') return INITIAL_EVENTS;
   try {
@@ -51,6 +53,9 @@ function loadEventsFromStorage(): Event[] {
       if (Array.isArray(parsed)) {
         // Clean out legacy demo/phantom events (evt-101, evt-102, evt-principal-01) from browser storage
         const cleaned = parsed.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+        setTimeout(() => {
+          autoSyncEventsToServer();
+        }, 150);
         return cleaned;
       }
     }
@@ -63,23 +68,52 @@ function loadEventsFromStorage(): Event[] {
 
 export function autoSyncEventsToServer(workspaceId?: string) {
   if (typeof window === 'undefined') return;
-  const store = getEventsStore();
-  const deletedIds = getDeletedEventIdsFromStorage();
-  const validEvents = store.filter(e => 
-    !deletedIds.includes(e.id) && 
-    e.id !== 'evt-101' && 
-    e.id !== 'evt-102' && 
-    e.id !== 'evt-principal-01' &&
-    (!workspaceId || e.workspace_id === workspaceId)
-  );
+  try {
+    const store = getEventsStore();
+    const deletedIds = getDeletedEventIdsFromStorage();
+    
+    // Normalize any orphan alias events for Weddings Co
+    if (workspaceId === 'ws-weddingsco-appqsop') {
+      let migrated = false;
+      store.forEach(e => {
+        if (e.workspace_id === 'ws-appqsopgmailcom' || (e.workspace_id === 'ws-a-1111' && store.length <= 4)) {
+          e.workspace_id = 'ws-weddingsco-appqsop';
+          migrated = true;
+        }
+      });
+      if (migrated) {
+        saveEventsToStorage(store);
+      }
+    }
 
-  validEvents.forEach(evt => {
-    fetch('/api/events/sync', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
-    }).catch(() => {});
-  });
+    const validEvents = store.filter(e => 
+      !deletedIds.includes(e.id) && 
+      e.id !== 'evt-101' && 
+      e.id !== 'evt-102' && 
+      e.id !== 'evt-principal-01' &&
+      (!workspaceId || e.workspace_id === workspaceId)
+    );
+
+    if (validEvents.length > 0) {
+      // 1. Instant Batch Upload
+      fetch('/api/events/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_ALL_EVENTS', events: validEvents }),
+      }).catch(() => {});
+
+      // 2. Individual Safe Push
+      validEvents.forEach(evt => {
+        fetch('/api/events/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+        }).catch(() => {});
+      });
+    }
+  } catch (e) {
+    console.warn('[autoSyncEventsToServer Error]', e);
+  }
 }
 
 function saveEventsToStorage(events: Event[]) {
@@ -87,6 +121,10 @@ function saveEventsToStorage(events: Event[]) {
   if (typeof window !== 'undefined') {
     try {
       localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
+      if (autoSyncTimer) clearTimeout(autoSyncTimer);
+      autoSyncTimer = setTimeout(() => {
+        autoSyncEventsToServer();
+      }, 150);
     } catch (err) {
       console.warn('[EventsStore] Failed to save to localStorage', err);
     }
@@ -140,18 +178,29 @@ function getGroupsStore(): Record<string, GuestGroup[]> {
 export function getWorkspaceEvents(workspaceId: string): Event[] {
   const store = getEventsStore();
   const deletedIds = getDeletedEventIdsFromStorage();
-  const res = !workspaceId ? store : store.filter(e => e.workspace_id === workspaceId);
+  let res = !workspaceId ? store : store.filter(e => e.workspace_id === workspaceId);
+
+  // If zero events found for Weddings Co, check alias workspace
+  if (res.length === 0 && workspaceId === 'ws-weddingsco-appqsop') {
+    res = store.filter(e => e.workspace_id === 'ws-appqsopgmailcom' || (e.workspace_id === 'ws-a-1111' && store.length <= 4));
+    res.forEach(e => { e.workspace_id = 'ws-weddingsco-appqsop'; });
+  }
+
   return res
     .filter(e => !deletedIds.includes(e.id) && e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01')
     .sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
 }
 
-export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Event[]> {
+export async function getWorkspaceEventsAsync(workspaceId: string, userEmail?: string): Promise<Event[]> {
   const deletedIds = getDeletedEventIdsFromStorage();
 
   // 1. Primary: Query Central Online Database API first
   try {
-    const res = await fetch(`/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`);
+    let url = `/api/events/sync?workspaceId=${encodeURIComponent(workspaceId)}`;
+    if (userEmail) {
+      url += `&email=${encodeURIComponent(userEmail)}`;
+    }
+    const res = await fetch(url);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.events)) {
@@ -175,7 +224,15 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
         );
 
         // Preserve local events for this workspace that are NOT on the server and NOT in updatedDeletedIds
-        const localWorkspaceEvents = localStore.filter(e => e.workspace_id === workspaceId);
+        const isWeddingsCo = workspaceId === 'ws-weddingsco-appqsop';
+        const localWorkspaceEvents = localStore.filter(e => 
+          e.workspace_id === workspaceId || 
+          (isWeddingsCo && (e.workspace_id === 'ws-appqsopgmailcom' || (e.workspace_id === 'ws-a-1111' && localStore.length <= 4)))
+        );
+        localWorkspaceEvents.forEach(e => {
+          if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
+        });
+
         const unsyncedLocalEvents = localWorkspaceEvents.filter(le => {
           const isServerMatch = serverEvents.some((se: Event) => se.id === le.id);
           if (isServerMatch) return false;
@@ -183,20 +240,26 @@ export async function getWorkspaceEventsAsync(workspaceId: string): Promise<Even
           return true;
         });
 
-        // Re-sync unsynced local events to the server
-        unsyncedLocalEvents.forEach(evt => {
+        // Re-sync unsynced local events to the server in batch and individual
+        if (unsyncedLocalEvents.length > 0) {
           fetch('/api/events/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
+            body: JSON.stringify({ action: 'SYNC_ALL_EVENTS', events: unsyncedLocalEvents }),
           }).catch(() => {});
-        });
+        }
 
         // Keep local events from other workspaces
         const otherWorkspaceEvents = localStore.filter(e => e.workspace_id !== workspaceId && !updatedDeletedIds.includes(e.id));
         
         // Final merged list for local storage
-        const mergedWorkspaceEvents = [...serverEvents, ...unsyncedLocalEvents].sort(
+        const mergedWorkspaceEvents = [...serverEvents];
+        unsyncedLocalEvents.forEach(ule => {
+          if (!mergedWorkspaceEvents.some(me => me.id === ule.id)) {
+            mergedWorkspaceEvents.push(ule);
+          }
+        });
+        mergedWorkspaceEvents.sort(
           (a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime()
         );
 
@@ -289,7 +352,16 @@ export function createEvent(data: Omit<Event, 'id' | 'created_at' | 'updated_at'
 }
 
 export async function createEventAsync(data: Omit<Event, 'id' | 'created_at' | 'updated_at'>): Promise<Event> {
-  const newEvt = createEvent(data);
+  const store = getEventsStore();
+  const newEvt: Event = {
+    ...data,
+    id: `evt-${Date.now()}`,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  const updated = [newEvt, ...store];
+  saveEventsToStorage(updated);
+
   if (typeof window !== 'undefined') {
     try {
       await fetch('/api/events/sync', {

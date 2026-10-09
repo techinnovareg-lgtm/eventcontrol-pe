@@ -8,7 +8,7 @@ import {
   CheckCircle, Clock, MessageSquare, ArrowRight, BarChart3, 
   Scissors, Edit3, Home, LogOut, Trash2
 } from 'lucide-react';
-import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, updateEventAsync, deleteEvent } from '@/lib/events';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, updateEventAsync, deleteEvent, autoSyncEventsToServer } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 import { getAccountForSession, getActiveSession, getAdminAccountByEmailAsync, setActiveSession } from '@/lib/superadmin-store';
 
@@ -30,11 +30,26 @@ export default function EventsCrudPage() {
     const name = session?.user?.name || contractAccount?.adminName || contractAccount?.companyName || 'Cliente VIP';
     const email = session?.user?.email || contractAccount?.contactEmail || 'cliente@empresa.pe';
 
+    if (email.toLowerCase() === 'appqsop@gmail.com' && wsId !== 'ws-weddingsco-appqsop') {
+      wsId = 'ws-weddingsco-appqsop';
+      if (session && session.user) {
+        session.user.workspaceId = wsId;
+        setActiveSession(session);
+      }
+    }
+
     setCurrentWorkspaceId(wsId);
-    setEvents(getWorkspaceEvents(wsId));
     setUserName(name);
     setUserEmail(email);
     setUserInitial(name ? name.charAt(0).toUpperCase() : 'C');
+
+    // Auto-sync any existing local events immediately on mount
+    autoSyncEventsToServer(wsId);
+
+    const initialLocal = getWorkspaceEvents(wsId);
+    if (initialLocal.length > 0) {
+      setEvents(initialLocal);
+    }
 
     if (email && email !== 'cliente@empresa.pe') {
       getAdminAccountByEmailAsync(email).then(acc => {
@@ -45,7 +60,8 @@ export default function EventsCrudPage() {
             session.user.workspaceId = acc.workspaceId;
             setActiveSession(session);
           }
-          getWorkspaceEventsAsync(acc.workspaceId).then(onlineEvts => {
+          autoSyncEventsToServer(acc.workspaceId);
+          getWorkspaceEventsAsync(acc.workspaceId, email).then(onlineEvts => {
             if (Array.isArray(onlineEvts)) setEvents(onlineEvts);
           });
         }
@@ -54,9 +70,12 @@ export default function EventsCrudPage() {
 
     const fetchEvents = () => {
       const activeWs = session?.user?.workspaceId || wsId;
-      getWorkspaceEventsAsync(activeWs).then(onlineEvts => {
-        if (Array.isArray(onlineEvts)) {
+      getWorkspaceEventsAsync(activeWs, email).then(onlineEvts => {
+        if (Array.isArray(onlineEvts) && onlineEvts.length > 0) {
           setEvents(onlineEvts);
+        } else if (Array.isArray(onlineEvts) && onlineEvts.length === 0) {
+          const fallbackLocal = getWorkspaceEvents(activeWs);
+          setEvents(fallbackLocal.length > 0 ? fallbackLocal : onlineEvts);
         }
       });
     };

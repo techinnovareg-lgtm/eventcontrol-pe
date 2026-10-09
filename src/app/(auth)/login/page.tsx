@@ -110,7 +110,10 @@ export default function LoginPage() {
       if (!matchedAccount) {
         matchedAccount = getAdminAccountByEmail(inputEmail);
       }
-      const wsId = authUser.user_metadata?.workspaceId || matchedAccount?.workspaceId || `ws-${inputEmail.replace(/[^a-z0-9]/g, '')}`;
+      let wsId = authUser.user_metadata?.workspaceId || matchedAccount?.workspaceId || `ws-${inputEmail.replace(/[^a-z0-9]/g, '')}`;
+      if (inputEmail.toLowerCase() === 'appqsop@gmail.com') {
+        wsId = 'ws-weddingsco-appqsop';
+      }
       setActiveSession({
         user: {
           id: authUser.id,
@@ -122,7 +125,7 @@ export default function LoginPage() {
       });
       let targetEvtId: string | undefined = undefined;
       try {
-        const userEvents = await getWorkspaceEventsAsync(wsId);
+        const userEvents = await getWorkspaceEventsAsync(wsId, inputEmail);
         targetEvtId = userEvents[0]?.id;
       } catch (e) {}
       router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
@@ -138,19 +141,21 @@ export default function LoginPage() {
         return;
       }
 
+      const activeWs = matchedAccount.contactEmail.toLowerCase() === 'appqsop@gmail.com' ? 'ws-weddingsco-appqsop' : matchedAccount.workspaceId;
+
       setActiveSession({
         user: {
           id: matchedAccount.id,
           email: matchedAccount.contactEmail,
           name: matchedAccount.companyName || matchedAccount.adminName,
           role: 'ADMIN',
-          workspaceId: matchedAccount.workspaceId,
+          workspaceId: activeWs,
         },
       });
 
       let targetEvtId: string | undefined = undefined;
       try {
-        const userEvents = await getWorkspaceEventsAsync(matchedAccount.workspaceId);
+        const userEvents = await getWorkspaceEventsAsync(activeWs, matchedAccount.contactEmail);
         targetEvtId = userEvents[0]?.id;
       } catch (e) {}
       router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
