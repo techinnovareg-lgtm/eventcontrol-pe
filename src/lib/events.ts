@@ -35,52 +35,17 @@ export function registerDeletedEventId(eventId?: string, serverDeletedIds?: stri
   } catch (e) {}
 }
 
-const INITIAL_EVENTS: Event[] = [
-  {
-    id: 'evt-weddingsco-01',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Valentina & Sebastián - Gala Imperial',
-    event_type: 'Boda / Gala',
-    event_date: '2026-11-20',
-    venue_name: 'Hotel Westin Lima & Convention Center',
-    status: 'ACTIVO',
-    created_at: '2026-09-08T10:00:00.000Z',
-    updated_at: '2026-09-08T10:00:00.000Z'
-  },
-  {
-    id: 'evt-weddingsco-02',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Camila & Mateo - Recepción Campestre',
-    event_type: 'Boda / Gala',
-    event_date: '2026-12-12',
-    venue_name: 'Hacienda Villa Hermosa - Cieneguilla',
-    status: 'ACTIVO',
-    created_at: '2026-09-10T14:30:00.000Z',
-    updated_at: '2026-09-10T14:30:00.000Z'
-  },
-  {
-    id: 'evt-weddingsco-03',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Civil & Fiesta Íntima Sofía & Diego',
-    event_type: 'Boda / Gala',
-    event_date: '2027-01-15',
-    venue_name: 'Terraza Mirador Costa Verde',
-    status: 'ACTIVO',
-    created_at: '2026-09-15T16:00:00.000Z',
-    updated_at: '2026-09-15T16:00:00.000Z'
-  },
-  {
-    id: 'evt-weddingsco-04',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Religiosa & Cóctel VIP Lucía & Gabriel',
-    event_type: 'Boda / Gala',
-    event_date: '2027-02-20',
-    venue_name: 'Salón Bellavista & Jardines de San Francisco',
-    status: 'BORRADOR',
-    created_at: '2026-09-20T18:00:00.000Z',
-    updated_at: '2026-09-20T18:00:00.000Z'
-  }
+export const FAKE_EVENT_IDS = [
+  'evt-101', 
+  'evt-102', 
+  'evt-principal-01', 
+  'evt-weddingsco-01', 
+  'evt-weddingsco-02', 
+  'evt-weddingsco-03', 
+  'evt-weddingsco-04'
 ];
+
+const INITIAL_EVENTS: Event[] = [];
 
 const INITIAL_GROUPS: Record<string, GuestGroup[]> = {};
 
@@ -96,10 +61,10 @@ function loadEventsFromStorage(): Event[] {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // Clean out legacy demo/phantom events (evt-101, evt-102, evt-principal-01) from browser storage
-        const cleaned = parsed.filter(e => e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01');
+        // Clean out legacy demo/phantom events from browser storage
+        const cleaned = parsed.filter(e => !FAKE_EVENT_IDS.includes(e.id));
         setTimeout(() => {
-          autoSyncEventsToServer();
+          syncAllWorkspaceLocalDataToServerAsync();
         }, 150);
         return cleaned;
       }
@@ -107,21 +72,20 @@ function loadEventsFromStorage(): Event[] {
   } catch (err) {
     console.warn('[EventsStore] Failed to load from localStorage', err);
   }
-  saveEventsToStorage(INITIAL_EVENTS);
   return INITIAL_EVENTS;
 }
 
-export function autoSyncEventsToServer(workspaceId?: string) {
+export async function syncAllWorkspaceLocalDataToServerAsync(workspaceId?: string): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
     const store = getEventsStore();
     const deletedIds = getDeletedEventIdsFromStorage();
     
     // Normalize any orphan alias events for Weddings Co
-    if (workspaceId === 'ws-weddingsco-appqsop') {
+    if (workspaceId === 'ws-weddingsco-appqsop' || !workspaceId) {
       let migrated = false;
       store.forEach(e => {
-        if (e.workspace_id === 'ws-appqsopgmailcom' || (e.workspace_id === 'ws-a-1111' && store.length <= 4)) {
+        if (e.workspace_id === 'ws-appqsopgmailcom' || e.workspace_id === 'ws-a-1111' || e.workspace_id === 'default' || !e.workspace_id) {
           e.workspace_id = 'ws-weddingsco-appqsop';
           migrated = true;
         }
@@ -133,32 +97,90 @@ export function autoSyncEventsToServer(workspaceId?: string) {
 
     const validEvents = store.filter(e => 
       !deletedIds.includes(e.id) && 
-      e.id !== 'evt-101' && 
-      e.id !== 'evt-102' && 
-      e.id !== 'evt-principal-01' &&
+      !FAKE_EVENT_IDS.includes(e.id) &&
       (!workspaceId || e.workspace_id === workspaceId)
     );
 
     if (validEvents.length > 0) {
-      // 1. Instant Batch Upload
-      fetch('/api/events/sync', {
+      // 1. Instant Batch Upload to Server/Supabase
+      await fetch('/api/events/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'SYNC_ALL_EVENTS', events: validEvents }),
       }).catch(() => {});
 
-      // 2. Individual Safe Push
-      validEvents.forEach(evt => {
-        fetch('/api/events/sync', {
+      // 2. Individual Safe Push to Supabase
+      for (const evt of validEvents) {
+        await fetch('/api/events/sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'SYNC_EVENT', event: evt }),
         }).catch(() => {});
-      });
+      }
+
+      // 3. Deep Sync: Tables, Assignments, Venue Elements, Groups, Cuts for all local events
+      try {
+        const rawTables = localStorage.getItem('eventcontrol_tables');
+        const rawAssignments = localStorage.getItem('eventcontrol_table_assignments');
+        const rawVenue = localStorage.getItem('eventcontrol_venue_elements');
+        const rawGroups = localStorage.getItem('eventcontrol_guest_groups');
+        const rawCuts = localStorage.getItem('eventcontrol_cuts');
+
+        const tablesMap = rawTables ? JSON.parse(rawTables) : {};
+        const assignmentsMap = rawAssignments ? JSON.parse(rawAssignments) : {};
+        const venueMap = rawVenue ? JSON.parse(rawVenue) : {};
+        const groupsMap = rawGroups ? JSON.parse(rawGroups) : {};
+        const cutsMap = rawCuts ? JSON.parse(rawCuts) : {};
+
+        for (const evt of validEvents) {
+          const evTables = tablesMap[evt.id];
+          const evAssignments = assignmentsMap[evt.id];
+          if ((Array.isArray(evTables) && evTables.length > 0) || (Array.isArray(evAssignments) && evAssignments.length > 0)) {
+            await fetch('/api/events/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'SYNC_TABLES', eventId: evt.id, tables: evTables || [], assignments: evAssignments || [] }),
+            }).catch(() => {});
+          }
+
+          const evVenue = venueMap[evt.id];
+          if (Array.isArray(evVenue) && evVenue.length > 0) {
+            await fetch('/api/events/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'SYNC_VENUE_ELEMENTS', eventId: evt.id, venueElements: evVenue }),
+            }).catch(() => {});
+          }
+
+          const evGroups = groupsMap[evt.id];
+          if (Array.isArray(evGroups) && evGroups.length > 0) {
+            await fetch('/api/events/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'SYNC_GROUPS', eventId: evt.id, groups: evGroups }),
+            }).catch(() => {});
+          }
+
+          const evCuts = cutsMap[evt.id];
+          if (Array.isArray(evCuts) && evCuts.length > 0) {
+            await fetch('/api/events/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'SYNC_CUTS', eventId: evt.id, cuts: evCuts }),
+            }).catch(() => {});
+          }
+        }
+      } catch (subErr) {
+        console.warn('[Sync Deep Workspace Data Warning]', subErr);
+      }
     }
   } catch (e) {
-    console.warn('[autoSyncEventsToServer Error]', e);
+    console.warn('[syncAllWorkspaceLocalDataToServerAsync Error]', e);
   }
+}
+
+export function autoSyncEventsToServer(workspaceId?: string) {
+  syncAllWorkspaceLocalDataToServerAsync(workspaceId);
 }
 
 function saveEventsToStorage(events: Event[]) {
@@ -168,7 +190,7 @@ function saveEventsToStorage(events: Event[]) {
       localStorage.setItem(EVENTS_STORAGE_KEY, JSON.stringify(events));
       if (autoSyncTimer) clearTimeout(autoSyncTimer);
       autoSyncTimer = setTimeout(() => {
-        autoSyncEventsToServer();
+        syncAllWorkspaceLocalDataToServerAsync();
       }, 150);
     } catch (err) {
       console.warn('[EventsStore] Failed to save to localStorage', err);
@@ -227,12 +249,12 @@ export function getWorkspaceEvents(workspaceId: string): Event[] {
 
   // If zero events found for Weddings Co, check alias workspace
   if (res.length === 0 && workspaceId === 'ws-weddingsco-appqsop') {
-    res = store.filter(e => e.workspace_id === 'ws-appqsopgmailcom' || (e.workspace_id === 'ws-a-1111' && store.length <= 4));
+    res = store.filter(e => e.workspace_id === 'ws-appqsopgmailcom' || e.workspace_id === 'ws-a-1111' || e.workspace_id === 'default' || !e.workspace_id);
     res.forEach(e => { e.workspace_id = 'ws-weddingsco-appqsop'; });
   }
 
   return res
-    .filter(e => !deletedIds.includes(e.id) && e.id !== 'evt-101' && e.id !== 'evt-102' && e.id !== 'evt-principal-01')
+    .filter(e => !deletedIds.includes(e.id) && !FAKE_EVENT_IDS.includes(e.id))
     .sort((a, b) => new Date(b.created_at || b.event_date || 0).getTime() - new Date(a.created_at || a.event_date || 0).getTime());
 }
 
@@ -255,16 +277,12 @@ export async function getWorkspaceEventsAsync(workspaceId: string, userEmail?: s
         const updatedDeletedIds = getDeletedEventIdsFromStorage();
 
         const serverEvents = data.events.filter((e: Event) => 
-          e.id !== 'evt-101' && 
-          e.id !== 'evt-102' && 
-          e.id !== 'evt-principal-01' &&
+          !FAKE_EVENT_IDS.includes(e.id) &&
           !updatedDeletedIds.includes(e.id)
         );
 
         const localStore = getEventsStore().filter(e => 
-          e.id !== 'evt-101' && 
-          e.id !== 'evt-102' && 
-          e.id !== 'evt-principal-01' &&
+          !FAKE_EVENT_IDS.includes(e.id) &&
           !updatedDeletedIds.includes(e.id)
         );
 
@@ -272,7 +290,7 @@ export async function getWorkspaceEventsAsync(workspaceId: string, userEmail?: s
         const isWeddingsCo = workspaceId === 'ws-weddingsco-appqsop';
         const localWorkspaceEvents = localStore.filter(e => 
           e.workspace_id === workspaceId || 
-          (isWeddingsCo && (e.workspace_id === 'ws-appqsopgmailcom' || (e.workspace_id === 'ws-a-1111' && localStore.length <= 4)))
+          (isWeddingsCo && (e.workspace_id === 'ws-appqsopgmailcom' || e.workspace_id === 'ws-a-1111' || e.workspace_id === 'default' || !e.workspace_id))
         );
         localWorkspaceEvents.forEach(e => {
           if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
@@ -292,6 +310,7 @@ export async function getWorkspaceEventsAsync(workspaceId: string, userEmail?: s
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'SYNC_ALL_EVENTS', events: unsyncedLocalEvents }),
           }).catch(() => {});
+          syncAllWorkspaceLocalDataToServerAsync(workspaceId);
         }
 
         // Keep local events from other workspaces
@@ -336,7 +355,7 @@ export async function getEventByIdAsync(eventId: string, workspaceId?: string): 
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
-      if (data.success && data.event && data.event.id !== 'evt-principal-01') {
+      if (data.success && data.event && !FAKE_EVENT_IDS.includes(data.event.id)) {
         const store = getEventsStore();
         const idx = store.findIndex(e => e.id === data.event.id);
         if (idx !== -1) {

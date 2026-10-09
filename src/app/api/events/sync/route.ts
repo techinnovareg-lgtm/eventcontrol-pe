@@ -322,52 +322,17 @@ const TEMP_DB_FILE = path.join(process.cwd(), 'data', 'server_events_db.json.tmp
 
 let isDbLoaded = false;
 
-const INITIAL_SERVER_EVENTS: Event[] = [
-  {
-    id: 'evt-weddingsco-01',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Valentina & Sebastián - Gala Imperial',
-    event_type: 'Boda / Gala',
-    event_date: '2026-11-20',
-    venue_name: 'Hotel Westin Lima & Convention Center',
-    status: 'ACTIVO',
-    created_at: '2026-09-08T10:00:00.000Z',
-    updated_at: '2026-09-08T10:00:00.000Z'
-  },
-  {
-    id: 'evt-weddingsco-02',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Camila & Mateo - Recepción Campestre',
-    event_type: 'Boda / Gala',
-    event_date: '2026-12-12',
-    venue_name: 'Hacienda Villa Hermosa - Cieneguilla',
-    status: 'ACTIVO',
-    created_at: '2026-09-10T14:30:00.000Z',
-    updated_at: '2026-09-10T14:30:00.000Z'
-  },
-  {
-    id: 'evt-weddingsco-03',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Civil & Fiesta Íntima Sofía & Diego',
-    event_type: 'Boda / Gala',
-    event_date: '2027-01-15',
-    venue_name: 'Terraza Mirador Costa Verde',
-    status: 'ACTIVO',
-    created_at: '2026-09-15T16:00:00.000Z',
-    updated_at: '2026-09-15T16:00:00.000Z'
-  },
-  {
-    id: 'evt-weddingsco-04',
-    workspace_id: 'ws-weddingsco-appqsop',
-    name: 'Boda Religiosa & Cóctel VIP Lucía & Gabriel',
-    event_type: 'Boda / Gala',
-    event_date: '2027-02-20',
-    venue_name: 'Salón Bellavista & Jardines de San Francisco',
-    status: 'BORRADOR',
-    created_at: '2026-09-20T18:00:00.000Z',
-    updated_at: '2026-09-20T18:00:00.000Z'
-  }
+const FAKE_EVENT_IDS = [
+  'evt-101', 
+  'evt-102', 
+  'evt-principal-01', 
+  'evt-weddingsco-01', 
+  'evt-weddingsco-02', 
+  'evt-weddingsco-03', 
+  'evt-weddingsco-04'
 ];
+
+const INITIAL_SERVER_EVENTS: Event[] = [];
 
 function loadDbFromFile() {
   if (isDbLoaded) return;
@@ -383,9 +348,7 @@ function loadDbFromFile() {
           }
           if (Array.isArray(parsed.events)) {
             const fileEvents = parsed.events.filter((e: Event) => 
-              e.id !== 'evt-101' && 
-              e.id !== 'evt-102' && 
-              e.id !== 'evt-principal-01' &&
+              !FAKE_EVENT_IDS.includes(e.id) &&
               !globalServerDeletedEventsStore.includes(e.id)
             );
             fileEvents.forEach((fe: Event) => {
@@ -398,9 +361,7 @@ function loadDbFromFile() {
             });
           }
           if (parsed.groups && typeof parsed.groups === 'object') {
-            delete parsed.groups['evt-101'];
-            delete parsed.groups['evt-102'];
-            delete parsed.groups['evt-principal-01'];
+            FAKE_EVENT_IDS.forEach(id => delete parsed.groups[id]);
             Object.entries(parsed.groups).forEach(([evtId, grps]) => {
               if (Array.isArray(grps) && grps.length > 0) {
                 globalServerGroupsStore[evtId] = grps as GuestGroup[];
@@ -410,9 +371,7 @@ function loadDbFromFile() {
             });
           }
           if (parsed.tables && typeof parsed.tables === 'object') {
-            delete parsed.tables['evt-101'];
-            delete parsed.tables['evt-102'];
-            delete parsed.tables['evt-principal-01'];
+            FAKE_EVENT_IDS.forEach(id => delete parsed.tables[id]);
             Object.entries(parsed.tables).forEach(([evtId, tbls]) => {
               if (Array.isArray(tbls) && tbls.length > 0) {
                 globalServerTablesStore[evtId] = tbls as Table[];
@@ -422,9 +381,7 @@ function loadDbFromFile() {
             });
           }
           if (parsed.assignments && typeof parsed.assignments === 'object') {
-            delete parsed.assignments['evt-101'];
-            delete parsed.assignments['evt-102'];
-            delete parsed.assignments['evt-principal-01'];
+            FAKE_EVENT_IDS.forEach(id => delete parsed.assignments[id]);
             Object.entries(parsed.assignments).forEach(([evtId, asgns]) => {
               if (Array.isArray(asgns) && asgns.length > 0) {
                 globalServerAssignmentsStore[evtId] = asgns as TableAssignment[];
@@ -434,9 +391,7 @@ function loadDbFromFile() {
             });
           }
           if (parsed.cuts && typeof parsed.cuts === 'object') {
-            delete parsed.cuts['evt-101'];
-            delete parsed.cuts['evt-102'];
-            delete parsed.cuts['evt-principal-01'];
+            FAKE_EVENT_IDS.forEach(id => delete parsed.cuts[id]);
             Object.entries(parsed.cuts).forEach(([evtId, cts]) => {
               if (Array.isArray(cts) && cts.length > 0) {
                 globalServerCutsStore[evtId] = cts as Cut[];
@@ -446,9 +401,7 @@ function loadDbFromFile() {
             });
           }
           if (parsed.checkIns && typeof parsed.checkIns === 'object') {
-            delete parsed.checkIns['evt-101'];
-            delete parsed.checkIns['evt-102'];
-            delete parsed.checkIns['evt-principal-01'];
+            FAKE_EVENT_IDS.forEach(id => delete parsed.checkIns[id]);
             Object.entries(parsed.checkIns).forEach(([evtId, chks]) => {
               if (Array.isArray(chks) && chks.length > 0) {
                 globalServerCheckInsStore[evtId] = chks as CheckIn[];
@@ -458,9 +411,7 @@ function loadDbFromFile() {
             });
           }
           if (parsed.venueElements && typeof parsed.venueElements === 'object') {
-            delete parsed.venueElements['evt-101'];
-            delete parsed.venueElements['evt-102'];
-            delete parsed.venueElements['evt-principal-01'];
+            FAKE_EVENT_IDS.forEach(id => delete parsed.venueElements[id]);
             Object.entries(parsed.venueElements).forEach(([evtId, elems]) => {
               if (Array.isArray(elems) && elems.length > 0) {
                 globalServerVenueElementsStore[evtId] = elems as VenueElement[];
@@ -476,11 +427,15 @@ function loadDbFromFile() {
     console.warn('[Server DB Load Warning - Retrying on next request]', e);
   }
 
-  // Ensure default server events are always available even on fresh container start
-  INITIAL_SERVER_EVENTS.forEach(initEvt => {
-    if (!globalServerDeletedEventsStore.includes(initEvt.id) && !globalServerEventsStore.some(e => e.id === initEvt.id)) {
-      globalServerEventsStore.push(initEvt);
-    }
+  // Scrub any lingering fake events from in-memory store
+  globalServerEventsStore = globalServerEventsStore.filter(e => !FAKE_EVENT_IDS.includes(e.id));
+  FAKE_EVENT_IDS.forEach(fakeId => {
+    delete globalServerGroupsStore[fakeId];
+    delete globalServerTablesStore[fakeId];
+    delete globalServerAssignmentsStore[fakeId];
+    delete globalServerCutsStore[fakeId];
+    delete globalServerCheckInsStore[fakeId];
+    delete globalServerVenueElementsStore[fakeId];
   });
 }
 
@@ -707,9 +662,9 @@ export async function GET(req: Request) {
 
     const isWeddingsCo = workspaceId === 'ws-weddingsco-appqsop';
     const localEvents = globalServerEventsStore.filter(e => {
-      if (globalServerDeletedEventsStore.includes(e.id)) return false;
+      if (globalServerDeletedEventsStore.includes(e.id) || FAKE_EVENT_IDS.includes(e.id)) return false;
       if (e.workspace_id === workspaceId) return true;
-      if (isWeddingsCo && (e.workspace_id === 'ws-appqsopgmailcom' || e.workspace_id === 'ws-a-1111')) {
+      if (isWeddingsCo && (e.workspace_id === 'ws-appqsopgmailcom' || e.workspace_id === 'ws-a-1111' || e.workspace_id === 'default' || !e.workspace_id)) {
         e.workspace_id = 'ws-weddingsco-appqsop';
         return true;
       }
@@ -718,19 +673,19 @@ export async function GET(req: Request) {
     const mergedEventsMap = new Map<string, Event>();
 
     onlineEvents.forEach(e => {
-      if (!globalServerDeletedEventsStore.includes(e.id)) {
+      if (!globalServerDeletedEventsStore.includes(e.id) && !FAKE_EVENT_IDS.includes(e.id)) {
         if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
         mergedEventsMap.set(e.id, e);
       }
     });
     supabaseEvents.forEach(e => {
-      if (!globalServerDeletedEventsStore.includes(e.id)) {
+      if (!globalServerDeletedEventsStore.includes(e.id) && !FAKE_EVENT_IDS.includes(e.id)) {
         if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
         mergedEventsMap.set(e.id, e);
       }
     });
     localEvents.forEach(e => {
-      if (!globalServerDeletedEventsStore.includes(e.id)) {
+      if (!globalServerDeletedEventsStore.includes(e.id) && !FAKE_EVENT_IDS.includes(e.id)) {
         if (isWeddingsCo) e.workspace_id = 'ws-weddingsco-appqsop';
         mergedEventsMap.set(e.id, e);
       }
@@ -761,13 +716,13 @@ export async function GET(req: Request) {
   const mergedAllMap = new Map<string, Event>();
 
   onlineAll.forEach(e => {
-    if (!globalServerDeletedEventsStore.includes(e.id)) {
+    if (!globalServerDeletedEventsStore.includes(e.id) && !FAKE_EVENT_IDS.includes(e.id)) {
       mergedAllMap.set(e.id, e);
     }
   });
 
   globalServerEventsStore.forEach(e => {
-    if (!globalServerDeletedEventsStore.includes(e.id)) {
+    if (!globalServerDeletedEventsStore.includes(e.id) && !FAKE_EVENT_IDS.includes(e.id)) {
       mergedAllMap.set(e.id, e);
     }
   });
@@ -792,7 +747,7 @@ export async function POST(req: Request) {
     if (action === 'SYNC_ALL_EVENTS' && Array.isArray(body.events)) {
       const incomingEvents: Event[] = body.events;
       for (const ev of incomingEvents) {
-        if (!globalServerDeletedEventsStore.includes(ev.id)) {
+        if (!globalServerDeletedEventsStore.includes(ev.id) && !FAKE_EVENT_IDS.includes(ev.id)) {
           const idx = globalServerEventsStore.findIndex(e => e.id === ev.id);
           if (idx !== -1) {
             globalServerEventsStore[idx] = { ...globalServerEventsStore[idx], ...ev };
@@ -807,8 +762,8 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_EVENT' && event) {
-      if (globalServerDeletedEventsStore.includes(event.id)) {
-        return NextResponse.json({ success: false, message: 'Evento fue eliminado previamente' });
+      if (globalServerDeletedEventsStore.includes(event.id) || FAKE_EVENT_IDS.includes(event.id)) {
+        return NextResponse.json({ success: false, message: 'Evento inválido o eliminado' });
       }
       const idx = globalServerEventsStore.findIndex(e => e.id === event.id);
       if (idx !== -1) {

@@ -34,6 +34,16 @@ const TABLES_STORAGE_KEY = 'eventcontrol_tables';
 const ASSIGNMENTS_STORAGE_KEY = 'eventcontrol_table_assignments';
 const VENUE_ELEMENTS_STORAGE_KEY = 'eventcontrol_venue_elements';
 
+const FAKE_EVENT_IDS = [
+  'evt-101', 
+  'evt-102', 
+  'evt-principal-01', 
+  'evt-weddingsco-01', 
+  'evt-weddingsco-02', 
+  'evt-weddingsco-03', 
+  'evt-weddingsco-04'
+];
+
 const INITIAL_TABLES: Record<string, Table[]> = {};
 const INITIAL_ASSIGNMENTS: Record<string, TableAssignment[]> = {};
 const INITIAL_VENUE_ELEMENTS: Record<string, VenueElement[]> = {};
@@ -119,8 +129,7 @@ function loadTablesFromStorage(): Record<string, Table[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        delete parsed['evt-101'];
-        delete parsed['evt-102'];
+        FAKE_EVENT_IDS.forEach(id => delete parsed[id]);
         tablesMemoryStore = parsed;
         return parsed;
       }
@@ -151,8 +160,7 @@ function loadAssignmentsFromStorage(): Record<string, TableAssignment[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        delete parsed['evt-101'];
-        delete parsed['evt-102'];
+        FAKE_EVENT_IDS.forEach(id => delete parsed[id]);
         assignmentsMemoryStore = parsed;
         return parsed;
       }
@@ -183,8 +191,7 @@ function loadVenueElementsFromStorage(): Record<string, VenueElement[]> {
     if (raw !== null) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        delete parsed['evt-101'];
-        delete parsed['evt-102'];
+        FAKE_EVENT_IDS.forEach(id => delete parsed[id]);
         venueElementsMemoryStore = parsed;
         return parsed;
       }
