@@ -137,7 +137,7 @@ async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
   if (!url || !key || !eventId) return {};
   const result: any = {};
   try {
-    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*`, {
+    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*&order=created_at.desc`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
       cache: 'no-store'
     });
@@ -147,10 +147,10 @@ async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
         rows.forEach(r => {
           try {
             const data = JSON.parse(r.device_info);
-            if (r.scanner_staff_name === `SYS_TABLES_${eventId}`) result.tables = data;
-            if (r.scanner_staff_name === `SYS_ASSIGNMENTS_${eventId}`) result.assignments = data;
-            if (r.scanner_staff_name === `SYS_GROUPS_${eventId}`) result.groups = data;
-            if (r.scanner_staff_name === `SYS_VENUE_${eventId}`) result.venueElements = data;
+            if (r.scanner_staff_name === `SYS_TABLES_${eventId}` && !result.tables) result.tables = data;
+            if (r.scanner_staff_name === `SYS_ASSIGNMENTS_${eventId}` && !result.assignments) result.assignments = data;
+            if (r.scanner_staff_name === `SYS_GROUPS_${eventId}` && !result.groups) result.groups = data;
+            if (r.scanner_staff_name === `SYS_VENUE_${eventId}` && !result.venueElements) result.venueElements = data;
           } catch (e) {}
         });
       }
@@ -202,7 +202,7 @@ async function persistTablesDataToSupabase(
 
   for (const p of payloads) {
     try {
-      await fetch(`${url}/rest/v1/check_ins`, {
+      const res = await fetch(`${url}/rest/v1/check_ins`, {
         method: 'POST',
         headers: {
           'apikey': key,
@@ -212,6 +212,21 @@ async function persistTablesDataToSupabase(
         },
         body: JSON.stringify(p)
       });
+      if (!res.ok) {
+        await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=eq.${p.scanner_staff_name}`, {
+          method: 'DELETE',
+          headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+        }).catch(() => {});
+        await fetch(`${url}/rest/v1/check_ins`, {
+          method: 'POST',
+          headers: {
+            'apikey': key,
+            'Authorization': `Bearer ${key}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(p)
+        }).catch(() => {});
+      }
     } catch (e) {}
   }
 }
@@ -707,20 +722,9 @@ export async function POST(req: Request) {
     }
 
     if (action === 'SYNC_VENUE_ELEMENTS' && eventId && Array.isArray(venueElements)) {
-      if (venueElements.length > 0) {
-        if (!globalServerVenueElementsStore[eventId]) globalServerVenueElementsStore[eventId] = [];
-        const currentElems = globalServerVenueElementsStore[eventId];
-        venueElements.forEach((ve: VenueElement) => {
-          const idx = currentElems.findIndex(x => x.id === ve.id);
-          if (idx !== -1) {
-            currentElems[idx] = { ...currentElems[idx], ...ve };
-          } else {
-            currentElems.push(ve);
-          }
-        });
-      }
+      globalServerVenueElementsStore[eventId] = venueElements;
       saveDbToFile();
-      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, globalServerVenueElementsStore[eventId]);
+      await persistTablesDataToSupabase(eventId, undefined, undefined, undefined, venueElements);
       return NextResponse.json({ success: true });
     }
 

@@ -358,30 +358,15 @@ export function getEventTables(eventId: string): Table[] {
 
 export async function getEventTablesAsync(eventId: string): Promise<Table[]> {
   const store = loadTablesFromStorage();
-  const localTables = store[eventId] || [];
 
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.tables)) {
-        let requiresResync = false;
-        const merged: Table[] = [...data.tables];
-        localTables.forEach(lt => {
-          if (!merged.some(mt => mt.id === lt.id)) {
-            merged.push(lt);
-            requiresResync = true;
-          }
-        });
-
-        store[eventId] = merged;
+        store[eventId] = data.tables;
         saveTablesToStorage(store);
-
-        if (requiresResync && merged.length > 0) {
-          syncTablesToServerAsync(eventId, merged);
-        }
-
-        return merged;
+        return data.tables;
       }
     }
   } catch (err) {}
@@ -395,47 +380,15 @@ export function getEventTableAssignments(eventId: string): TableAssignment[] {
 
 export async function getEventTableAssignmentsAsync(eventId: string): Promise<TableAssignment[]> {
   const store = loadAssignmentsFromStorage();
-  const localAssignments = store[eventId] || [];
 
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.assignments)) {
-        if (data.assignments.length === 0 && localAssignments.length > 0) {
-          syncTablesToServerAsync(eventId, undefined, localAssignments);
-          return localAssignments;
-        }
-
-        const mergedMap = new Map<string, TableAssignment>();
-        data.assignments.forEach((sa: TableAssignment) => {
-          const key = sa.id || `${sa.group_id}_${sa.companion_id || 'main'}`;
-          mergedMap.set(key, sa);
-        });
-
-        let requiresResync = false;
-        localAssignments.forEach(la => {
-          const key = la.id || `${la.group_id}_${la.companion_id || 'main'}`;
-          const existing = mergedMap.get(key);
-          if (!existing) {
-            mergedMap.set(key, la);
-            requiresResync = true;
-          } else {
-            if (la.companion_id || la.guest_name_label) {
-              mergedMap.set(key, { ...existing, ...la });
-            }
-          }
-        });
-
-        const finalAssignments = Array.from(mergedMap.values());
-        store[eventId] = finalAssignments;
+        store[eventId] = data.assignments;
         saveAssignmentsToStorage(store);
-
-        if (requiresResync && finalAssignments.length > 0) {
-          syncTablesToServerAsync(eventId, undefined, finalAssignments);
-        }
-
-        return finalAssignments;
+        return data.assignments;
       }
     }
   } catch (err) {}
@@ -557,30 +510,15 @@ export function getEventVenueElements(eventId: string): VenueElement[] {
 
 export async function getEventVenueElementsAsync(eventId: string): Promise<VenueElement[]> {
   const store = loadVenueElementsFromStorage();
-  const localElements = store[eventId] || [];
 
   try {
     const res = await fetch(`/api/events/sync?eventId=${encodeURIComponent(eventId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.venueElements)) {
-        let requiresResync = false;
-        const merged: VenueElement[] = [...data.venueElements];
-        localElements.forEach(le => {
-          if (!merged.some(me => me.id === le.id)) {
-            merged.push(le);
-            requiresResync = true;
-          }
-        });
-
-        store[eventId] = merged;
+        store[eventId] = data.venueElements;
         saveVenueElementsToStorage(store);
-
-        if (requiresResync && merged.length > 0) {
-          syncVenueElementsToServerAsync(eventId, merged);
-        }
-
-        return merged;
+        return data.venueElements;
       }
     }
   } catch (err) {}
@@ -623,7 +561,7 @@ export function createVenueElement(
 
   store[eventId].push(newElem);
   saveVenueElementsToStorage(store);
-  syncVenueElementsToServerAsync(eventId);
+  syncVenueElementsToServerAsync(eventId, store[eventId]);
   return newElem;
 }
 
@@ -639,7 +577,6 @@ export async function createVenueElementAsync(
   posY = 320
 ): Promise<VenueElement> {
   const newElem = createVenueElement(eventId, workspaceId, type, label, size, orientation, shape, posX, posY);
-  await syncVenueElementsToServerAsync(eventId);
   return newElem;
 }
 
@@ -651,14 +588,13 @@ export function updateVenueElementPosition(eventId: string, elementId: string, p
       elem.pos_x = posX;
       elem.pos_y = posY;
       saveVenueElementsToStorage(store);
-      syncVenueElementsToServerAsync(eventId);
+      syncVenueElementsToServerAsync(eventId, store[eventId]);
     }
   }
 }
 
 export async function updateVenueElementPositionAsync(eventId: string, elementId: string, posX: number, posY: number): Promise<void> {
   updateVenueElementPosition(eventId, elementId, posX, posY);
-  await syncVenueElementsToServerAsync(eventId);
 }
 
 export function updateVenueElement(
@@ -682,7 +618,7 @@ export function updateVenueElement(
         height: dims.height,
       });
       saveVenueElementsToStorage(store);
-      syncVenueElementsToServerAsync(eventId);
+      syncVenueElementsToServerAsync(eventId, store[eventId]);
       return elem;
     }
   }
@@ -695,7 +631,6 @@ export async function updateVenueElementAsync(
   data: Partial<Pick<VenueElement, 'label' | 'size' | 'orientation' | 'shape' | 'width' | 'height'>>
 ): Promise<VenueElement | null> {
   const res = updateVenueElement(eventId, elementId, data);
-  await syncVenueElementsToServerAsync(eventId);
   return res;
 }
 
@@ -716,5 +651,4 @@ export function deleteVenueElement(eventId: string, elementId: string): void {
 
 export async function deleteVenueElementAsync(eventId: string, elementId: string): Promise<void> {
   deleteVenueElement(eventId, elementId);
-  await syncVenueElementsToServerAsync(eventId);
 }
