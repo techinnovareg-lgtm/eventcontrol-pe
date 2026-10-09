@@ -60,30 +60,28 @@ export default function TablesManagementPage() {
               if (Array.isArray(data.groups)) {
                 setGroups(prev => (data.groups.length === 0 && prev.length > 0 ? prev : data.groups));
               }
-              if (Array.isArray(data.tables)) {
-                if (data.tables.length > 0) {
-                  cacheEventTablesLocally(eventId, data.tables);
-                  setTables(data.tables);
-                  setTablePositions(prev => {
-                    const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
-                    data.tables.forEach((t: Table, i: number) => {
-                      const posX = typeof t.pos_x === 'number' && !isNaN(t.pos_x) ? t.pos_x : (140 + (i % 4) * 280);
-                      const posY = typeof t.pos_y === 'number' && !isNaN(t.pos_y) ? t.pos_y : (140 + Math.floor(i / 4) * 200);
-                      updatedPos[t.id] = {
-                        x: posX,
-                        y: posY,
-                        shape: updatedPos[t.id]?.shape || 'ROUND',
-                      };
-                    });
-                    return updatedPos;
+              if (Array.isArray(data.tables) && data.tables.length > 0) {
+                cacheEventTablesLocally(eventId, data.tables);
+                setTables(data.tables);
+                setTablePositions(prev => {
+                  const updatedPos: Record<string, { x: number; y: number; shape: TableShape }> = { ...prev };
+                  data.tables.forEach((t: Table, i: number) => {
+                    const posX = typeof t.pos_x === 'number' && !isNaN(t.pos_x) ? t.pos_x : (140 + (i % 4) * 280);
+                    const posY = typeof t.pos_y === 'number' && !isNaN(t.pos_y) ? t.pos_y : (140 + Math.floor(i / 4) * 200);
+                    updatedPos[t.id] = {
+                      x: posX,
+                      y: posY,
+                      shape: updatedPos[t.id]?.shape || 'ROUND',
+                    };
                   });
-                }
+                  return updatedPos;
+                });
               }
-              if (Array.isArray(data.assignments)) {
+              if (Array.isArray(data.assignments) && data.assignments.length > 0) {
                 cacheEventAssignmentsLocally(eventId, data.assignments);
                 setAssignments(data.assignments);
               }
-              if (Array.isArray(data.venueElements)) {
+              if (Array.isArray(data.venueElements) && data.venueElements.length > 0) {
                 cacheEventVenueElementsLocally(eventId, data.venueElements);
                 setVenueElements(data.venueElements);
               }
@@ -227,7 +225,7 @@ export default function TablesManagementPage() {
         }
       }
 
-      if (Array.isArray(data.assignments)) {
+      if (Array.isArray(data.assignments) && data.assignments.length > 0) {
         cacheEventAssignmentsLocally(eventId, data.assignments);
         setAssignments(data.assignments);
       }
@@ -236,7 +234,7 @@ export default function TablesManagementPage() {
         setGroups(prev => (data.groups.length === 0 && prev.length > 0 ? prev : data.groups));
       }
 
-      if (Array.isArray(data.venueElements)) {
+      if (Array.isArray(data.venueElements) && data.venueElements.length > 0) {
         cacheEventVenueElementsLocally(eventId, data.venueElements);
         setVenueElements(data.venueElements);
       }

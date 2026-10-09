@@ -109,7 +109,7 @@ async function persistEventToSupabase(event: Event) {
   if (!url || !key || !event || !event.workspace_id) return;
   try {
     const uuid = generateDeterministicUUID(`event_${event.id}`);
-    await fetch(`${url}/rest/v1/check_ins`, {
+    const res = await fetch(`${url}/rest/v1/check_ins`, {
       method: 'POST',
       headers: {
         'apikey': key,
@@ -123,6 +123,25 @@ async function persistEventToSupabase(event: Event) {
         device_info: JSON.stringify(event)
       })
     });
+    if (!res.ok) {
+      await fetch(`${url}/rest/v1/check_ins?id=eq.${uuid}`, {
+        method: 'DELETE',
+        headers: { 'apikey': key, 'Authorization': `Bearer ${key}` }
+      }).catch(() => {});
+      await fetch(`${url}/rest/v1/check_ins`, {
+        method: 'POST',
+        headers: {
+          'apikey': key,
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: uuid,
+          scanner_staff_name: `SYS_EVENT_SYNC_${event.workspace_id}`,
+          device_info: JSON.stringify(event)
+        })
+      }).catch(() => {});
+    }
   } catch (err) {}
 }
 
@@ -137,7 +156,7 @@ async function fetchOnlineTablesDataFromSupabase(eventId: string): Promise<{
   if (!url || !key || !eventId) return {};
   const result: any = {};
   try {
-    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*&order=created_at.desc`, {
+    const res = await fetch(`${url}/rest/v1/check_ins?scanner_staff_name=in.(SYS_TABLES_${eventId},SYS_ASSIGNMENTS_${eventId},SYS_GROUPS_${eventId},SYS_VENUE_${eventId})&select=*&order=scanned_at.desc`, {
       headers: { 'apikey': key, 'Authorization': `Bearer ${key}` },
       cache: 'no-store'
     });
