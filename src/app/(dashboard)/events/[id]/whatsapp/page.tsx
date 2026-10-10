@@ -213,8 +213,8 @@ export default function WhatsAppMessagingPage() {
   const getGroupDetails = (group: any) => {
     const token = getOrCreateGroupQRToken(group.id, eventId, currentWorkspaceId);
     const qrUrl = typeof window !== 'undefined' 
-      ? `${window.location.origin}/scan?token=${token.token_hash}` 
-      : `https://eventcontrol-pe.vercel.app/scan?token=${token.token_hash}`;
+      ? `${window.location.origin}/pass?token=${token.token_hash}&event=${eventId}` 
+      : `https://eventcontrol-pe.vercel.app/pass?token=${token.token_hash}&event=${eventId}`;
 
     const asgn = assignments.find(a => a.group_id === group.id);
     let tableName = 'Sin Mesa Asignada';

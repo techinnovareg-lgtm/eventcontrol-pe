@@ -341,6 +341,12 @@ export default function MobileScanCheckInPage() {
     }
   };
 
+  useEffect(() => {
+    if (scannedInput && groups.length > 0 && !matchedGroup) {
+      processScannedCode(scannedInput);
+    }
+  }, [groups, scannedInput]);
+
   const checkPendingQueue = async () => {
     try {
       const count = await getPendingOfflineQueueCount(selectedEventId);

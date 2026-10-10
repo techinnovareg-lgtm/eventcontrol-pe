@@ -40,7 +40,7 @@ export default function QRManagementPage() {
   const [copiedTokenId, setCopiedTokenId] = useState<string | null>(null);
 
   const handleCopyLink = (tokenHash: string, id: string) => {
-    const qrUrl = `${window.location.origin}/scan?token=${tokenHash}`;
+    const qrUrl = `${window.location.origin}/pass?token=${tokenHash}&event=${eventId}`;
     navigator.clipboard.writeText(qrUrl);
     setCopiedTokenId(id);
     setTimeout(() => setCopiedTokenId(null), 2000);
@@ -180,7 +180,7 @@ export default function QRManagementPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => {
             const token = getOrCreateGroupQRToken(group.id, eventId, currentWorkspaceId);
-            const qrPayloadUrl = typeof window !== 'undefined' ? `${window.location.origin}/scan?token=${token.token_hash}` : `https://eventcontrol-pe.vercel.app/scan?token=${token.token_hash}`;
+            const qrPayloadUrl = typeof window !== 'undefined' ? `${window.location.origin}/pass?token=${token.token_hash}&event=${eventId}` : `https://eventcontrol-pe.vercel.app/pass?token=${token.token_hash}&event=${eventId}`;
 
             // Ensure companions exist if max_passes > 1
             const companionSlotsCount = Math.max(0, group.max_passes - 1);
