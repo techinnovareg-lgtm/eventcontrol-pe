@@ -1,14 +1,14 @@
 # DEPLOYMENT.md - GUÍA DE DESPLIEGUE A PRODUCCIÓN Y MANTENIMIENTO
 
-## 1. Visión General del Despliegue (Dominio Oficial: tech-innova.online)
+## 1. Visión General del Despliegue (Producción Oficial: eventcontrol-pe.vercel.app)
 
-La plataforma **EventControl.pe** desarrollada por **Tech Innova** está optimizada para desplegarse con alto rendimiento y escalabilidad en la nube combinando **Vercel** (Frontend Next.js PWA) y **Supabase** (Backend PostgreSQL + Auth Realtime), vinculada al dominio empresarial `tech-innova.online`.
+La plataforma **EventControl.pe** desarrollada por **Tech Innova** está optimizada para desplegarse con alto rendimiento y escalabilidad en la nube combinando **Vercel** (Frontend Next.js PWA) y **Supabase** (Backend PostgreSQL + Auth Realtime).
 
-- **Dominio Principal**: `https://tech-innova.online/`
-- **Subdominio de la App**: `https://eventcontrol.tech-innova.online` (o `app.tech-innova.online`)
+- **Dominio de Producción en Vivo**: `https://eventcontrol-pe.vercel.app`
 - **Frontend / PWA**: Vercel Cloud (Next.js 14 App Router + Service Worker PWA).
 - **Backend & Base de Datos**: Supabase PostgreSQL + Auth + Realtime Engine.
 - **Servicio de Correos 2FA**: Resend API / SMTP transaccional para `tech.innova.reg@gmail.com`.
+- **Hito Activo**: `Hito 4: Sincronización Cloud, Pases VIP Públicos, Maps y Despacho WhatsApp` (`hito-4-cloud-maps-whatsapp-v1.0`).
 
 ---
 

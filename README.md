@@ -2,11 +2,15 @@
 
 Plataforma Web SaaS Multi-tenant orientada a **Wedding Planners, organizadores de bodas y eventos sociales** para administrar la operación posterior a la confirmación de invitados.
 
+- 🌐 **Producción Oficial**: [https://eventcontrol-pe.vercel.app](https://eventcontrol-pe.vercel.app)
+- 📌 **Hito Más Reciente**: `Hito 4: Sincronización Cloud, Pases VIP Públicos, Maps y Despacho WhatsApp` (`hito-4-cloud-maps-whatsapp-v1.0`)
+
 ![EventControl SaaS Architecture](https://img.shields.io/badge/Architecture-PWA%20Offline--First%20%2B%20BaaS-emerald)
 ![Framework](https://img.shields.io/badge/Framework-Next.js%2014%20App%20Router-blue)
 ![Database](https://img.shields.io/badge/Database-PostgreSQL%2015%20%2B%20RLS-indigo)
+![Deploy](https://img.shields.io/badge/Production-Vercel%20Live-success)
 ![Cost](https://img.shields.io/badge/Deploy%20Cost-S%2F%200%20(Free%20Tier)-brightgreen)
-![Status](https://img.shields.io/badge/QA%20Status-100%25%20Passed%20(10%2F10)-success)
+![Milestone](https://img.shields.io/badge/Milestone-Hito%204%20(Oct%202026)-gold)
 
 ---
 
@@ -80,6 +84,15 @@ El desarrollador humano o evaluador puede probar la aplicación completa de prin
 - 🔒 **[SECURITY.md](file:///d:/Proyectos%20Desarrollo/Antigravity/HRA.estadistica/App_Asistencia_Evento/SECURITY.md)**: Aislamiento por Workspace, criptografía QR de 256 bits (Cero PII), RBAC de 5 roles y Ley 29733 (Perú).
 - 🗺️ **[ROADMAP.md](file:///d:/Proyectos%20Desarrollo/Antigravity/HRA.estadistica/App_Asistencia_Evento/ROADMAP.md)**: Hoja de ruta de 14 Fases y especificación de los 10 Casos Críticos de QA.
 - 🚀 **[DEPLOYMENT.md](file:///d:/Proyectos%20Desarrollo/Antigravity/HRA.estadistica/App_Asistencia_Evento/DEPLOYMENT.md)**: Guía paso a paso para despliegue en producción con Vercel + Supabase (Costo S/ 0).
+
+---
+
+## 🏆 Registro de Hitos Oficiales
+
+- 🥇 **Hito 4 (Actual - 10/10/2026)**: `hito-4-cloud-maps-whatsapp-v1.0` - Sincronización Cloud Multi-Dispositivo, Pases VIP 100% Públicos (`/pass`), Geolocalización Google Maps/Waze y Despacho Directo de WhatsApp sin pantallas intermedias.
+- 🥈 **Hito 3 (02/10/2026)**: `hito-3-whatsapp-mesas-seguridad-v1.0` - Despacho WhatsApp por Bloques, Edición Inline de Teléfonos, Protocolo de Mesas y Roles RBAC.
+- 🥉 **Hito 2 (12/09/2026)**: Estabilización Total de PWA y Check-in offline.
+- 🏅 **Hito 1 (04/09/2026)**: Lanzamiento de MVP y Arquitectura Base.
 
 ---
 
