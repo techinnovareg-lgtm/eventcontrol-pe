@@ -124,7 +124,7 @@ export default function AccountProfilePage() {
     const pass = resendWhatsAppMember.rawPass || resendWhatsAppMember.member.initialPassword || 'puerta2026';
     const text = encodeURIComponent(
       `Hola ${resendWhatsAppMember.member.name}, te recordamos tus credenciales de acceso a la plataforma EventControl.pe (${contractInfo.companyName}).\n\n` +
-      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
       `📧 Usuario/Correo: ${resendWhatsAppMember.member.email}\n` +
       `🔑 Contraseña: ${pass}\n` +
       `👤 Rol Asignado: ${resendWhatsAppMember.member.roleLabel}\n\n` +
@@ -138,7 +138,7 @@ export default function AccountProfilePage() {
     if (!createdMemberSuccess) return '#';
     const text = encodeURIComponent(
       `Hola ${createdMemberSuccess.member.name}, se ha creado tu acceso a la plataforma EventControl.pe.\n\n` +
-      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
       `📧 Usuario/Correo: ${createdMemberSuccess.member.email}\n` +
       `🔑 Contraseña: ${createdMemberSuccess.rawPass}\n` +
       `👤 Rol Asignado: ${createdMemberSuccess.member.roleLabel}`

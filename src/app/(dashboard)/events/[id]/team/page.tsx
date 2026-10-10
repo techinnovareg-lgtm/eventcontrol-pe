@@ -104,7 +104,7 @@ export default function EventTeamPage() {
     
     const text = encodeURIComponent(
       `Hola ${resendWhatsAppMember.member.name}, te recordamos tus credenciales de acceso como ${resendWhatsAppMember.member.roleLabel} para el evento: "${eventTitle}".\n\n` +
-      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
       `📧 Usuario / Correo: ${resendWhatsAppMember.member.email}\n` +
       `🔑 Contraseña: ${pass}\n` +
       `👤 Rol Asignado: ${resendWhatsAppMember.member.roleLabel}${expText}\n\n` +
@@ -192,7 +192,7 @@ export default function EventTeamPage() {
     const eventTitle = event?.name || 'Evento Social';
     const text = encodeURIComponent(
       `Hola ${createdMemberSuccess.member.name}, se ha activado tu acceso como ${createdMemberSuccess.member.roleLabel} para el evento: "${eventTitle}".\n\n` +
-      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
       `📧 Usuario / Correo: ${createdMemberSuccess.member.email}\n` +
       `🔑 Contraseña: ${createdMemberSuccess.rawPass}\n\n` +
       `Al ingresar irás directo al módulo de control y escáner QR de la puerta.`

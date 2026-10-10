@@ -180,7 +180,7 @@ export default function QRManagementPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {groups.map((group) => {
             const token = getOrCreateGroupQRToken(group.id, eventId, currentWorkspaceId);
-            const qrPayloadUrl = typeof window !== 'undefined' ? `${window.location.origin}/scan?token=${token.token_hash}` : `https://app.eventos.pe/scan?token=${token.token_hash}`;
+            const qrPayloadUrl = typeof window !== 'undefined' ? `${window.location.origin}/scan?token=${token.token_hash}` : `https://eventcontrol-pe.vercel.app/scan?token=${token.token_hash}`;
 
             // Ensure companions exist if max_passes > 1
             const companionSlotsCount = Math.max(0, group.max_passes - 1);

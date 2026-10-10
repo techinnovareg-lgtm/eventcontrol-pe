@@ -87,7 +87,7 @@ export default function SuperAdminPage() {
 
     const text = encodeURIComponent(
       `🎉 ¡Hola ${acc.adminName}! Te recordamos las credenciales de acceso para "${acc.companyName}" en EventControl.pe:\n\n` +
-      `🌐 Acceso Web: https://eventcontrol.pe/login\n` +
+      `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
       `📧 Usuario: ${acc.contactEmail}\n` +
       `🔑 Contraseña Inicial: ${pass}\n` +
       `📦 Plan: Plan ${planName}\n` +
