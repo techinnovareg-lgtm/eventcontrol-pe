@@ -31,6 +31,8 @@ interface PassData {
     event_date: string;
     event_time: string;
     venue_name: string;
+    venue_address?: string;
+    google_maps_url?: string;
   };
   group: {
     id: string;
@@ -151,6 +153,8 @@ function GuestPassContent() {
                   event_date: matchedEvent.event_date,
                   event_time: matchedEvent.event_time || '',
                   venue_name: matchedEvent.venue_name || 'Salón Principal',
+                  venue_address: matchedEvent.venue_address || (matchedEvent as any).address || '',
+                  google_maps_url: matchedEvent.google_maps_url || (matchedEvent as any).maps_url || '',
                 },
                 group: {
                   id: foundGroup.id,
@@ -367,14 +371,19 @@ function GuestPassContent() {
               </div>
             </div>
 
-            {event.venue_name && (
-              <div className="col-span-2 flex items-center gap-2 pt-1 border-t border-slate-900">
-                <MapPin className="w-4 h-4 text-[#D4AF37] shrink-0" />
-                <div className="truncate">
-                  <span className="text-[10px] text-slate-400 block font-medium">Lugar / Salón</span>
-                  <span className="text-xs font-bold text-slate-200 truncate block">
-                    {event.venue_name}
+            {(event.venue_name || event.venue_address) && (
+              <div className="col-span-2 flex items-start gap-2 pt-1.5 border-t border-slate-900 text-left">
+                <MapPin className="w-4 h-4 text-[#D4AF37] shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-[10px] text-slate-400 block font-medium">Lugar / Salón de Recepción</span>
+                  <span className="text-xs font-bold text-slate-200 block truncate">
+                    {event.venue_name || 'Salón Principal'}
                   </span>
+                  {event.venue_address && (
+                    <span className="text-[11px] text-slate-300 block truncate font-normal mt-0.5">
+                      📍 {event.venue_address}
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -515,15 +524,22 @@ function GuestPassContent() {
               {isCopied ? '¡Enlace copiado al portapapeles!' : 'Copiar enlace de mi pase'}
             </button>
 
-            {event.venue_name && (
+            {(event.google_maps_url || event.venue_address || event.venue_name) && (
               <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${event.venue_name} ${event.name}`)}`}
+                href={
+                  event.google_maps_url && event.google_maps_url.trim().startsWith('http')
+                    ? event.google_maps_url.trim()
+                    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                        [event.venue_address, event.venue_name, event.name].filter(Boolean).join(', ')
+                      )}`
+                }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block text-center py-2.5 text-xs font-semibold text-slate-400 hover:text-[#D4AF37] transition flex items-center justify-center gap-1"
+                className="w-full py-3 bg-gradient-to-r from-slate-900 to-slate-800 hover:from-slate-850 hover:to-slate-750 text-slate-200 hover:text-white font-bold text-xs rounded-2xl border border-rose-500/30 hover:border-rose-500/60 transition flex items-center justify-center gap-2 shadow-sm group"
               >
-                <MapPin className="w-3.5 h-3.5" /> ¿Cómo llegar al salón? Ver en Google Maps
-                <ChevronRight className="w-3 h-3" />
+                <MapPin className="w-4 h-4 text-rose-500 group-hover:scale-110 transition-transform" />
+                <span>¿Cómo llegar al salón? Ver en Google Maps</span>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:translate-x-0.5 transition-transform" />
               </a>
             )}
           </div>

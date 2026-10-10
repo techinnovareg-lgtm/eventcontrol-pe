@@ -34,6 +34,8 @@ export interface Event {
   event_date: string;
   event_time?: string;
   venue_name?: string;
+  venue_address?: string;
+  google_maps_url?: string;
   status: EventStatus;
   contingency_pin?: string;
   allow_free_manual_checkin?: boolean;

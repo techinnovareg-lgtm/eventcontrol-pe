@@ -304,6 +304,8 @@ export async function GET(req: Request) {
       event_date: resolvedEvent.event_date,
       event_time: resolvedEvent.event_time || '',
       venue_name: resolvedEvent.venue_name || 'Salón Principal',
+      venue_address: resolvedEvent.venue_address || (resolvedEvent as any).address || '',
+      google_maps_url: resolvedEvent.google_maps_url || (resolvedEvent as any).maps_url || '',
     },
     group: {
       id: targetGroup.id,

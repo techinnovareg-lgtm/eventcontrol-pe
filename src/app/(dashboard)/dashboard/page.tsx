@@ -6,7 +6,7 @@ import Image from 'next/image';
 import EventNavHeader from '@/components/EventNavHeader';
 import { 
   Users, CheckCircle2, Clock, Grid, Plus, LogOut, QrCode, 
-  MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart, ShieldCheck, BarChart3, ExternalLink
+  MapPin, ShieldAlert, ArrowUpRight, Radio, Activity, PieChart, ShieldCheck, BarChart3, ExternalLink, Settings
 } from 'lucide-react';
 import { calculateDashboardMetrics, getTablesOccupancyStats, getRecentCheckInsFeed, getHourlyCheckInBreakdown } from '@/lib/dashboard-stats';
 import { checkInRealtimeChannel } from '@/lib/realtime';
@@ -221,6 +221,17 @@ export default function RealtimeDashboardPage() {
             </div>
             <h1 className="text-3xl font-serif font-bold text-[#1A1A1A] mt-1">{metrics.eventName}</h1>
             <p className="text-xs text-slate-500 mt-0.5">Control de ingresos, distribución de mesas y conciliación de catering</p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Link
+              href="/events"
+              className="py-2.5 px-4 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-xs rounded-xl border border-slate-200 transition flex items-center gap-2 shadow-xs group"
+              title="Configurar nombre, fecha, salón y ubicación de Google Maps"
+            >
+              <Settings className="w-3.5 h-3.5 text-[#C5A059] group-hover:rotate-45 transition-transform" />
+              <span>Configurar Evento y Ubicación</span>
+            </Link>
           </div>
         </div>
 
