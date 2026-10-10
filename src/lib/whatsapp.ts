@@ -53,13 +53,81 @@ export function formatWhatsAppMessage(template: string, data: WhatsAppMessageDat
     .replace(/{ENLACE_QR}/g, data.qrUrl);
 }
 
+export type WhatsAppChannel = 'web' | 'desktop_app' | 'wa_me';
+
 /**
- * Generates wa.me deep link that opens WhatsApp Web or App with pre-filled message
+ * Checks if current browser environment is mobile
  */
-export function generateWhatsAppLink(phone: string, message: string): string {
+export function isMobileDevice(): boolean {
+  if (typeof window === 'undefined') return false;
+  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+}
+
+/**
+ * Generates direct WhatsApp link tailored to avoid intermediate landing pages.
+ * - 'web': https://web.whatsapp.com/send?phone=... (Direct into WhatsApp Web chat on PC, NO intermediate screen)
+ * - 'desktop_app': whatsapp://send?phone=... (Direct Windows/Mac native application)
+ * - 'wa_me': https://wa.me/... (Universal link, standard for mobile devices)
+ */
+export function generateWhatsAppLink(
+  phone: string,
+  message: string,
+  channel?: WhatsAppChannel
+): string {
   const sanitizedPhone = sanitizePhoneForWhatsApp(phone);
-  const encodedText = encodeURIComponent(message);
-  return `https://wa.me/${sanitizedPhone}?text=${encodedText}`;
+  const isAlreadyEncoded = /%[0-9A-Fa-f]{2}/.test(message);
+  const encodedText = isAlreadyEncoded ? message : encodeURIComponent(message);
+
+  const resolvedChannel: WhatsAppChannel = channel || (isMobileDevice() ? 'wa_me' : 'web');
+
+  if (resolvedChannel === 'desktop_app') {
+    return sanitizedPhone
+      ? `whatsapp://send?phone=${sanitizedPhone}&text=${encodedText}`
+      : `whatsapp://send?text=${encodedText}`;
+  }
+
+  if (resolvedChannel === 'web') {
+    return sanitizedPhone
+      ? `https://web.whatsapp.com/send?phone=${sanitizedPhone}&text=${encodedText}`
+      : `https://web.whatsapp.com/send?text=${encodedText}`;
+  }
+
+  // 'wa_me'
+  return sanitizedPhone
+    ? `https://wa.me/${sanitizedPhone}?text=${encodedText}`
+    : `https://wa.me/?text=${encodedText}`;
+}
+
+/**
+ * Safely dispatches WhatsApp message:
+ * - If desktop app (whatsapp://): clicks invisible anchor to avoid opening empty browser tab
+ * - If web: opens WhatsApp Web in designated window (can reuse tab to avoid 50 tabs)
+ */
+export function dispatchWhatsAppMessage(
+  phone: string,
+  message: string,
+  channel?: WhatsAppChannel,
+  reuseTab: boolean = true
+): void {
+  if (typeof window === 'undefined') return;
+
+  const resolvedChannel: WhatsAppChannel = channel || (isMobileDevice() ? 'wa_me' : 'web');
+  const link = generateWhatsAppLink(phone, message, resolvedChannel);
+
+  if (resolvedChannel === 'desktop_app') {
+    const a = document.createElement('a');
+    a.href = link;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      if (document.body.contains(a)) document.body.removeChild(a);
+    }, 500);
+    return;
+  }
+
+  const target = reuseTab ? 'eventcontrol_wa_tab' : '_blank';
+  window.open(link, target);
 }
 
 /**

@@ -16,6 +16,7 @@ import {
   getEventMembers, getEventMembersAsync, createWorkspaceMember, createWorkspaceMemberAsync, updateWorkspaceMember, deleteWorkspaceMember,
   WorkspaceMemberUser, WorkspaceUserRole, isCredentialsExpired, formatExpirationDate, syncWorkspaceMemberOnlineAsync
 } from '@/lib/workspace-users';
+import { generateWhatsAppLink } from '@/lib/whatsapp';
 
 export default function EventTeamPage() {
   const params = useParams();
@@ -139,7 +140,7 @@ export default function EventTeamPage() {
       `${instruction}`
     );
     const phoneCleaned = resendPhone.replace(/[^0-9]/g, '');
-    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+    return generateWhatsAppLink(phoneCleaned, text);
   };
 
   const handleCreateSubUser = async (e: React.FormEvent) => {
@@ -232,7 +233,7 @@ export default function EventTeamPage() {
       `${instruction}`
     );
     const phoneCleaned = newMemberPhone.replace(/[^0-9]/g, '');
-    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+    return generateWhatsAppLink(phoneCleaned, text);
   };
 
   return (

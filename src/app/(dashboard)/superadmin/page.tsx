@@ -17,6 +17,7 @@ import {
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, syncAdminAccountOnlineAsync
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
+import { generateWhatsAppLink } from '@/lib/whatsapp';
 
 export default function SuperAdminPage() {
   const session = getActiveSession();
@@ -95,7 +96,7 @@ export default function SuperAdminPage() {
       `Por seguridad, te recomendamos cambiar tu clave al ingresar si aún no lo has hecho.`
     );
     const phoneCleaned = superadminWhatsAppPhone.replace(/[^0-9]/g, '');
-    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+    return generateWhatsAppLink(phoneCleaned, text);
   };
 
   if (!isAuthorized) {
@@ -714,9 +715,7 @@ export default function SuperAdminPage() {
                   const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
                   const phoneParam = cleanPhone.length > 0 ? (cleanPhone.startsWith('51') ? cleanPhone : `51${cleanPhone}`) : '';
                   const msg = `🎉 ¡Hola ${createdNoticeModal.account.adminName}! Tu cuenta para "${createdNoticeModal.account.companyName}" en EventControl.pe ya está activa.\n\n🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n📧 Usuario: ${createdNoticeModal.account.contactEmail}\n🔑 Contraseña Inicial: ${createdNoticeModal.initialPassword}\n\nPor seguridad, te recomendamos cambiar tu clave al ingresar.`;
-                  const waUrl = phoneParam 
-                    ? `https://api.whatsapp.com/send?phone=${phoneParam}&text=${encodeURIComponent(msg)}`
-                    : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+                  const waUrl = generateWhatsAppLink(phoneParam, msg);
                   window.open(waUrl, '_blank');
                 }}
                 className="w-full sm:w-2/5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5 transition"

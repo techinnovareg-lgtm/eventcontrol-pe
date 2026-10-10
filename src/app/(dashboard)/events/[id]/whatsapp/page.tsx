@@ -8,7 +8,8 @@ import {
   Copy, ExternalLink, Settings, Sparkles, MapPin, QrCode, Users,
   ShieldAlert, Clock, AlertTriangle, ChevronDown, ChevronUp, Coffee,
   Lock, ShieldCheck, HelpCircle, Info, RefreshCw, FileText,
-  Edit3, Save, X, Play, Pause, RotateCcw, Check, Grid
+  Edit3, Save, X, Play, Pause, RotateCcw, Check, Grid,
+  Globe, Laptop, Smartphone
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
 import { 
@@ -21,7 +22,8 @@ import { Event, GuestGroup } from '@/lib/supabase/types';
 import { getOrCreateGroupQRToken } from '@/lib/qr-engine';
 import { 
   DEFAULT_WHATSAPP_TEMPLATE, FIRST_GREETING_SAFE_TEMPLATE, formatWhatsAppMessage,
-  generateWhatsAppLink, recordWhatsAppSent, getWhatsAppSentLogMap, WALogItem
+  generateWhatsAppLink, dispatchWhatsAppMessage, recordWhatsAppSent, getWhatsAppSentLogMap, 
+  WALogItem, WhatsAppChannel, isMobileDevice
 } from '@/lib/whatsapp';
 
 export default function WhatsAppMessagingPage() {
@@ -58,6 +60,42 @@ export default function WhatsAppMessagingPage() {
   const [autoRestSecondsRemaining, setAutoRestSecondsRemaining] = useState<number>(0);
   const [autoBlockSentCount, setAutoBlockSentCount] = useState<number>(0);
   const [autoStatusText, setAutoStatusText] = useState<string>('Listo para iniciar envío automático por bloques');
+
+  // Dispatch Channel & Tab Control (Bypass Meta intermediate landing page)
+  const [dispatchChannel, setDispatchChannel] = useState<WhatsAppChannel>('web');
+  const [reuseTab, setReuseTab] = useState<boolean>(true);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedChannel = localStorage.getItem('eventcontrol_wa_channel') as WhatsAppChannel;
+      if (savedChannel && ['web', 'desktop_app', 'wa_me'].includes(savedChannel)) {
+        setDispatchChannel(savedChannel);
+      } else if (isMobileDevice()) {
+        setDispatchChannel('wa_me');
+      } else {
+        setDispatchChannel('web');
+      }
+
+      const savedReuse = localStorage.getItem('eventcontrol_wa_reuse_tab');
+      if (savedReuse !== null) {
+        setReuseTab(savedReuse === 'true');
+      }
+    }
+  }, []);
+
+  const handleChannelChange = (ch: WhatsAppChannel) => {
+    setDispatchChannel(ch);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('eventcontrol_wa_channel', ch);
+    }
+  };
+
+  const handleReuseTabChange = (val: boolean) => {
+    setReuseTab(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('eventcontrol_wa_reuse_tab', String(val));
+    }
+  };
 
   useEffect(() => {
     async function loadOnlineData() {
@@ -143,7 +181,9 @@ export default function WhatsAppMessagingPage() {
       const data = getGroupDetails(pendingGroup);
       const message = formatWhatsAppMessage(template, data);
       const phone = pendingGroup.responsible_phone!.trim();
-      const link = generateWhatsAppLink(phone, message);
+
+      // Dispatch directly using selected channel and tab management
+      dispatchWhatsAppMessage(phone, message, dispatchChannel, reuseTab);
 
       const sentIso = recordWhatsAppSent(eventId, pendingGroup.id, phone, messageMode);
       setSentLogs(prev => ({
@@ -161,15 +201,13 @@ export default function WhatsAppMessagingPage() {
       setAutoBlockSentCount(prev => prev + 1);
       setAutoStatusText(`🚀 Enviada invitación a ${pendingGroup.group_name} (${autoBlockSentCount + 1}/${autoBatchSize} del bloque actual)`);
 
-      // Open WhatsApp tab automatically
-      window.open(link, '_blank');
-
     }, 1000);
 
     return () => clearInterval(autoInterval);
   }, [
     isAutoRunning, autoRestSecondsRemaining, lastSentTimestamp, autoDelaySeconds,
-    groups, sentLogs, autoBlockSentCount, autoBatchSize, autoRestMinutes, template, eventId, messageMode
+    groups, sentLogs, autoBlockSentCount, autoBatchSize, autoRestMinutes, template, eventId, messageMode,
+    dispatchChannel, reuseTab
   ]);
 
   // Table Filter & Prerequisite State
@@ -245,7 +283,9 @@ export default function WhatsAppMessagingPage() {
 
     const data = getGroupDetails(group);
     const message = formatWhatsAppMessage(template, data);
-    const link = generateWhatsAppLink(phone, message);
+    
+    // Dispatch directly using selected channel and tab management
+    dispatchWhatsAppMessage(phone, message, dispatchChannel, reuseTab);
     
     // Record timestamp sent_at
     const sentIso = recordWhatsAppSent(eventId, group.id, phone, messageMode);
@@ -260,8 +300,6 @@ export default function WhatsAppMessagingPage() {
     }));
     setLastSentTimestamp(Date.now());
     setSecondsRemaining(autoDelaySeconds);
-
-    window.open(link, '_blank');
   };
 
   const handleCopyMessage = (group: any) => {
@@ -445,6 +483,93 @@ export default function WhatsAppMessagingPage() {
                 Pausa: <strong>{autoRestMinutes}m</strong>
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* DISPATCH CHANNEL & TAB REUSE CONFIGURATION (BYPASS INTERMEDIATE LANDING PAGE) */}
+        <div className="card-luxury p-5 border border-emerald-300/80 bg-white shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+            <div className="flex items-center gap-2">
+              <Settings className="w-5 h-5 text-emerald-600" />
+              <div>
+                <h4 className="text-sm font-bold text-slate-900">Canal de Envío Directo (Sin Pantalla Intermedia)</h4>
+                <p className="text-xs text-slate-500">
+                  Selecciona cómo se despachan los mensajes para enviar directamente al chat sin pantallas intermedias de WhatsApp.
+                </p>
+              </div>
+            </div>
+            
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
+              <input
+                type="checkbox"
+                checked={reuseTab}
+                onChange={(e) => handleReuseTabChange(e.target.checked)}
+                className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+              />
+              <span>Reutilizar la misma pestaña de WhatsApp Web (evita abrir decenas de pestañas)</span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => handleChannelChange('web')}
+              className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 ${
+                dispatchChannel === 'web'
+                  ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 font-bold'
+                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold text-xs text-emerald-800">
+                  <Globe className="w-4 h-4 text-emerald-600" /> WhatsApp Web Directo
+                </span>
+                <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Recomendado PC</span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-normal leading-tight">
+                Abre directamente la conversación en WhatsApp Web con el mensaje listo. ¡Omite al 100% la pantalla intermedia de Meta!
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleChannelChange('desktop_app')}
+              className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 ${
+                dispatchChannel === 'desktop_app'
+                  ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 font-bold'
+                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold text-xs text-indigo-800">
+                  <Laptop className="w-4 h-4 text-indigo-600" /> App de Escritorio WhatsApp
+                </span>
+                <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">Windows / Mac</span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-normal leading-tight">
+                Abre directo la aplicación oficial instalada en tu computadora, sin abrir pestañas en el navegador.
+              </p>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleChannelChange('wa_me')}
+              className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 ${
+                dispatchChannel === 'wa_me'
+                  ? 'bg-amber-50/90 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 font-bold'
+                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 font-bold text-xs text-amber-800">
+                  <Smartphone className="w-4 h-4 text-amber-600" /> Enlace Universal (wa.me)
+                </span>
+                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Móviles / Tablets</span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-normal leading-tight">
+                Enlace universal wa.me diseñado para teléfonos celulares o tabletas.
+              </p>
+            </button>
           </div>
         </div>
 
@@ -799,9 +924,23 @@ export default function WhatsAppMessagingPage() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => handleOpenWhatsApp(group.responsible_phone!, group)}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1 shadow-sm"
+                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"
+                              title={
+                                dispatchChannel === 'web'
+                                  ? 'Abrir directamente en WhatsApp Web (sin pantalla previa de confirmación)'
+                                  : dispatchChannel === 'desktop_app'
+                                  ? 'Abrir en la aplicación nativa de WhatsApp'
+                                  : 'Abrir vía enlace universal wa.me'
+                              }
                             >
-                              <ExternalLink className="w-3.5 h-3.5" /> Enviar por WhatsApp
+                              {dispatchChannel === 'desktop_app' ? (
+                                <Laptop className="w-3.5 h-3.5" />
+                              ) : dispatchChannel === 'web' ? (
+                                <Globe className="w-3.5 h-3.5" />
+                              ) : (
+                                <ExternalLink className="w-3.5 h-3.5" />
+                              )}
+                              <span>Enviar por WhatsApp</span>
                             </button>
                             <button
                               onClick={() => handleCopyMessage(group)}

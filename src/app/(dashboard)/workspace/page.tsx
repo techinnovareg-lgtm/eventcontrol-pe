@@ -14,6 +14,7 @@ import { PLAN_LIMITS } from '@/lib/plans';
 import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
 import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
 import { getWorkspaceEvents, getWorkspaceEventsAsync, getLastActiveEventId } from '@/lib/events';
+import { generateWhatsAppLink } from '@/lib/whatsapp';
 
 export default function AccountProfilePage() {
   const session = getActiveSession();
@@ -170,7 +171,7 @@ export default function AccountProfilePage() {
       `${instruction}`
     );
     const phoneCleaned = resendPhone.replace(/[^0-9]/g, '');
-    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+    return generateWhatsAppLink(phoneCleaned, text);
   };
 
   const getWhatsAppDispatchLink = () => {
@@ -186,7 +187,7 @@ export default function AccountProfilePage() {
       `${instruction}`
     );
     const phoneCleaned = newMemberPhone.replace(/[^0-9]/g, '');
-    return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
+    return generateWhatsAppLink(phoneCleaned, text);
   };
 
   return (
