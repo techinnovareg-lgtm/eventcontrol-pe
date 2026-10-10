@@ -531,7 +531,7 @@ export default function EventsCrudPage() {
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Este enlace se integrará en el botón <strong>"¿Cómo llegar al salón? Ver en Google Maps"</strong> del pase digital QR enviado por WhatsApp a los invitados.
+                  Este enlace se integrará en el botón <strong>&quot;¿Cómo llegar al salón? Ver en Google Maps&quot;</strong> del pase digital QR enviado por WhatsApp a los invitados.
                 </p>
               </div>
 
@@ -632,7 +632,7 @@ export default function EventsCrudPage() {
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                 />
                 <p className="text-[10px] text-slate-500 mt-1">
-                  Este enlace se integrará en el botón <strong>"¿Cómo llegar al salón? Ver en Google Maps"</strong> del pase digital QR enviado por WhatsApp a los invitados.
+                  Este enlace se integrará en el botón <strong>&quot;¿Cómo llegar al salón? Ver en Google Maps&quot;</strong> del pase digital QR enviado por WhatsApp a los invitados.
                 </p>
               </div>
 
