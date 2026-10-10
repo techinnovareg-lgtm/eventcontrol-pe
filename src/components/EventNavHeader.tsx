@@ -45,6 +45,14 @@ export default function EventNavHeader({
   // Dynamic contract account & active session check
   const contractAccount = getAccountForSession();
   const session = getActiveSession();
+
+  useEffect(() => {
+    if (session?.user?.role === 'OPERATOR') {
+      const scanRoute = session.user.eventId ? `/scan?event=${session.user.eventId}` : '/scan';
+      window.location.href = scanRoute;
+    }
+  }, [session]);
+
   const remainingDays = calculateRemainingDays(contractAccount.contractEndDate);
   const isExpiringSoon = remainingDays <= 7;
 
@@ -52,6 +60,14 @@ export default function EventNavHeader({
   const userName = session?.user?.name || contractAccount.adminName || contractAccount.companyName;
   const userEmail = session?.user?.email || contractAccount.contactEmail;
   const userInitial = userName ? userName.charAt(0).toUpperCase() : 'A';
+
+  const isCoordinator = session?.user?.role === 'COORDINADOR';
+  const profileHref = isCoordinator 
+    ? (safeEventId ? `/dashboard?eventId=${safeEventId}` : '/dashboard') 
+    : '/workspace';
+  const catalogHref = (isCoordinator && session?.user?.eventId) 
+    ? (safeEventId ? `/dashboard?eventId=${safeEventId}` : '/dashboard') 
+    : '/events';
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3, href: safeEventId ? `/dashboard?eventId=${safeEventId}` : '/dashboard' },
@@ -108,7 +124,7 @@ export default function EventNavHeader({
           <div className="flex items-center gap-2 pl-3 border-l border-slate-200 min-w-0">
             <span className="text-slate-300 text-sm hidden sm:inline">/</span>
             <Link 
-              href="/events"
+              href={catalogHref}
               className="flex items-center gap-2 bg-[#FAF8F5] hover:bg-amber-50/90 px-3.5 h-11 rounded-xl border border-[#C5A059]/40 shadow-2xs min-w-0 transition group cursor-pointer"
               title="Catálogo de Eventos (Ver / Cambiar Evento)"
             >
@@ -128,7 +144,7 @@ export default function EventNavHeader({
           
           {/* 1. USER PROFILE CARD */}
           <Link 
-            href="/workspace"
+            href={profileHref}
             className="h-11 px-3.5 flex items-center gap-2.5 bg-[#FAF8F5] hover:bg-amber-50/80 rounded-xl border border-[#C5A059]/40 transition group shadow-2xs"
             title="Ver Mi Perfil / Cuenta"
           >
@@ -147,7 +163,7 @@ export default function EventNavHeader({
 
           {/* 2. CATÁLOGO BUTTON */}
           <Link
-            href="/events"
+            href={catalogHref}
             className="h-11 px-3.5 bg-white hover:bg-amber-50/50 text-slate-800 font-serif font-bold text-xs rounded-xl border border-[#C5A059]/40 transition flex items-center gap-2 shadow-2xs"
             title="Catálogo de Eventos"
           >

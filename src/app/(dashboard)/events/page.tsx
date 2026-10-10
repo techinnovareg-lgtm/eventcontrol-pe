@@ -23,7 +23,12 @@ export default function EventsCrudPage() {
   useEffect(() => {
     const session = getActiveSession();
     if (session?.user?.role === 'OPERATOR') {
-      window.location.href = '/scan';
+      const scanRoute = session.user.eventId ? `/scan?event=${session.user.eventId}` : '/scan';
+      window.location.href = scanRoute;
+      return;
+    }
+    if (session?.user?.role === 'COORDINADOR' && session.user.eventId) {
+      window.location.href = `/dashboard?eventId=${session.user.eventId}`;
       return;
     }
     const contractAccount = getAccountForSession();

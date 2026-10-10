@@ -50,7 +50,8 @@ export default function RealtimeDashboardPage() {
     async function initDashboard() {
       const session = getActiveSession();
       if (session?.user?.role === 'OPERATOR') {
-        window.location.href = '/scan';
+        const scanRoute = session.user.eventId ? `/scan?event=${session.user.eventId}` : '/scan';
+        window.location.href = scanRoute;
         return;
       }
       const contract = getAccountForSession();
@@ -67,7 +68,10 @@ export default function RealtimeDashboardPage() {
       let userEvents = await getWorkspaceEventsAsync(wsId, email);
 
       let selectedId = '';
-      if (typeof window !== 'undefined') {
+      if (session?.user?.eventId) {
+        userEvents = userEvents.filter(e => e.id === session.user.eventId);
+        selectedId = session.user.eventId;
+      } else if (typeof window !== 'undefined') {
         const urlParams = new URLSearchParams(window.location.search);
         selectedId = urlParams.get('eventId') || '';
       }
@@ -121,10 +125,14 @@ export default function RealtimeDashboardPage() {
     if (!currentWorkspaceId) return;
 
     const pollDashboard = async () => {
-      const userEvents = await getWorkspaceEventsAsync(currentWorkspaceId);
+      const session = getActiveSession();
+      let userEvents = await getWorkspaceEventsAsync(currentWorkspaceId);
+      if (session?.user?.eventId) {
+        userEvents = userEvents.filter(e => e.id === session.user.eventId);
+      }
       if (userEvents.length > 0) {
         setHasNoEvents(false);
-        let selectedId = eventId;
+        let selectedId = session?.user?.eventId || eventId;
         if (!selectedId) {
           if (typeof window !== 'undefined') {
             const urlParams = new URLSearchParams(window.location.search);

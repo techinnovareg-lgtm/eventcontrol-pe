@@ -30,6 +30,17 @@ export default function AccountProfilePage() {
   const [activeEventsCount, setActiveEventsCount] = useState<number>(0);
 
   useEffect(() => {
+    const session = getActiveSession();
+    if (session?.user?.role === 'OPERATOR') {
+      const scanRoute = session.user.eventId ? `/scan?event=${session.user.eventId}` : '/scan';
+      window.location.href = scanRoute;
+      return;
+    }
+    if (session?.user?.role === 'COORDINADOR') {
+      const dest = session.user.eventId ? `/dashboard?eventId=${session.user.eventId}` : '/dashboard';
+      window.location.href = dest;
+      return;
+    }
     setTeamMembers(getWorkspaceMembers(currentWorkspaceId));
     setActiveEventsCount(getWorkspaceEvents(currentWorkspaceId).length);
     getWorkspaceEventsAsync(currentWorkspaceId).then(evts => {
@@ -119,16 +130,44 @@ export default function AccountProfilePage() {
   const [resendWhatsAppMember, setResendWhatsAppMember] = useState<{ member: WorkspaceMemberUser; rawPass?: string } | null>(null);
   const [resendPhone, setResendPhone] = useState<string>('');
 
+  const getRoleMessageDetails = (role: WorkspaceUserRole) => {
+    switch (role) {
+      case 'COORDINADOR':
+        return {
+          roleTitle: 'COORDINADOR (Gestión & Mesas)',
+          instruction: 'Al ingresar podrás coordinar el plano de mesas, invitados y reportes del evento asignado.',
+        };
+      case 'ADMIN':
+        return {
+          roleTitle: 'ADMINISTRADOR (Acceso Completo)',
+          instruction: 'Al ingresar tendrás acceso administrativo completo para gestionar eventos y equipos.',
+        };
+      case 'OWNER':
+        return {
+          roleTitle: 'PROPIETARIO',
+          instruction: 'Al ingresar tendrás control total del espacio de trabajo, eventos, facturación y equipo.',
+        };
+      case 'OPERATOR':
+      default:
+        return {
+          roleTitle: 'SEGURIDAD (Puerta)',
+          instruction: 'Al ingresar irás directo al módulo de control y escáner QR de la puerta.',
+        };
+    }
+  };
+
   const getResendWhatsAppLink = () => {
     if (!resendWhatsAppMember) return '#';
-    const pass = resendWhatsAppMember.rawPass || resendWhatsAppMember.member.initialPassword || 'puerta2026';
+    const member = resendWhatsAppMember.member;
+    const pass = resendWhatsAppMember.rawPass || member.initialPassword || 'puerta2026';
+    const { roleTitle, instruction } = getRoleMessageDetails(member.role);
     const text = encodeURIComponent(
-      `Hola ${resendWhatsAppMember.member.name}, te recordamos tus credenciales de acceso a la plataforma EventControl.pe (${contractInfo.companyName}).\n\n` +
+      `Hola ${member.name}, te recordamos tus credenciales de acceso a la plataforma EventControl.pe (${contractInfo.companyName}).\n\n` +
       `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
-      `📧 Usuario/Correo: ${resendWhatsAppMember.member.email}\n` +
+      `📧 Usuario / Correo: ${member.email}\n` +
       `🔑 Contraseña: ${pass}\n` +
-      `👤 Rol Asignado: ${resendWhatsAppMember.member.roleLabel}\n\n` +
-      `Al ingresar podrás coordinar y gestionar los eventos asignados.`
+      `👤 Rol Asignado: ${roleTitle}\n\n` +
+      `${instruction}`
     );
     const phoneCleaned = resendPhone.replace(/[^0-9]/g, '');
     return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
@@ -136,12 +175,15 @@ export default function AccountProfilePage() {
 
   const getWhatsAppDispatchLink = () => {
     if (!createdMemberSuccess) return '#';
+    const member = createdMemberSuccess.member;
+    const { roleTitle, instruction } = getRoleMessageDetails(member.role);
     const text = encodeURIComponent(
-      `Hola ${createdMemberSuccess.member.name}, se ha creado tu acceso a la plataforma EventControl.pe.\n\n` +
+      `Hola ${member.name}, se ha creado tu acceso a la plataforma EventControl.pe (${contractInfo.companyName}).\n\n` +
       `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
-      `📧 Usuario/Correo: ${createdMemberSuccess.member.email}\n` +
+      `📧 Usuario / Correo: ${member.email}\n` +
       `🔑 Contraseña: ${createdMemberSuccess.rawPass}\n` +
-      `👤 Rol Asignado: ${createdMemberSuccess.member.roleLabel}`
+      `👤 Rol Asignado: ${roleTitle}\n\n` +
+      `${instruction}`
     );
     const phoneCleaned = newMemberPhone.replace(/[^0-9]/g, '');
     return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;

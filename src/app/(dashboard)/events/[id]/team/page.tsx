@@ -95,20 +95,48 @@ export default function EventTeamPage() {
   const [resendWhatsAppMember, setResendWhatsAppMember] = useState<{ member: WorkspaceMemberUser; rawPass?: string } | null>(null);
   const [resendPhone, setResendPhone] = useState<string>('');
 
+  const getRoleMessageDetails = (role: WorkspaceUserRole) => {
+    switch (role) {
+      case 'COORDINADOR':
+        return {
+          roleTitle: 'COORDINADOR (Gestión & Mesas)',
+          instruction: 'Al ingresar tendrás acceso al panel de coordinación, plano de mesas, lista de invitados y reportes del evento.',
+        };
+      case 'ADMIN':
+        return {
+          roleTitle: 'ADMINISTRADOR (Acceso Completo)',
+          instruction: 'Al ingresar tendrás acceso administrativo completo para gestionar y coordinar el evento.',
+        };
+      case 'OWNER':
+        return {
+          roleTitle: 'PROPIETARIO',
+          instruction: 'Al ingresar tendrás control total del espacio de trabajo, eventos, facturación y equipo.',
+        };
+      case 'OPERATOR':
+      default:
+        return {
+          roleTitle: 'SEGURIDAD (Puerta)',
+          instruction: 'Al ingresar irás directo al módulo de control y escáner QR de la puerta.',
+        };
+    }
+  };
+
   const getResendWhatsAppLink = () => {
     if (!resendWhatsAppMember) return '#';
     const eventTitle = event?.name || 'Evento Social';
-    const pass = resendWhatsAppMember.rawPass || resendWhatsAppMember.member.initialPassword || 'puerta2026';
-    const expStr = resendWhatsAppMember.member.credentialsExpiresAt || contractInfo?.contractEndDate;
+    const member = resendWhatsAppMember.member;
+    const pass = resendWhatsAppMember.rawPass || member.initialPassword || 'puerta2026';
+    const expStr = member.credentialsExpiresAt || contractInfo?.contractEndDate;
     const expText = expStr ? ` (Válido hasta: ${formatExpirationDate(expStr)})` : '';
+    const { roleTitle, instruction } = getRoleMessageDetails(member.role);
     
     const text = encodeURIComponent(
-      `Hola ${resendWhatsAppMember.member.name}, te recordamos tus credenciales de acceso como ${resendWhatsAppMember.member.roleLabel} para el evento: "${eventTitle}".\n\n` +
+      `Hola ${member.name}, te recordamos tus credenciales de acceso como ${roleTitle} para el evento: "${eventTitle}".\n\n` +
       `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
-      `📧 Usuario / Correo: ${resendWhatsAppMember.member.email}\n` +
+      `📧 Usuario / Correo: ${member.email}\n` +
       `🔑 Contraseña: ${pass}\n` +
-      `👤 Rol Asignado: ${resendWhatsAppMember.member.roleLabel}${expText}\n\n` +
-      `Al ingresar irás directo al módulo de control y escáner QR de la puerta.`
+      `👤 Rol Asignado: ${roleTitle}${expText}\n\n` +
+      `${instruction}`
     );
     const phoneCleaned = resendPhone.replace(/[^0-9]/g, '');
     return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
@@ -190,12 +218,18 @@ export default function EventTeamPage() {
   const getWhatsAppDispatchLink = () => {
     if (!createdMemberSuccess) return '#';
     const eventTitle = event?.name || 'Evento Social';
+    const member = createdMemberSuccess.member;
+    const expStr = member.credentialsExpiresAt || contractInfo?.contractEndDate;
+    const expText = expStr ? ` (Válido hasta: ${formatExpirationDate(expStr)})` : '';
+    const { roleTitle, instruction } = getRoleMessageDetails(member.role);
+
     const text = encodeURIComponent(
-      `Hola ${createdMemberSuccess.member.name}, se ha activado tu acceso como ${createdMemberSuccess.member.roleLabel} para el evento: "${eventTitle}".\n\n` +
+      `Hola ${member.name}, se ha activado tu acceso como ${roleTitle} para el evento: "${eventTitle}".\n\n` +
       `🌐 Acceso Web: https://eventcontrol-pe.vercel.app/login\n` +
-      `📧 Usuario / Correo: ${createdMemberSuccess.member.email}\n` +
-      `🔑 Contraseña: ${createdMemberSuccess.rawPass}\n\n` +
-      `Al ingresar irás directo al módulo de control y escáner QR de la puerta.`
+      `📧 Usuario / Correo: ${member.email}\n` +
+      `🔑 Contraseña: ${createdMemberSuccess.rawPass}\n` +
+      `👤 Rol Asignado: ${roleTitle}${expText}\n\n` +
+      `${instruction}`
     );
     const phoneCleaned = newMemberPhone.replace(/[^0-9]/g, '');
     return phoneCleaned ? `https://wa.me/${phoneCleaned}?text=${text}` : `https://wa.me/?text=${text}`;
@@ -516,8 +550,8 @@ export default function EventTeamPage() {
                       onChange={(e) => setNewMemberRole(e.target.value as WorkspaceUserRole)}
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                     >
-                      <option value="OPERATOR">OPERADOR / SEGURIDAD (Escáner de Puerta únicamente)</option>
-                      <option value="COORDINADOR">COORDINADOR (Edición de Listas y Mesas del Evento)</option>
+                      <option value="OPERATOR">SEGURIDAD (Puerta & Escáner QR únicamente)</option>
+                      <option value="COORDINADOR">COORDINADOR (Gestión de Mesas, Invitados y Reportes)</option>
                       <option value="ADMIN">ADMINISTRADOR (Acceso Completo al Evento)</option>
                     </select>
                   </div>
@@ -541,7 +575,7 @@ export default function EventTeamPage() {
                     type="submit"
                     className="w-full py-3.5 gold-button font-bold text-xs rounded-xl transition shadow-md mt-2"
                   >
-                    Crear Operador y Asignar al Evento
+                    Crear Colaborador y Asignar al Evento
                   </button>
                 </form>
               </>
@@ -550,13 +584,13 @@ export default function EventTeamPage() {
                 <div className="w-12 h-12 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto">
                   <Check className="w-6 h-6" />
                 </div>
-                <h3 className="text-xl font-serif font-bold text-slate-900">¡Operador Creado para {event?.name}!</h3>
+                <h3 className="text-xl font-serif font-bold text-slate-900">¡Colaborador Creado para {event?.name}!</h3>
                 
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-left text-xs space-y-2 font-mono">
-                  <p><strong>Operador:</strong> {createdMemberSuccess.member.name}</p>
+                  <p><strong>Colaborador:</strong> {createdMemberSuccess.member.name}</p>
                   <p><strong>Correo:</strong> {createdMemberSuccess.member.email}</p>
                   <p><strong>Clave:</strong> {createdMemberSuccess.rawPass}</p>
-                  <p><strong>Rol:</strong> {createdMemberSuccess.member.roleLabel}</p>
+                  <p><strong>Rol:</strong> {getRoleMessageDetails(createdMemberSuccess.member.role).roleTitle}</p>
                   <p><strong>Evento:</strong> {event?.name}</p>
                 </div>
 
@@ -675,8 +709,8 @@ export default function EventTeamPage() {
                   onChange={(e) => setEditRole(e.target.value as WorkspaceUserRole)}
                   className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                 >
-                  <option value="OPERATOR">OPERADOR / SEGURIDAD (Escáner de Puerta únicamente)</option>
-                  <option value="COORDINADOR">COORDINADOR (Edición de Listas y Mesas del Evento)</option>
+                  <option value="OPERATOR">SEGURIDAD (Puerta & Escáner QR únicamente)</option>
+                  <option value="COORDINADOR">COORDINADOR (Gestión de Mesas, Invitados y Reportes)</option>
                   <option value="ADMIN">ADMINISTRADOR (Acceso Completo al Evento)</option>
                 </select>
               </div>
@@ -700,7 +734,17 @@ export default function EventTeamPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    setResendWhatsAppMember({ member: editingMember, rawPass: editPassword });
+                    const currentFormMember: WorkspaceMemberUser = {
+                      ...editingMember,
+                      name: editName,
+                      email: editEmail,
+                      initialPassword: editPassword,
+                      role: editRole,
+                      roleLabel: getRoleMessageDetails(editRole).roleTitle,
+                      status: editStatus,
+                      credentialsExpiresAt: editExpiresAt ? editExpiresAt.trim() : editingMember.credentialsExpiresAt,
+                    };
+                    setResendWhatsAppMember({ member: currentFormMember, rawPass: editPassword });
                     setResendPhone('');
                   }}
                   className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold border border-emerald-300 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-2xs"
@@ -754,7 +798,7 @@ export default function EventTeamPage() {
               <p><strong>Colaborador:</strong> {resendWhatsAppMember.member.name}</p>
               <p><strong>Correo:</strong> {resendWhatsAppMember.member.email}</p>
               <p><strong>Contraseña:</strong> {resendWhatsAppMember.rawPass || resendWhatsAppMember.member.initialPassword || 'puerta2026'}</p>
-              <p><strong>Rol:</strong> {resendWhatsAppMember.member.roleLabel}</p>
+              <p><strong>Rol:</strong> {getRoleMessageDetails(resendWhatsAppMember.member.role).roleTitle}</p>
               <p><strong>Evento:</strong> {event?.name || 'Evento'}</p>
             </div>
 

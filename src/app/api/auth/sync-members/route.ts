@@ -210,14 +210,17 @@ export async function GET(req: Request) {
 
         if (sbData.access_token || sbData.user || sbData.error_code === 'email_not_confirmed') {
           const userMeta = sbData.user?.user_metadata || {};
+          const rawRole = userMeta.role || 'COORDINADOR';
+          const validRole = (rawRole === 'OPERATOR' || rawRole === 'COORDINADOR' || rawRole === 'ADMIN' || rawRole === 'OWNER') ? rawRole : 'COORDINADOR';
+          const validRoleLabel = validRole === 'OPERATOR' ? 'SEGURIDAD (Puerta)' : validRole === 'COORDINADOR' ? 'COORDINADOR' : validRole === 'ADMIN' ? 'ADMINISTRADOR' : 'PROPIETARIO';
           found = {
             id: sbData.user?.id || `usr-mb-${Date.now()}`,
             workspaceId: userMeta.workspaceId || 'ws-a-1111',
             eventId: userMeta.eventId,
             name: userMeta.name || userMeta.companyName || 'Colaborador',
             email: cleanedInput,
-            role: userMeta.role === 'OPERATOR' ? 'OPERATOR' : 'ADMIN',
-            roleLabel: userMeta.role === 'OPERATOR' ? 'Operador de Puerta' : 'Administrador',
+            role: validRole,
+            roleLabel: userMeta.roleLabel || validRoleLabel,
             permissionsScope: userMeta.permissionsScope || 'Acceso Estándar',
             status: 'ACTIVO',
             initialPassword: trimmedPass,

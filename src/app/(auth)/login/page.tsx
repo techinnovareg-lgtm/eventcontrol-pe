@@ -170,7 +170,7 @@ export default function LoginPage() {
           id: matchedSubUser.id,
           email: matchedSubUser.email,
           name: matchedSubUser.name,
-          role: matchedSubUser.role === 'OPERATOR' ? 'OPERATOR' : 'ADMIN',
+          role: matchedSubUser.role,
           workspaceId: matchedSubUser.workspaceId,
           eventId: matchedSubUser.eventId,
         },
@@ -180,11 +180,13 @@ export default function LoginPage() {
         const scanRoute = matchedSubUser.eventId ? `/scan?event=${matchedSubUser.eventId}` : '/scan';
         router.push(scanRoute);
       } else {
-        let targetEvtId: string | undefined = undefined;
-        try {
-          const subUserEvents = await getWorkspaceEventsAsync(matchedSubUser.workspaceId);
-          targetEvtId = subUserEvents[0]?.id;
-        } catch (e) {}
+        let targetEvtId: string | undefined = matchedSubUser.eventId;
+        if (!targetEvtId) {
+          try {
+            const subUserEvents = await getWorkspaceEventsAsync(matchedSubUser.workspaceId);
+            targetEvtId = subUserEvents[0]?.id;
+          } catch (e) {}
+        }
         router.push(targetEvtId ? `/dashboard?eventId=${targetEvtId}` : '/dashboard');
       }
       return;

@@ -22,7 +22,7 @@ export interface AuthSession {
     id: string;
     email: string;
     name: string;
-    role: 'SUPER_USER' | 'ADMIN' | 'OPERATOR';
+    role: 'SUPER_USER' | 'OWNER' | 'ADMIN' | 'COORDINADOR' | 'OPERATOR';
     workspaceId?: string;
     eventId?: string;
     mustChangePassword?: boolean;
