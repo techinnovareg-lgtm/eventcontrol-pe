@@ -59,7 +59,13 @@ export default function WhatsAppMessagingPage() {
   const [autoRestMinutes, setAutoRestMinutes] = useState<number>(15);
   const [autoRestSecondsRemaining, setAutoRestSecondsRemaining] = useState<number>(0);
   const [autoBlockSentCount, setAutoBlockSentCount] = useState<number>(0);
-  const [autoStatusText, setAutoStatusText] = useState<string>('Listo para iniciar envío automático por bloques');
+  const [autoStatusText, setAutoStatusText] = useState<string>('Listo para iniciar envío asistido por bloques');
+  const [currentAutoGroupName, setCurrentAutoGroupName] = useState<string | null>(null);
+
+  const handleSkipToNextAutoRunner = () => {
+    setLastSentTimestamp(1);
+    setSecondsRemaining(0);
+  };
 
   // Dispatch Channel & Tab Control (Bypass Meta intermediate landing page)
   const [dispatchChannel, setDispatchChannel] = useState<WhatsAppChannel>('web');
@@ -155,7 +161,8 @@ export default function WhatsAppMessagingPage() {
         const elapsedSec = Math.floor((Date.now() - lastSentTimestamp) / 1000);
         if (elapsedSec < autoDelaySeconds) {
           const rem = autoDelaySeconds - elapsedSec;
-          setAutoStatusText(`⏳ Próximo envío en ${rem}s (Respetando intervalo anti-baneo)...`);
+          setSecondsRemaining(rem);
+          setAutoStatusText(`⏳ Chat precargado para "${currentAutoGroupName || 'invitado'}". Presiona ENTER en WhatsApp para enviar. Siguiente contacto en ${rem}s...`);
           return;
         }
       }
@@ -165,7 +172,8 @@ export default function WhatsAppMessagingPage() {
 
       if (!pendingGroup) {
         setIsAutoRunning(false);
-        setAutoStatusText('🎉 ¡Envío finalizado! Todos los grupos han recibido sus invitaciones.');
+        setCurrentAutoGroupName(null);
+        setAutoStatusText('🎉 ¡Envío asistido finalizado! Todos los grupos han sido despachados.');
         return;
       }
 
@@ -196,10 +204,11 @@ export default function WhatsAppMessagingPage() {
         }
       }));
 
+      setCurrentAutoGroupName(pendingGroup.group_name);
       setLastSentTimestamp(Date.now());
       setSecondsRemaining(autoDelaySeconds);
       setAutoBlockSentCount(prev => prev + 1);
-      setAutoStatusText(`🚀 Enviada invitación a ${pendingGroup.group_name} (${autoBlockSentCount + 1}/${autoBatchSize} del bloque actual)`);
+      setAutoStatusText(`📲 Precargado en WhatsApp: "${pendingGroup.group_name}" (${autoBlockSentCount + 1}/${autoBatchSize}). Presiona ENTER en WhatsApp para enviar. Siguiente en ${autoDelaySeconds}s.`);
 
     }, 1000);
 
@@ -207,7 +216,7 @@ export default function WhatsAppMessagingPage() {
   }, [
     isAutoRunning, autoRestSecondsRemaining, lastSentTimestamp, autoDelaySeconds,
     groups, sentLogs, autoBlockSentCount, autoBatchSize, autoRestMinutes, template, eventId, messageMode,
-    dispatchChannel, reuseTab
+    dispatchChannel, reuseTab, currentAutoGroupName
   ]);
 
   // Table Filter & Prerequisite State
@@ -231,12 +240,13 @@ export default function WhatsAppMessagingPage() {
       return;
     }
     setIsAutoRunning(true);
-    setAutoStatusText('🚀 Envío automático iniciado. Procesando invitaciones por bloques...');
+    setAutoStatusText('🚀 Iniciando despacho asistido... Abriendo primer chat en WhatsApp.');
   };
 
   const handlePauseAutoRunner = () => {
     setIsAutoRunning(false);
-    setAutoStatusText('⏸️ Envío automático pausado por el usuario.');
+    setAutoStatusText('⏸️ Envío asistido pausado por el usuario.');
+    setCurrentAutoGroupName(null);
   };
 
   const handleModeChange = (mode: 'FULL_INVITATION' | 'FIRST_GREETING') => {
@@ -426,6 +436,37 @@ export default function WhatsAppMessagingPage() {
           </div>
         )}
 
+        {/* BANNER EXPLICATIVO DE PROTOCOLO WHATSAPP ASISTIDO */}
+        <div className="card-luxury p-4.5 border border-emerald-400/80 bg-emerald-50/70 shadow-xs rounded-2xl flex items-start gap-3.5 text-xs text-emerald-950">
+          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs font-bold text-base">
+            💬
+          </div>
+          <div className="space-y-1.5 flex-1">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <strong className="text-emerald-950 font-bold text-sm">
+                ¿Cómo funciona el Despacho Asistido por WhatsApp?
+              </strong>
+              <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                Seguridad Oficial de Meta
+              </span>
+            </div>
+            <p className="text-emerald-900/90 leading-relaxed text-[11px]">
+              Por directivas globales de seguridad de WhatsApp (Meta), los enlaces de navegador siempre precargan el contacto y el texto del pase QR en el cuadro de mensaje. Para completar el envío, <strong>solo debes presionar la tecla <kbd className="px-1.5 py-0.5 bg-white border border-emerald-300 rounded font-mono font-bold text-emerald-950 shadow-2xs">ENTER ↵</kbd> en WhatsApp</strong>.
+            </p>
+            <div className="flex flex-wrap items-center gap-4 pt-0.5 text-[11px] text-emerald-950 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> 1 Clic precarga el mensaje directo en el chat
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Presiona <kbd className="px-1 py-0.2 bg-white border border-emerald-300 rounded font-mono">ENTER</kbd> para enviar
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Cero riesgo de bloqueo o suspensión de tu cuenta
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* AUTOMATED BATCH DISPATCHER CONTROL BAR */}
         <div className="card-luxury p-5 border border-emerald-400 bg-gradient-to-r from-emerald-900 to-teal-950 text-white shadow-lg rounded-2xl space-y-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-emerald-800/80 pb-3">
@@ -435,32 +476,42 @@ export default function WhatsAppMessagingPage() {
               </div>
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  🚀 Envío Automático por Bloques Anti-Baneo
+                  🚀 Despachador Asistido por Bloques (Anti-Baneo Meta)
                 </h3>
                 <p className="text-xs text-emerald-200/90">
-                  Despacha bloques de {autoBatchSize} invitaciones en segundo plano respetando las pausas de seguridad de {autoRestMinutes} min.
+                  Abre secuencialmente cada invitado en WhatsApp con su pase QR precargado. Solo debes presionar ENTER (↵) en WhatsApp para enviar.
                 </p>
               </div>
             </div>
 
             {/* Run / Pause Controls */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {!isAutoRunning ? (
                 <button
                   type="button"
                   onClick={handleStartAutoRunner}
                   className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2"
                 >
-                  <Play className="w-4 h-4 text-slate-950 fill-current" /> Iniciar Envío Automático
+                  <Play className="w-4 h-4 text-slate-950 fill-current" /> Iniciar Despacho Asistido
                 </button>
               ) : (
-                <button
-                  type="button"
-                  onClick={handlePauseAutoRunner}
-                  className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2 animate-pulse"
-                >
-                  <Pause className="w-4 h-4 text-slate-950 fill-current" /> Pausar Envío
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleSkipToNextAutoRunner}
+                    className="px-4 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5"
+                    title="Ya presioné ENTER en WhatsApp, cargar el siguiente contacto de inmediato"
+                  >
+                    <span>⏭️ Siguiente Contacto</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePauseAutoRunner}
+                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 animate-pulse"
+                  >
+                    <Pause className="w-4 h-4 text-slate-950 fill-current" /> Pausar
+                  </button>
+                </div>
               )}
             </div>
           </div>
