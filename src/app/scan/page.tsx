@@ -43,7 +43,16 @@ export default function MobileScanCheckInPage() {
     async function loadEventsAsync() {
       const activeSession = getActiveSession();
       if (!activeSession) {
-        if (typeof window !== 'undefined') window.location.href = '/login';
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const urlToken = params.get('token');
+          const urlEvt = params.get('event') || params.get('eventId');
+          if (urlToken) {
+            window.location.href = `/pass?token=${encodeURIComponent(urlToken)}${urlEvt ? `&event=${encodeURIComponent(urlEvt)}` : ''}`;
+            return;
+          }
+          window.location.href = '/login';
+        }
         return;
       }
 

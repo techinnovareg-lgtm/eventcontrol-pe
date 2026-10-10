@@ -21,6 +21,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import Link from 'next/link';
+import { generateDeterministicTokenString } from '@/lib/qr-engine';
 
 interface PassData {
   event: {
@@ -107,7 +108,14 @@ function GuestPassContent() {
 
             for (const [evtId, gList] of Object.entries(allGroups)) {
               if (Array.isArray(gList)) {
-                const match = gList.find((g) => g.id === token || g.external_id === token);
+                const tokenClean = token.trim().toLowerCase();
+                const match = gList.find((g) => 
+                  g.id === token || 
+                  generateDeterministicTokenString(g.id) === token ||
+                  (g.external_id && g.external_id.toLowerCase().trim() === tokenClean) ||
+                  (g.group_name && g.group_name.toLowerCase().trim() === tokenClean) ||
+                  (g.responsible_phone && token.replace(/\D/g, '') && g.responsible_phone.replace(/\D/g, '') === token.replace(/\D/g, ''))
+                );
                 if (match) {
                   foundGroup = match;
                   foundEventId = evtId;
@@ -274,12 +282,9 @@ function GuestPassContent() {
               <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
               Reintentar Carga
             </button>
-            <Link
-              href="/"
-              className="block w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs rounded-xl transition"
-            >
-              Ir a EventControl
-            </Link>
+            <p className="text-[11px] text-slate-400 leading-relaxed pt-2">
+              💡 <strong>Nota para el invitado:</strong> Tu pase de acceso es 100% libre y no requiere crear ninguna cuenta ni iniciar sesión. Si el código no carga, por favor solicita a los anfitriones del evento que te reenvíen tu enlace de pase digital.
+            </p>
           </div>
         </div>
       </div>
@@ -302,7 +307,12 @@ function GuestPassContent() {
             <span className="text-xs font-black tracking-widest text-transparent bg-clip-text bg-gradient-to-r from-[#F3E5AB] via-[#D4AF37] to-[#AA771C] uppercase block">
               EventControl
             </span>
-            <span className="text-[10px] text-slate-400 font-medium">Pase Digital Oficial</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-slate-400 font-medium">Pase Digital Oficial</span>
+              <span className="text-[9px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-semibold border border-emerald-500/30">
+                Público • Sin cuenta
+              </span>
+            </div>
           </div>
         </div>
 
@@ -531,8 +541,8 @@ function GuestPassContent() {
 
       {/* Security notice bottom */}
       <div className="w-full max-w-md text-center mt-6 text-[11px] text-slate-500 space-y-1">
-        <p>Este pase es personal e intransferible para el aforo registrado.</p>
-        <p>Por favor, presente este código directamente en su pantalla al momento de ingresar.</p>
+        <p className="text-slate-400 font-medium">✨ Acceso oficial público • No necesitas crear cuenta ni iniciar sesión.</p>
+        <p>Este pase es personal para el grupo registrado. Por favor, presente este código directamente en su pantalla al momento de ingresar.</p>
       </div>
     </div>
   );

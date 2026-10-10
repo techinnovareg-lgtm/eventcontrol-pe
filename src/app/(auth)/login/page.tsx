@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -21,6 +21,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberDeviceChecked, setRememberDeviceChecked] = useState(false);
+
+  // Auto-redirect guests who arrive with token parameters to public VIP pass
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const urlToken = params.get('token');
+      const urlEvt = params.get('event') || params.get('eventId');
+      if (urlToken) {
+        window.location.href = `/pass?token=${encodeURIComponent(urlToken)}${urlEvt ? `&event=${encodeURIComponent(urlEvt)}` : ''}`;
+      }
+    }
+  }, []);
   
   // 2FA Verification Modal State for tech.innova.reg@gmail.com
   const [show2FAModal, setShow2FAModal] = useState(false);

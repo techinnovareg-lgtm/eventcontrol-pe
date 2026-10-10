@@ -31,6 +31,22 @@ function loadLocalFileDb(): any {
   return null;
 }
 
+function matchGroupWithToken(g: GuestGroup, cleanToken: string): boolean {
+  if (!g || !cleanToken) return false;
+  const tokenClean = cleanToken.trim();
+  const tokenLower = tokenClean.toLowerCase();
+  if (g.id === tokenClean) return true;
+  if (generateDeterministicTokenString(g.id) === tokenClean) return true;
+  if (g.external_id && g.external_id.toLowerCase().trim() === tokenLower) return true;
+  if (g.group_name && g.group_name.toLowerCase().trim() === tokenLower) return true;
+  if (g.responsible_phone) {
+    const p1 = g.responsible_phone.replace(/\D/g, '');
+    const p2 = tokenClean.replace(/\D/g, '');
+    if (p1 && p2 && (p1 === p2 || p1.endsWith(p2) || p2.endsWith(p1))) return true;
+  }
+  return false;
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const rawToken = searchParams.get('token') || '';
@@ -71,10 +87,11 @@ export async function GET(req: Request) {
           }
         );
 
+        let groupsList: GuestGroup[] = [];
+
         if (res.ok) {
           const rows = await res.json();
           if (Array.isArray(rows)) {
-            let groupsList: GuestGroup[] = [];
             rows.forEach((r: any) => {
               try {
                 const data = JSON.parse(r.device_info);
@@ -90,14 +107,36 @@ export async function GET(req: Request) {
               } catch (e) {}
             });
 
-            // Find group in groupsList
-            targetGroup =
-              groupsList.find(
-                (g) =>
-                  g.id === cleanToken ||
-                  generateDeterministicTokenString(g.id) === cleanToken ||
-                  (g.external_id && g.external_id.toLowerCase() === cleanToken.toLowerCase())
-              ) || null;
+            targetGroup = groupsList.find((g) => matchGroupWithToken(g, cleanToken)) || null;
+          }
+        }
+
+        // Secondary fallback for this event if tables, assignments, or groups not found by direct UUID
+        if (!targetGroup || targetTables.length === 0 || targetAssignments.length === 0) {
+          const patternRes = await fetch(
+            `${url}/rest/v1/check_ins?scanner_staff_name=like.SYS_%25_${eventId}&select=*&order=scanned_at.desc`,
+            {
+              headers: { apikey: key, Authorization: `Bearer ${key}` },
+              cache: 'no-store',
+            }
+          );
+          if (patternRes.ok) {
+            const pRows = await patternRes.json();
+            if (Array.isArray(pRows)) {
+              pRows.forEach((r: any) => {
+                try {
+                  const data = JSON.parse(r.device_info);
+                  if (r.scanner_staff_name === `SYS_TABLES_${eventId}` && targetTables.length === 0) {
+                    targetTables = data;
+                  } else if (r.scanner_staff_name === `SYS_ASSIGNMENTS_${eventId}` && targetAssignments.length === 0) {
+                    targetAssignments = data;
+                  } else if (r.scanner_staff_name === `SYS_GROUPS_${eventId}` && !targetGroup) {
+                    const matched = (data as GuestGroup[]).find((g) => matchGroupWithToken(g, cleanToken));
+                    if (matched) targetGroup = matched;
+                  }
+                } catch (e) {}
+              });
+            }
           }
         }
       }
@@ -119,12 +158,7 @@ export async function GET(req: Request) {
               try {
                 const gList: GuestGroup[] = JSON.parse(r.device_info);
                 if (Array.isArray(gList)) {
-                  const match = gList.find(
-                    (g) =>
-                      g.id === cleanToken ||
-                      generateDeterministicTokenString(g.id) === cleanToken ||
-                      (g.external_id && g.external_id.toLowerCase() === cleanToken.toLowerCase())
-                  );
+                  const match = gList.find((g) => matchGroupWithToken(g, cleanToken));
                   if (match) {
                     targetGroup = match;
                     eventId = match.event_id;
@@ -178,12 +212,7 @@ export async function GET(req: Request) {
     if (localDb.groups) {
       for (const [evtId, gList] of Object.entries<GuestGroup[]>(localDb.groups)) {
         if (Array.isArray(gList)) {
-          const match = gList.find(
-            (g) =>
-              g.id === cleanToken ||
-              generateDeterministicTokenString(g.id) === cleanToken ||
-              (g.external_id && g.external_id.toLowerCase() === cleanToken.toLowerCase())
-          );
+          const match = gList.find((g) => matchGroupWithToken(g, cleanToken));
           if (match) {
             targetGroup = match;
             eventId = evtId;
@@ -206,7 +235,7 @@ export async function GET(req: Request) {
     }
   }
 
-  // If still no event found, check if event exists by scanning events
+  // If still no event found, scan across all events in Supabase
   if (targetGroup && !targetEvent && url && key) {
     try {
       const allEvtsRes = await fetch(
@@ -252,7 +281,7 @@ export async function GET(req: Request) {
     }
   }
 
-  // Fallback Event Name if event object not in sync
+  // Fallback Event Details if event record was partial
   const resolvedEvent = targetEvent || {
     id: targetGroup.event_id,
     workspace_id: targetGroup.workspace_id,
