@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { 
@@ -9,7 +9,7 @@ import {
   ShieldAlert, Clock, AlertTriangle, ChevronDown, ChevronUp, Coffee,
   Lock, ShieldCheck, HelpCircle, Info, RefreshCw, FileText,
   Edit3, Save, X, Play, Pause, RotateCcw, Check, Grid,
-  Globe, Laptop, Smartphone
+  Globe, Laptop, Smartphone, Trash2, Undo2, Search, SlidersHorizontal
 } from 'lucide-react';
 import EventNavHeader from '@/components/EventNavHeader';
 import { 
@@ -22,7 +22,8 @@ import { Event, GuestGroup } from '@/lib/supabase/types';
 import { getOrCreateGroupQRToken } from '@/lib/qr-engine';
 import { 
   DEFAULT_WHATSAPP_TEMPLATE, FIRST_GREETING_SAFE_TEMPLATE, formatWhatsAppMessage,
-  generateWhatsAppLink, dispatchWhatsAppMessage, recordWhatsAppSent, getWhatsAppSentLogMap, 
+  generateWhatsAppLink, dispatchWhatsAppMessage, recordWhatsAppSent, getWhatsAppSentLogMap,
+  deleteWhatsAppSentLog, resetAllWhatsAppSentLogs,
   WALogItem, WhatsAppChannel, isMobileDevice
 } from '@/lib/whatsapp';
 
@@ -41,7 +42,17 @@ export default function WhatsAppMessagingPage() {
   const [messageMode, setMessageMode] = useState<'FULL_INVITATION' | 'FIRST_GREETING'>('FULL_INVITATION');
   const [template, setTemplate] = useState<string>(DEFAULT_WHATSAPP_TEMPLATE);
   const [copiedGroup, setCopiedGroup] = useState<string | null>(null);
-  const [showAntiBanGuide, setShowAntiBanGuide] = useState<boolean>(true);
+
+  // Modals for Friendly Non-Expert UX
+  const [showHowItWorksModal, setShowHowItWorksModal] = useState<boolean>(false);
+  const [showAntiBanModal, setShowAntiBanModal] = useState<boolean>(false);
+  const [showChannelModal, setShowChannelModal] = useState<boolean>(false);
+  const [showTemplateEditor, setShowTemplateEditor] = useState<boolean>(false);
+
+  // Table Filters & Realtime Search
+  const [tableSearchQuery, setTableSearchQuery] = useState<string>('');
+  const [statusFilterTab, setStatusFilterTab] = useState<'ALL' | 'PENDING' | 'SENT' | 'NO_PHONE'>('ALL');
+  const [tableFilterMode, setTableFilterMode] = useState<'ALL' | 'WITH_TABLE' | 'WITHOUT_TABLE'>('ALL');
 
   // Inline Phone Editing State
   const [editingPhoneGroupId, setEditingPhoneGroupId] = useState<string | null>(null);
@@ -219,9 +230,6 @@ export default function WhatsAppMessagingPage() {
     dispatchChannel, reuseTab, currentAutoGroupName
   ]);
 
-  // Table Filter & Prerequisite State
-  const [tableFilterMode, setTableFilterMode] = useState<'ALL' | 'WITH_TABLE' | 'WITHOUT_TABLE'>('ALL');
-
   // Compute table assignment counts
   const groupsWithTableCount = groups.filter(g => assignments.some(a => a.group_id === g.id)).length;
   const groupsWithoutTableCount = Math.max(0, groups.length - groupsWithTableCount);
@@ -312,6 +320,37 @@ export default function WhatsAppMessagingPage() {
     setSecondsRemaining(autoDelaySeconds);
   };
 
+  // Reenviar mensaje
+  const handleResendWhatsApp = (phone: string, group: any) => {
+    handleOpenWhatsApp(phone, group);
+  };
+
+  // Eliminar registro de envío individual (volver a pendiente)
+  const handleDeleteSentLog = (groupId: string, groupName: string) => {
+    const confirmDel = confirm(
+      `¿Deseas eliminar el registro de envío de "${groupName}" y volver a marcarlo como PENDIENTE?`
+    );
+    if (!confirmDel) return;
+
+    deleteWhatsAppSentLog(eventId, groupId);
+    setSentLogs(prev => {
+      const updated = { ...prev };
+      delete updated[groupId];
+      return updated;
+    });
+  };
+
+  // Restablecer todos a Pendiente (global)
+  const handleResetAllSentLogs = () => {
+    const confirmReset = confirm(
+      `⚠️ RESTABLECER TODOS LOS ENVÍOS\n\n¿Estás seguro de restablecer todos los registros de envío a PENDIENTE para este evento?\n\nEsta acción borrará el historial de horas de envío para que puedas despachar nuevamente a todos los invitados.`
+    );
+    if (!confirmReset) return;
+
+    resetAllWhatsAppSentLogs(eventId);
+    setSentLogs({});
+  };
+
   const handleCopyMessage = (group: any) => {
     const data = getGroupDetails(group);
     const message = formatWhatsAppMessage(template, data);
@@ -377,651 +416,845 @@ export default function WhatsAppMessagingPage() {
   const totalCount = groups.length;
   const sentCount = Object.keys(sentLogs).length;
   const pendingCount = Math.max(0, totalCount - sentCount);
-  const currentBatchMessageNum = (sentCount % autoBatchSize) + 1;
-  const currentBatchNum = Math.floor(sentCount / autoBatchSize) + 1;
-  const isRestingPeriod = autoRestSecondsRemaining > 0 || (sentCount > 0 && sentCount % autoBatchSize === 0 && pendingCount > 0);
+  const noPhoneCount = groups.filter(g => !g.responsible_phone || !g.responsible_phone.trim()).length;
+  const sentPercentage = totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0;
+
+  // Filtered groups according to tabs and search query
+  const filteredGroups = useMemo(() => {
+    const query = tableSearchQuery.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    return groups.filter(g => {
+      const hasPhone = Boolean(g.responsible_phone && g.responsible_phone.trim());
+      const isSent = Boolean(sentLogs[g.id]);
+
+      // Status tab filter
+      if (statusFilterTab === 'PENDING' && isSent) return false;
+      if (statusFilterTab === 'SENT' && !isSent) return false;
+      if (statusFilterTab === 'NO_PHONE' && hasPhone) return false;
+
+      // Table assignment filter
+      const hasTable = assignments.some(a => a.group_id === g.id);
+      if (tableFilterMode === 'WITH_TABLE' && !hasTable) return false;
+      if (tableFilterMode === 'WITHOUT_TABLE' && hasTable) return false;
+
+      // Search query filter
+      if (query) {
+        const normName = g.group_name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        const phone = (g.responsible_phone || '').replace(/\D/g, '');
+        const asgn = assignments.find(a => a.group_id === g.id);
+        const tblName = asgn ? (tables.find(t => t.id === asgn.table_id)?.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+
+        return normName.includes(query) || phone.includes(query) || tblName.includes(query);
+      }
+
+      return true;
+    });
+  }, [groups, sentLogs, assignments, tables, statusFilterTab, tableFilterMode, tableSearchQuery]);
+
+  const channelLabel = dispatchChannel === 'desktop_app' 
+    ? 'App WhatsApp' 
+    : dispatchChannel === 'wa_me' 
+    ? 'Enlace Móvil (wa.me)' 
+    : 'WhatsApp Web Directo';
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] flex flex-col select-none">
       <EventNavHeader currentTab="whatsapp" eventId={eventId} eventName={event?.name} />
-      <main className="flex-1 py-8 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6 w-full">
+      <main className="flex-1 py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-5 w-full">
 
-        {/* Page Title & Status Banner */}
-        <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* 1. COMPACT & CLEAN HEADER WITH DYNAMIC HELP BUTTONS */}
+        <div className="bg-white rounded-2xl p-5 border border-[#C5A059]/30 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs font-bold text-emerald-700 uppercase tracking-widest flex items-center gap-1">
-                <ShieldCheck className="w-4 h-4 text-emerald-600" /> WhatsApp Asistido con Protección Anti-Baneo
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp Protegido
               </span>
-              <span className="text-[11px] font-serif font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-[#C5A059]/40 shadow-2xs">
-                🍷 Evento: {event?.name}
+              <span className="text-[11px] font-serif font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-[#C5A059]/40">
+                🍷 {event?.name || 'Evento'}
               </span>
             </div>
-            <h1 className="text-2xl font-serif font-bold text-slate-900 mt-1">Despacho de Invitaciones por WhatsApp</h1>
+            <h1 className="text-xl sm:text-2xl font-serif font-bold text-slate-900 mt-1.5">
+              Despacho de Pases por WhatsApp
+            </h1>
             <p className="text-xs text-slate-500 mt-0.5">
-              Sistema de envío seguro con temporizador de ritmo, edición de teléfonos, descansos por bloque y registro de hora de envío.
+              Envía invitaciones con pase QR individual y mesa asignada de forma rápida, segura y guiada.
             </p>
           </div>
 
-          <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-center gap-2 self-start sm:self-auto">
-            <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-            <div>
-              <strong className="block text-[11px]">Protección Anti-Spam Activa</strong>
-              <span className="text-[10px] text-emerald-700">Ritmo seguro: {autoDelaySeconds}s entre envíos</span>
-            </div>
+          {/* Dynamic Interactive Action Pills */}
+          <div className="flex flex-wrap items-center gap-2 self-start md:self-auto">
+            <button
+              type="button"
+              onClick={() => setShowHowItWorksModal(true)}
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-xl border border-slate-200 transition flex items-center gap-1.5 shadow-2xs"
+              title="Aprende cómo funciona el despacho asistido en 3 pasos simples"
+            >
+              <Info className="w-4 h-4 text-emerald-600" />
+              <span>¿Cómo Funciona?</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowAntiBanModal(true)}
+              className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-bold rounded-xl border border-amber-300 transition flex items-center gap-1.5 shadow-2xs"
+              title="Consejos clave para proteger tu número de bloqueos de Meta"
+            >
+              <ShieldAlert className="w-4 h-4 text-amber-600" />
+              <span>Consejos Anti-Baneo</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowChannelModal(true)}
+              className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 text-xs font-bold rounded-xl border border-emerald-300 transition flex items-center gap-1.5 shadow-2xs"
+              title="Cambia el canal entre WhatsApp Web, App Escritorio o Móvil"
+            >
+              <Settings className="w-4 h-4 text-emerald-600" />
+              <span>Canal: {channelLabel}</span>
+            </button>
           </div>
         </div>
 
-        {/* TABLE ASSIGNMENT PREREQUISITE WARNING BANNER */}
+        {/* 2. TABLE ASSIGNMENT ALERT (ONLY IF GUESTS HAVE NO TABLE ASSIGNED) */}
         {groupsWithoutTableCount > 0 && (
-          <div className="card-luxury p-4 border border-amber-300 bg-amber-50 rounded-2xl shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="w-6 h-6 text-amber-600 shrink-0" />
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
               <div>
-                <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wider">
-                  ⚠️ Protocolo Previo: {groupsWithoutTableCount} pases aún no tienen mesa asignada
-                </h4>
-                <p className="text-xs text-amber-800 mt-0.5">
-                  Se recomienda asignar las mesas antes del despacho por WhatsApp para que las invitaciones incluyan el nombre de la mesa.
-                </p>
+                <strong className="text-amber-950 font-bold block">
+                  Hay {groupsWithoutTableCount} pases sin mesa asignada
+                </strong>
+                <span className="text-amber-800 text-[11px]">
+                  Si envías ahora, las invitaciones dirán "Sin Mesa Asignada". Puedes asignar mesas primero si lo prefieres.
+                </span>
               </div>
             </div>
 
             <Link
               href={`/events/${eventId}/tables`}
-              className="px-3.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto shadow-2xs"
+              className="px-3 py-1.5 bg-amber-700 hover:bg-amber-800 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto shadow-2xs"
             >
-              <Grid className="w-4 h-4" /> Ir a Asignar Mesas Primero
+              <Grid className="w-3.5 h-3.5" /> Asignar Mesas Primero
             </Link>
           </div>
         )}
 
-        {/* BANNER EXPLICATIVO DE PROTOCOLO WHATSAPP ASISTIDO */}
-        <div className="card-luxury p-4.5 border border-emerald-400/80 bg-emerald-50/70 shadow-xs rounded-2xl flex items-start gap-3.5 text-xs text-emerald-950">
-          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs font-bold text-base">
-            💬
-          </div>
-          <div className="space-y-1.5 flex-1">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <strong className="text-emerald-950 font-bold text-sm">
-                ¿Cómo funciona el Despacho Asistido por WhatsApp?
+        {/* 3. EXECUTIVE DISPATCH COMMAND CENTER (UNIFIED PROGRESS & RUNNER) */}
+        <div className="bg-white rounded-2xl border border-emerald-300/80 shadow-md p-5 space-y-4">
+          {/* Top Metrics Row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+              <span className="text-[10px] text-slate-500 font-bold uppercase block">Total Invitados</span>
+              <strong className="text-xl font-bold text-slate-900 font-mono mt-0.5 block">{totalCount}</strong>
+            </div>
+
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-center">
+              <span className="text-[10px] text-emerald-700 font-bold uppercase block">Pases Enviados</span>
+              <strong className="text-xl font-bold text-emerald-800 font-mono mt-0.5 block">
+                {sentCount} <span className="text-xs font-semibold text-emerald-600">({sentPercentage}%)</span>
               </strong>
-              <span className="text-[10px] bg-emerald-200/80 text-emerald-900 font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
-                Seguridad Oficial de Meta
-              </span>
             </div>
-            <p className="text-emerald-900/90 leading-relaxed text-[11px]">
-              Por directivas globales de seguridad de WhatsApp (Meta), los enlaces de navegador siempre precargan el contacto y el texto del pase QR en el cuadro de mensaje. Para completar el envío, <strong>solo debes presionar la tecla <kbd className="px-1.5 py-0.5 bg-white border border-emerald-300 rounded font-mono font-bold text-emerald-950 shadow-2xs">ENTER ↵</kbd> en WhatsApp</strong>.
-            </p>
-            <div className="flex flex-wrap items-center gap-4 pt-0.5 text-[11px] text-emerald-950 font-semibold">
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> 1 Clic precarga el mensaje directo en el chat
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Presiona <kbd className="px-1 py-0.2 bg-white border border-emerald-300 rounded font-mono">ENTER</kbd> para enviar
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> Cero riesgo de bloqueo o suspensión de tu cuenta
-              </span>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-center">
+              <span className="text-[10px] text-amber-700 font-bold uppercase block">Pendientes</span>
+              <strong className="text-xl font-bold text-amber-900 font-mono mt-0.5 block">{pendingCount}</strong>
+            </div>
+
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-center">
+              <span className="text-[10px] text-slate-500 font-bold uppercase block">Sin Teléfono</span>
+              <strong className="text-xl font-bold text-slate-600 font-mono mt-0.5 block">{noPhoneCount}</strong>
             </div>
           </div>
-        </div>
 
-        {/* AUTOMATED BATCH DISPATCHER CONTROL BAR */}
-        <div className="card-luxury p-5 border border-emerald-400 bg-gradient-to-r from-emerald-900 to-teal-950 text-white shadow-lg rounded-2xl space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-emerald-800/80 pb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-700/60 border border-emerald-500/50 flex items-center justify-center shrink-0">
-                {isAutoRunning ? <Play className="w-5 h-5 text-emerald-300 animate-pulse" /> : <RocketIcon />}
+          {/* Visual Progress Bar */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs text-slate-600">
+              <span className="font-semibold">Progreso global del despacho:</span>
+              <span className="font-bold text-emerald-700">{sentCount} de {totalCount} completados</span>
+            </div>
+            <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden border border-slate-200">
+              <div 
+                className="h-full bg-gradient-to-r from-emerald-500 to-teal-600 rounded-full transition-all duration-500"
+                style={{ width: `${sentPercentage}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Automated Batch Runner Control Strip */}
+          <div className="bg-gradient-to-r from-emerald-900 to-teal-950 text-white rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shadow-sm">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Play className="w-3.5 h-3.5 text-emerald-400" /> Despacho Automático Asistido
+                </span>
+                {secondsRemaining > 0 && (
+                  <span className="px-2 py-0.5 bg-amber-500/30 border border-amber-400/50 text-amber-300 text-[10px] font-bold rounded-full animate-pulse">
+                    Pausa anti-spam: {secondsRemaining}s
+                  </span>
+                )}
               </div>
-              <div>
-                <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  🚀 Despachador Asistido por Bloques (Anti-Baneo Meta)
-                </h3>
-                <p className="text-xs text-emerald-200/90">
-                  Abre secuencialmente cada invitado en WhatsApp con su pase QR precargado. Solo debes presionar ENTER (↵) en WhatsApp para enviar.
-                </p>
-              </div>
+              <p className="text-xs text-emerald-100/90 font-mono">
+                {autoStatusText}
+              </p>
             </div>
 
-            {/* Run / Pause Controls */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {!isAutoRunning ? (
                 <button
                   type="button"
                   onClick={handleStartAutoRunner}
-                  className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2"
+                  className="px-5 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-2"
                 >
-                  <Play className="w-4 h-4 text-slate-950 fill-current" /> Iniciar Despacho Asistido
+                  <Play className="w-4 h-4 fill-current" /> Iniciar Envío Asistido
                 </button>
               ) : (
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleSkipToNextAutoRunner}
-                    className="px-4 py-2.5 bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5"
-                    title="Ya presioné ENTER en WhatsApp, cargar el siguiente contacto de inmediato"
+                    className="px-3.5 py-2.5 bg-emerald-300 hover:bg-emerald-200 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5"
+                    title="Cargar inmediatamente el siguiente invitado"
                   >
-                    <span>⏭️ Siguiente Contacto</span>
+                    <span>⏭️ Siguiente</span>
                   </button>
                   <button
                     type="button"
                     onClick={handlePauseAutoRunner}
-                    className="px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 animate-pulse"
+                    className="px-4 py-2.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-extrabold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 animate-pulse"
                   >
-                    <Pause className="w-4 h-4 text-slate-950 fill-current" /> Pausar
+                    <Pause className="w-4 h-4 fill-current" /> Pausar
                   </button>
                 </div>
               )}
             </div>
           </div>
-
-          {/* Status Message & Live Settings */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-emerald-100 font-mono">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0" />
-              <strong className="text-emerald-300">Estado:</strong> {autoStatusText}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3 text-[11px] text-emerald-200/90">
-              <span className="bg-emerald-800/60 border border-emerald-700/80 px-2.5 py-1 rounded-lg">
-                Bloque: <strong>{autoBatchSize} msgs</strong>
-              </span>
-              <span className="bg-emerald-800/60 border border-emerald-700/80 px-2.5 py-1 rounded-lg">
-                Espera: <strong>{autoDelaySeconds}s</strong>
-              </span>
-              <span className="bg-emerald-800/60 border border-emerald-700/80 px-2.5 py-1 rounded-lg">
-                Pausa: <strong>{autoRestMinutes}m</strong>
-              </span>
-            </div>
-          </div>
         </div>
 
-        {/* DISPATCH CHANNEL & TAB REUSE CONFIGURATION (BYPASS INTERMEDIATE LANDING PAGE) */}
-        <div className="card-luxury p-5 border border-emerald-300/80 bg-white shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Settings className="w-5 h-5 text-emerald-600" />
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">Canal de Envío Directo (Sin Pantalla Intermedia)</h4>
-                <p className="text-xs text-slate-500">
-                  Selecciona cómo se despachan los mensajes para enviar directamente al chat sin pantallas intermedias de WhatsApp.
-                </p>
-              </div>
-            </div>
-            
-            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 cursor-pointer hover:bg-slate-100 transition">
-              <input
-                type="checkbox"
-                checked={reuseTab}
-                onChange={(e) => handleReuseTabChange(e.target.checked)}
-                className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
-              />
-              <span>Reutilizar la misma pestaña de WhatsApp Web (evita abrir decenas de pestañas)</span>
-            </label>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button
-              type="button"
-              onClick={() => handleChannelChange('web')}
-              className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 ${
-                dispatchChannel === 'web'
-                  ? 'bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 font-bold'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-bold text-xs text-emerald-800">
-                  <Globe className="w-4 h-4 text-emerald-600" /> WhatsApp Web Directo
-                </span>
-                <span className="text-[10px] font-extrabold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">Recomendado PC</span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-normal leading-tight">
-                Abre directamente la conversación en WhatsApp Web con el mensaje listo. ¡Omite al 100% la pantalla intermedia de Meta!
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleChannelChange('desktop_app')}
-              className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 ${
-                dispatchChannel === 'desktop_app'
-                  ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 font-bold'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-bold text-xs text-indigo-800">
-                  <Laptop className="w-4 h-4 text-indigo-600" /> App de Escritorio WhatsApp
-                </span>
-                <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded">Windows / Mac</span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-normal leading-tight">
-                Abre directo la aplicación oficial instalada en tu computadora, sin abrir pestañas en el navegador.
-              </p>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleChannelChange('wa_me')}
-              className={`p-3.5 rounded-xl border text-left transition flex flex-col justify-between gap-1.5 ${
-                dispatchChannel === 'wa_me'
-                  ? 'bg-amber-50/90 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 font-bold'
-                  : 'bg-white border-slate-200 hover:border-slate-300 text-slate-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5 font-bold text-xs text-amber-800">
-                  <Smartphone className="w-4 h-4 text-amber-600" /> Enlace Universal (wa.me)
-                </span>
-                <span className="text-[10px] font-extrabold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">Móviles / Tablets</span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-normal leading-tight">
-                Enlace universal wa.me diseñado para teléfonos celulares o tabletas.
-              </p>
-            </button>
-          </div>
-        </div>
-
-        {/* INTERACTIVE WHATSAPP ANTI-BAN SAFETY GUIDE ACCORDION */}
-        <div className="card-luxury border border-amber-300 bg-amber-50/40 p-5 shadow-sm space-y-3">
+        {/* 4. COLLAPSIBLE TEMPLATE & PREVIEW ACCORDION (UNCLUTTERED BY DEFAULT) */}
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
           <button
             type="button"
-            onClick={() => setShowAntiBanGuide(!showAntiBanGuide)}
-            className="w-full flex items-center justify-between text-left focus:outline-none"
+            onClick={() => setShowTemplateEditor(!showTemplateEditor)}
+            className="w-full p-4 flex items-center justify-between text-left hover:bg-slate-50 transition"
           >
-            <div className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0" />
-              <h3 className="text-sm font-bold text-amber-955 uppercase tracking-wider">
-                🛡️ Guía y Protocolos Anti-Baneo de WhatsApp para Wedding Planners
-              </h3>
+            <div className="flex items-center gap-2.5">
+              <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div>
+                <span className="text-xs font-bold text-slate-900 block">
+                  Plantilla del Mensaje de WhatsApp: {messageMode === 'FULL_INVITATION' ? '💬 Invitación Completa (Con QR y Mesa)' : '🛡️ Primer Saludo Seguro (Sin Link)'}
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  {showTemplateEditor ? 'Toca para ocultar el editor' : 'Toca para ver o personalizar el texto del mensaje'}
+                </span>
+              </div>
             </div>
-            {showAntiBanGuide ? <ChevronUp className="w-5 h-5 text-amber-700" /> : <ChevronDown className="w-5 h-5 text-amber-700" />}
+
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
+                {showTemplateEditor ? 'Ocultar' : 'Personalizar Texto'}
+              </span>
+              {showTemplateEditor ? <ChevronUp className="w-4 h-4 text-slate-500" /> : <ChevronDown className="w-4 h-4 text-slate-500" />}
+            </div>
           </button>
 
-          {showAntiBanGuide && (
-            <div className="pt-2 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs border-t border-amber-200/80 animate-in fade-in duration-200">
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <Clock className="w-4 h-4 text-indigo-600" /> 1. Ritmo de Envío (30-60s)
-                </span>
-                <p className="text-[#4A5568] text-[11px] leading-relaxed">
-                  Deja pasar entre 30 segundos y 1 minuto entre cada mensaje. WhatsApp detecta envíos automáticos instantáneos como comportamiento de bot.
-                </p>
-              </div>
+          {showTemplateEditor && (
+            <div className="p-5 border-t border-slate-100 bg-slate-50/50 space-y-4 animate-in fade-in duration-200">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Editor Column */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">Tipo de mensaje:</span>
+                    <button
+                      onClick={() => handleModeChange(messageMode)}
+                      className="text-[11px] text-emerald-700 hover:underline font-semibold"
+                    >
+                      Restablecer texto original
+                    </button>
+                  </div>
 
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <Coffee className="w-4 h-4 text-amber-700" /> 2. Descansos por Bloques
-                </span>
-                <p className="text-[#4A5568] text-[11px] leading-relaxed">
-                  Envía en bloques de 20 a 30 invitaciones y realiza una pausa obligatoria de 15 a 20 minutos antes de continuar con el siguiente grupo.
-                </p>
-              </div>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange('FULL_INVITATION')}
+                      className={`py-2 px-3 rounded-xl border text-center transition ${
+                        messageMode === 'FULL_INVITATION'
+                          ? 'bg-emerald-700 border-emerald-700 text-white shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      💬 Con Pase QR y Mesa
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleModeChange('FIRST_GREETING')}
+                      className={`py-2 px-3 rounded-xl border text-center transition ${
+                        messageMode === 'FIRST_GREETING'
+                          ? 'bg-indigo-700 border-indigo-700 text-white shadow-xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      🛡️ Saludo Sin Enlace
+                    </button>
+                  </div>
 
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <PhoneOff className="w-4 h-4 text-red-600" /> 3. No Usar Listas de Difusión
-                </span>
-                <p className="text-[#4A5568] text-[11px] leading-relaxed">
-                  Las listas de difusión NO entregan el mensaje a contactos que no te tienen agendado. El envío directo wa.me garantiza entrega individual.
-                </p>
-              </div>
+                  <textarea
+                    rows={6}
+                    value={template}
+                    onChange={(e) => setTemplate(e.target.value)}
+                    className="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono bg-white focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Etiquetas: <code className="bg-slate-200 text-slate-800 px-1 rounded">&#123;GRUPO&#125;</code>, <code className="bg-slate-200 text-slate-800 px-1 rounded">&#123;EVENTO&#125;</code>, <code className="bg-slate-200 text-slate-800 px-1 rounded">&#123;MESA&#125;</code>, <code className="bg-slate-200 text-slate-800 px-1 rounded">&#123;ENLACE_QR&#125;</code>.
+                  </p>
+                </div>
 
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <FileText className="w-4 h-4 text-emerald-600" /> 4. Personalización Obligatoria
-                </span>
-                <p className="text-[#4A5568] text-[11px] leading-relaxed">
-                  Varía el texto usando las etiquetas <code className="bg-slate-100 text-emerald-800 px-1 rounded">&#123;GRUPO&#125;</code> y <code className="bg-slate-100 text-emerald-800 px-1 rounded">&#123;MESA&#125;</code>. Los mensajes 100% idénticos activan el filtro de spam.
-                </p>
-              </div>
-
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-purple-600" /> 5. Pregunta de Confirmación (CTA)
-                </span>
-                <p className="text-[#4A5568] text-[11px] leading-relaxed">
-                  Concluye el mensaje con una pregunta (ej. <em>"¿Nos acompañan? Avísame para confirmar..."</em>). La respuesta del invitado elimina el riesgo de baneo.
-                </p>
-              </div>
-
-              <div className="p-3 bg-white rounded-xl border border-amber-200 space-y-1">
-                <span className="font-bold text-slate-900 flex items-center gap-1.5">
-                  <Lock className="w-4 h-4 text-blue-600" /> 6. Saludo Seguro Sin Enlace
-                </span>
-                <p className="text-[#4A5568] text-[11px] leading-relaxed">
-                  Si vas a enviar a números lejanos o no agendados, utiliza la plantilla "Primer Saludo Seguro" sin URL previa para evitar alertas de spam.
-                </p>
+                {/* Live WhatsApp Bubble Preview */}
+                <div className="bg-emerald-950 text-white rounded-xl p-4 flex flex-col justify-between space-y-2">
+                  <div>
+                    <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest block mb-2 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Vista Previa en WhatsApp
+                    </span>
+                    <div className="p-3 bg-emerald-900/60 rounded-xl border border-emerald-800/80 text-xs font-mono leading-relaxed whitespace-pre-wrap">
+                      {groups.length > 0 ? formatWhatsAppMessage(template, getGroupDetails(groups[0])) : 'Sin invitados registrados.'}
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-emerald-300/70 italic">
+                    * El mensaje se abrirá en WhatsApp precargado con los datos del invitado seleccionado.
+                  </span>
+                </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* BATCH MONITOR & COOLDOWN BAR */}
-        <div className="card-luxury p-5 border border-emerald-300 bg-white shadow-sm space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-emerald-600" />
-              <div>
-                <h4 className="text-sm font-bold text-slate-900">Monitor de Ritmo y Cooldown Anti-Spam</h4>
-                <p className="text-xs text-slate-500">
-                  Progreso: <strong className="text-emerald-700">{sentCount} de {totalCount} enviadas</strong> ({totalCount > 0 ? Math.round((sentCount / totalCount) * 100) : 0}%)
-                </p>
+        {/* 5. GUEST INVITATION TABLE WITH SEARCH, RE-SEND & RESET ACTIONS */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+          {/* Table Header with Search, Filter Tabs and Reset Button */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+            <div className="space-y-2 flex-1">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-base font-bold text-slate-900">
+                  Lista de Invitados ({filteredGroups.length} mostrados de {groups.length})
+                </h3>
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilterTab('ALL')}
+                  className={`px-3 py-1 text-xs font-bold rounded-xl transition ${
+                    statusFilterTab === 'ALL'
+                      ? 'bg-slate-900 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Todos ({totalCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilterTab('PENDING')}
+                  className={`px-3 py-1 text-xs font-bold rounded-xl transition ${
+                    statusFilterTab === 'PENDING'
+                      ? 'bg-amber-600 text-white shadow-2xs'
+                      : 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+                  }`}
+                >
+                  ⏰ Pendientes ({pendingCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilterTab('SENT')}
+                  className={`px-3 py-1 text-xs font-bold rounded-xl transition ${
+                    statusFilterTab === 'SENT'
+                      ? 'bg-emerald-700 text-white shadow-2xs'
+                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                  }`}
+                >
+                  ✅ Enviados ({sentCount})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilterTab('NO_PHONE')}
+                  className={`px-3 py-1 text-xs font-bold rounded-xl transition ${
+                    statusFilterTab === 'NO_PHONE'
+                      ? 'bg-slate-700 text-white shadow-2xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                >
+                  Sin Teléfono ({noPhoneCount})
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 self-start sm:self-auto">
-              <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-xl border border-slate-200">
-                Bloque #{currentBatchNum} (Envío {currentBatchMessageNum} de {autoBatchSize})
-              </span>
+            {/* Google-Style Table Search Bar & Reset Button */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[240px] flex-1 sm:flex-initial">
+                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={tableSearchQuery}
+                  onChange={(e) => setTableSearchQuery(e.target.value)}
+                  placeholder="Buscar por nombre, teléfono o mesa..."
+                  className="w-full bg-slate-50 border border-slate-200 text-xs py-2 pl-9 pr-8 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+                {tableSearchQuery && (
+                  <button
+                    onClick={() => setTableSearchQuery('')}
+                    className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 text-xs"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
 
-              {secondsRemaining > 0 ? (
-                <span className="text-xs font-extrabold text-amber-900 bg-amber-100 border border-amber-300 px-3 py-1 rounded-xl flex items-center gap-1.5 animate-pulse">
-                  <Clock className="w-3.5 h-3.5 text-amber-700" /> Espera recomendada: {secondsRemaining}s
-                </span>
-              ) : (
-                <span className="text-xs font-extrabold text-emerald-900 bg-emerald-100 border border-emerald-300 px-3 py-1 rounded-xl flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" /> Listo para siguiente envío
-                </span>
+              {sentCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handleResetAllSentLogs}
+                  className="px-3 py-2 bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-600 text-xs font-bold rounded-xl border border-slate-200 hover:border-red-300 transition flex items-center gap-1.5 shadow-2xs"
+                  title="Restablecer todos los envíos de este evento a estado pendiente"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restablecer Todos</span>
+                </button>
               )}
             </div>
           </div>
 
-          {/* Resting Period Warning */}
-          {isRestingPeriod && (
-            <div className="p-3 bg-amber-100/80 border border-amber-300 rounded-xl flex items-center gap-3 text-xs text-amber-950 font-semibold">
-              <Coffee className="w-6 h-6 text-amber-700 shrink-0" />
-              <div>
-                <strong className="block text-amber-900 font-bold">☕ PAUSA DE SEGURIDAD RECOMENDADA ({autoRestMinutes} minutos)</strong>
-                <span>Has completado los envíos del bloque actual. Toma un descanso para garantizar que tu cuenta de WhatsApp no sea sancionada.</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* MODE SELECTOR & TEMPLATE EDITOR GRID */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Template Configuration */}
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                <Settings className="w-4 h-4 text-emerald-600" /> Modo y Plantilla del Mensaje
-              </h3>
-            </div>
-
-            {/* Mode Switcher */}
-            <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl text-xs font-bold">
-              <button
-                type="button"
-                onClick={() => handleModeChange('FULL_INVITATION')}
-                className={`py-2 px-3 rounded-lg transition text-center ${messageMode === 'FULL_INVITATION' ? 'bg-emerald-700 text-white shadow-sm font-extrabold' : 'text-slate-600 hover:text-slate-900'}`}
-              >
-                💬 Invitación Completa (Con QR)
-              </button>
-              <button
-                type="button"
-                onClick={() => handleModeChange('FIRST_GREETING')}
-                className={`py-2 px-3 rounded-lg transition text-center ${messageMode === 'FIRST_GREETING' ? 'bg-indigo-700 text-white shadow-sm font-extrabold' : 'text-slate-600 hover:text-slate-900'}`}
-              >
-                🛡️ Primer Saludo Seguro (Sin Link)
-              </button>
-            </div>
-
-            <p className="text-xs text-slate-500">
-              Variables disponibles: <code className="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono text-[11px]">&#123;GRUPO&#125;</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono text-[11px]">&#123;EVENTO&#125;</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono text-[11px]">&#123;MESA&#125;</code>, <code className="bg-slate-100 px-1 py-0.5 rounded text-emerald-700 font-mono text-[11px]">&#123;ENLACE_QR&#125;</code>.
-            </p>
-
-            <textarea
-              rows={8}
-              value={template}
-              onChange={(e) => setTemplate(e.target.value)}
-              className="w-full p-3 border border-slate-300 rounded-xl text-xs font-mono bg-slate-50 focus:ring-2 focus:ring-emerald-500 focus:outline-none"
-            />
-
-            <div className="flex justify-between items-center text-xs">
-              <button
-                onClick={() => handleModeChange(messageMode)}
-                className="text-slate-500 hover:text-emerald-600 underline font-medium"
-              >
-                Restablecer plantilla del modo
-              </button>
-            </div>
-          </div>
-
-          {/* Message Live Preview */}
-          <div className="bg-emerald-950 text-white rounded-2xl border border-emerald-900 p-6 shadow-sm space-y-3 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <h3 className="text-sm font-bold text-emerald-400 uppercase tracking-wider">Vista Previa WhatsApp (Personalizada)</h3>
-              </div>
-
-              <div className="p-4 bg-emerald-900/60 rounded-xl border border-emerald-800 text-xs font-mono leading-relaxed whitespace-pre-wrap">
-                {groups.length > 0 ? formatWhatsAppMessage(template, getGroupDetails(groups[0])) : 'Sin grupos cargados.'}
-              </div>
-            </div>
-
-            <div className="text-[11px] text-emerald-400/80 italic border-t border-emerald-900 pt-3">
-              * El mensaje se abrirá en WhatsApp Web o App personalizado con el nombre del invitado y su hora de envío auditada.
-            </div>
-          </div>
-        </div>
-
-        {/* GUEST GROUPS DISPATCH LIST WITH TIMESTAMP LOGGING & INLINE PHONE EDITING */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-3">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Users className="w-5 h-5 text-emerald-600" /> Lista de Invitados para Envío ({groups.length})
-              </h3>
-              
-              {/* Filter Tabs by Table Assignment */}
-              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <button
-                  type="button"
-                  onClick={() => setTableFilterMode('ALL')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
-                    tableFilterMode === 'ALL'
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Todos ({groups.length})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTableFilterMode('WITH_TABLE')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
-                    tableFilterMode === 'WITH_TABLE'
-                      ? 'bg-emerald-700 text-white'
-                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
-                  }`}
-                >
-                  Con Mesa ({groupsWithTableCount})
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTableFilterMode('WITHOUT_TABLE')}
-                  className={`px-2.5 py-1 text-xs font-bold rounded-lg transition ${
-                    tableFilterMode === 'WITHOUT_TABLE'
-                      ? 'bg-amber-700 text-white'
-                      : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
-                  }`}
-                >
-                  Sin Mesa ({groupsWithoutTableCount})
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-3 text-xs self-start sm:self-auto">
-              <span className="text-emerald-800 font-bold bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
-                ✅ Enviados: {sentCount}
-              </span>
-              <span className="text-slate-600 font-bold bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
-                ⏰ Pendientes: {pendingCount}
-              </span>
-            </div>
-          </div>
-
-          {groups.length === 0 ? (
-            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-xs text-slate-500 space-y-2">
-              <Users className="w-8 h-8 text-slate-400 mx-auto" />
-              <p className="font-bold text-slate-700">Aún no hay invitados importados para este evento.</p>
-              <p className="text-slate-500">Carga tu lista de invitados desde la sección de Excel para habilitar los envíos asistidos por WhatsApp.</p>
+          {/* Table Body */}
+          {filteredGroups.length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-xs text-slate-500 space-y-2">
+              <Users className="w-8 h-8 text-slate-300 mx-auto" />
+              <p className="font-bold text-slate-700">No se encontraron invitados con los filtros actuales.</p>
+              <p className="text-slate-400">Prueba cambiando la búsqueda o seleccionando la pestaña "Todos".</p>
             </div>
           ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 font-bold text-slate-600 uppercase">
-                  <th className="py-3 px-4">Grupo / Responsable</th>
-                  <th className="py-3 px-4">Pases</th>
-                  <th className="py-3 px-4">Mesa</th>
-                  <th className="py-3 px-4">Teléfono (Modificable)</th>
-                  <th className="py-3 px-4">Hora de Envío (sent_at)</th>
-                  <th className="py-3 px-4">Acción WhatsApp</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {groups
-                  .filter((g) => {
-                    const hasTable = assignments.some((a) => a.group_id === g.id);
-                    if (tableFilterMode === 'WITH_TABLE') return hasTable;
-                    if (tableFilterMode === 'WITHOUT_TABLE') return !hasTable;
-                    return true;
-                  })
-                  .map((group) => {
-                  const hasPhone = Boolean(group.responsible_phone && group.responsible_phone.trim());
-                  const logItem = sentLogs[group.id];
-                  const sentTimeFormatted = logItem ? formatSentTime(logItem.sentAt) : null;
-                  const isEditingThisPhone = editingPhoneGroupId === group.id;
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-200 font-bold text-slate-600 uppercase text-[11px]">
+                    <th className="py-3 px-3">Invitado / Familia</th>
+                    <th className="py-3 px-3">Pases</th>
+                    <th className="py-3 px-3">Mesa</th>
+                    <th className="py-3 px-3">Teléfono</th>
+                    <th className="py-3 px-3">Estado</th>
+                    <th className="py-3 px-3 text-right">Acción</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredGroups.map((group) => {
+                    const hasPhone = Boolean(group.responsible_phone && group.responsible_phone.trim());
+                    const logItem = sentLogs[group.id];
+                    const isSent = Boolean(logItem);
+                    const sentTimeFormatted = logItem ? formatSentTime(logItem.sentAt) : null;
+                    const isEditingThisPhone = editingPhoneGroupId === group.id;
 
-                  return (
-                    <tr key={group.id} className="hover:bg-slate-50 transition">
-                      <td className="py-3 px-4 font-bold text-slate-900">{group.group_name}</td>
-                      <td className="py-3 px-4 font-bold text-emerald-600">{group.max_passes} pases</td>
-                      <td className="py-3 px-4 text-purple-700 font-semibold">{getGroupDetails(group).tableName}</td>
-                      
-                      {/* INLINE PHONE EDITING CELL */}
-                      <td className="py-3 px-4 font-mono text-slate-600">
-                        {isEditingThisPhone ? (
-                          <div className="flex items-center gap-1.5 animate-in fade-in duration-150">
-                            <input
-                              type="text"
-                              value={editingPhoneValue}
-                              onChange={(e) => setEditingPhoneValue(e.target.value)}
-                              placeholder="Ej. 987654321"
-                              disabled={isSavingPhone}
-                              className="w-32 px-2.5 py-1 text-xs border border-emerald-500 rounded-lg focus:ring-2 focus:ring-emerald-500 bg-white font-mono"
-                              autoFocus
-                            />
-                            <button
-                              onClick={() => handleSavePhone(group.id)}
-                              disabled={isSavingPhone}
-                              className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition"
-                              title="Guardar teléfono"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={handleCancelEditPhone}
-                              disabled={isSavingPhone}
-                              className="p-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg transition"
-                              title="Cancelar"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2">
-                            {hasPhone ? (
-                              <span className="text-emerald-700 font-semibold flex items-center gap-1">
-                                <Send className="w-3 h-3 text-emerald-600" /> {group.responsible_phone}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 italic flex items-center gap-1">
-                                <PhoneOff className="w-3 h-3" /> Sin Teléfono
-                              </span>
-                            )}
+                    return (
+                      <tr key={group.id} className="hover:bg-slate-50/80 transition">
+                        {/* Name Column */}
+                        <td className="py-3 px-3">
+                          <strong className="text-slate-900 block font-semibold">{group.group_name}</strong>
+                        </td>
 
-                            <button
-                              onClick={() => handleStartEditPhone(group)}
-                              className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition"
-                              title="Editar número de teléfono"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </td>
-                      
-                      {/* Recorded Sent Timestamp Column */}
-                      <td className="py-3 px-4 whitespace-nowrap">
-                        {sentTimeFormatted ? (
-                          <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2.5 py-1 rounded-lg inline-flex items-center gap-1 shadow-2xs">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Enviado: {sentTimeFormatted}
+                        {/* Passes Column */}
+                        <td className="py-3 px-3">
+                          <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                            {group.max_passes} {group.max_passes === 1 ? 'pase' : 'pases'}
                           </span>
-                        ) : (
-                          <span className="text-[11px] font-mono text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded italic">
-                            ⏰ Pendiente
-                          </span>
-                        )}
-                      </td>
+                        </td>
 
-                      <td className="py-3 px-4">
-                        {hasPhone ? (
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenWhatsApp(group.responsible_phone!, group)}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-sm"
-                              title={
-                                dispatchChannel === 'web'
-                                  ? 'Abrir directamente en WhatsApp Web (sin pantalla previa de confirmación)'
-                                  : dispatchChannel === 'desktop_app'
-                                  ? 'Abrir en la aplicación nativa de WhatsApp'
-                                  : 'Abrir vía enlace universal wa.me'
-                              }
-                            >
-                              {dispatchChannel === 'desktop_app' ? (
-                                <Laptop className="w-3.5 h-3.5" />
-                              ) : dispatchChannel === 'web' ? (
-                                <Globe className="w-3.5 h-3.5" />
+                        {/* Table Column */}
+                        <td className="py-3 px-3">
+                          <span className="text-purple-700 font-semibold flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-purple-500" /> {getGroupDetails(group).tableName}
+                          </span>
+                        </td>
+
+                        {/* Phone Column with Inline Edit */}
+                        <td className="py-3 px-3 font-mono">
+                          {isEditingThisPhone ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={editingPhoneValue}
+                                onChange={(e) => setEditingPhoneValue(e.target.value)}
+                                placeholder="987654321"
+                                disabled={isSavingPhone}
+                                className="w-28 px-2 py-1 text-xs border border-emerald-500 rounded-lg focus:ring-1 focus:ring-emerald-500 bg-white font-mono"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => handleSavePhone(group.id)}
+                                disabled={isSavingPhone}
+                                className="p-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md transition"
+                                title="Guardar teléfono"
+                              >
+                                <Check className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                onClick={handleCancelEditPhone}
+                                disabled={isSavingPhone}
+                                className="p-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-md transition"
+                                title="Cancelar"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                              {hasPhone ? (
+                                <span className="text-slate-700 font-semibold">{group.responsible_phone}</span>
                               ) : (
-                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span className="text-slate-400 italic">Sin teléfono</span>
                               )}
-                              <span>Enviar por WhatsApp</span>
-                            </button>
-                            <button
-                              onClick={() => handleCopyMessage(group)}
-                              className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition"
-                              title="Copiar texto del mensaje y registrar envío"
-                            >
-                              {copiedGroup === group.id ? <CheckCircle2 className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
-                            </button>
+                              <button
+                                onClick={() => handleStartEditPhone(group)}
+                                className="p-1 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition"
+                                title="Editar número de teléfono"
+                              >
+                                <Edit3 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Status Column */}
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          {isSent ? (
+                            <span className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded-lg inline-flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Enviado: {sentTimeFormatted}
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-amber-900 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg inline-flex items-center gap-1 font-semibold">
+                              <Clock className="w-3 h-3 text-amber-600" /> Pendiente
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Actions Column */}
+                        <td className="py-3 px-3 text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            {hasPhone ? (
+                              <>
+                                {!isSent ? (
+                                  <button
+                                    onClick={() => handleOpenWhatsApp(group.responsible_phone!, group)}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition flex items-center gap-1.5 shadow-2xs"
+                                    title="Enviar pase por WhatsApp"
+                                  >
+                                    <Send className="w-3 h-3" />
+                                    <span>Enviar</span>
+                                  </button>
+                                ) : (
+                                  <>
+                                    {/* Botón Reenviar */}
+                                    <button
+                                      onClick={() => handleResendWhatsApp(group.responsible_phone!, group)}
+                                      className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold text-xs rounded-xl transition flex items-center gap-1"
+                                      title="Reenviar mensaje por WhatsApp"
+                                    >
+                                      <RotateCcw className="w-3 h-3 text-amber-700" />
+                                      <span>Reenviar</span>
+                                    </button>
+
+                                    {/* Botón Desmarcar / Volver a Pendiente */}
+                                    <button
+                                      onClick={() => handleDeleteSentLog(group.id, group.group_name)}
+                                      className="p-1.5 bg-slate-100 hover:bg-red-50 hover:text-red-700 text-slate-500 border border-slate-200 hover:border-red-300 rounded-xl transition"
+                                      title="Desmarcar y volver a poner como PENDIENTE"
+                                    >
+                                      <Undo2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </>
+                                )}
+
+                                {/* Copiar texto */}
+                                <button
+                                  onClick={() => handleCopyMessage(group)}
+                                  className="p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl transition"
+                                  title="Copiar texto del mensaje"
+                                >
+                                  {copiedGroup === group.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => handleStartEditPhone(group)}
+                                className="px-2.5 py-1 bg-slate-100 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 font-bold text-xs rounded-xl transition flex items-center gap-1"
+                              >
+                                <Edit3 className="w-3 h-3" /> Agregar Teléfono
+                              </button>
+                            )}
                           </div>
-                        ) : (
-                          <span className="text-slate-400 text-[11px] italic">Sin teléfono registrado</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
-      </main>
-    </div>
-  );
-}
 
-function RocketIcon() {
-  return (
-    <svg className="w-5 h-5 text-emerald-300 fill-current" viewBox="0 0 24 24">
-      <path d="M12 2.5s-4.5 4.5-4.5 10.5c0 2.5 1 4.5 2.5 5.5v3h4v-3c1.5-1 2.5-3 2.5-5.5C16.5 7 12 2.5 12 2.5zM12 15a2 2 0 1 1 0-4 2 2 0 0 1 0 4z"/>
-    </svg>
+      </main>
+
+      {/* MODAL 1: ¿CÓMO FUNCIONA EL DESPACHO ASISTIDO? */}
+      {showHowItWorksModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+                  💬
+                </div>
+                <h3 className="text-base font-bold text-slate-900 font-serif">
+                  ¿Cómo funciona el Envío de WhatsApp?
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowHowItWorksModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              Para garantizar que Meta (WhatsApp) nunca bloquee ni suspenda tu número por comportamiento de "bot", el sistema funciona con el protocolo oficial:
+            </p>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center font-bold text-xs shrink-0">1</span>
+                <div>
+                  <strong className="text-emerald-950 font-bold block">1 Clic abre el chat directamente</strong>
+                  <span className="text-emerald-800 text-[11px]">
+                    Al presionar "Enviar", se abre WhatsApp con el contacto y el texto del pase QR precargado listo para mandar.
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">2</span>
+                <div>
+                  <strong className="text-indigo-950 font-bold block">Presiona ENTER (↵) en WhatsApp</strong>
+                  <span className="text-indigo-800 text-[11px]">
+                    Solo debes presionar la tecla Enter o el botón de enviar en WhatsApp para despachar el mensaje.
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-amber-600 text-white flex items-center justify-center font-bold text-xs shrink-0">3</span>
+                <div>
+                  <strong className="text-amber-950 font-bold block">Pausa de Ritmo y Cero Riesgo de Baneo</strong>
+                  <span className="text-amber-800 text-[11px]">
+                    El sistema respeta una pausa de 30-40 segundos entre invitados. Así tu número se mantiene 100% seguro y activo.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowHowItWorksModal(false)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition"
+            >
+              Entendido, volver al despacho
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: CONSEJOS ANTI-BANEO PARA WEDDING PLANNERS */}
+      {showAntiBanModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-amber-600" />
+                <h3 className="text-base font-bold text-slate-900 font-serif">
+                  Protocolos Anti-Baneo de WhatsApp (Meta)
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowAntiBanModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <strong className="text-slate-900 flex items-center gap-1.5 font-bold">
+                  <Clock className="w-4 h-4 text-emerald-600" /> 1. Ritmo de Envío (30-60s)
+                </strong>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Evita enviar decenas de mensajes por segundo. Dejar 30-40 segundos entre mensajes simula uso humano legítimo.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <strong className="text-slate-900 flex items-center gap-1.5 font-bold">
+                  <Coffee className="w-4 h-4 text-amber-600" /> 2. Descansos por Bloques
+                </strong>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Envía en bloques de 20 invitaciones y toma una pausa de 15 minutos antes de despachar el siguiente grupo.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <strong className="text-slate-900 flex items-center gap-1.5 font-bold">
+                  <PhoneOff className="w-4 h-4 text-red-600" /> 3. No Usar Listas de Difusión
+                </strong>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Las listas de difusión no llegan a contactos que no te tienen guardado. El envío directo individual es 100% efectivo.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <strong className="text-slate-900 flex items-center gap-1.5 font-bold">
+                  <FileText className="w-4 h-4 text-indigo-600" /> 4. Personalización del Mensaje
+                </strong>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Cada mensaje lleva el nombre de la familia y su mesa. La variación de texto evita los filtros de spam de Meta.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <strong className="text-slate-900 flex items-center gap-1.5 font-bold">
+                  <HelpCircle className="w-4 h-4 text-purple-600" /> 5. Pregunta de Confirmación
+                </strong>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  La plantilla invita al invitado a responder ("¿Nos acompañan?"). Cuando el invitado responde, el chat se valida.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                <strong className="text-slate-900 flex items-center gap-1.5 font-bold">
+                  <Lock className="w-4 h-4 text-blue-600" /> 6. Primer Saludo Seguro
+                </strong>
+                <p className="text-slate-600 text-[11px] leading-relaxed">
+                  Para números desconocidos, puedes usar el modo "Primer Saludo Seguro" sin enlace web previo.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowAntiBanModal(false)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition"
+            >
+              Cerrar Guía
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 3: CANAL DE ENVÍO DIRECTO (SIN PANTALLA INTERMEDIA) */}
+      {showChannelModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2">
+                <Settings className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-base font-bold text-slate-900 font-serif">
+                  Configuración del Canal de Envío
+                </h3>
+              </div>
+              <button
+                onClick={() => setShowChannelModal(false)}
+                className="text-slate-400 hover:text-slate-700 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600">
+              Elige cómo deseas que se abran las conversaciones de WhatsApp para omitir pantallas intermedias:
+            </p>
+
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={() => handleChannelChange('web')}
+                className={`w-full p-3 rounded-xl border text-left transition flex items-center justify-between ${
+                  dispatchChannel === 'web'
+                    ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-950 font-bold'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Globe className="w-4 h-4 text-emerald-600" />
+                  <div>
+                    <span className="text-xs font-bold block">WhatsApp Web Directo</span>
+                    <span className="text-[11px] text-slate-500 font-normal">Abre directo la conversación en el navegador (Recomendado PC)</span>
+                  </div>
+                </div>
+                {dispatchChannel === 'web' && <Check className="w-4 h-4 text-emerald-600" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleChannelChange('desktop_app')}
+                className={`w-full p-3 rounded-xl border text-left transition flex items-center justify-between ${
+                  dispatchChannel === 'desktop_app'
+                    ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 font-bold'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Laptop className="w-4 h-4 text-indigo-600" />
+                  <div>
+                    <span className="text-xs font-bold block">App Oficial de Escritorio</span>
+                    <span className="text-[11px] text-slate-500 font-normal">Abre directamente la aplicación instalada en Windows/Mac</span>
+                  </div>
+                </div>
+                {dispatchChannel === 'desktop_app' && <Check className="w-4 h-4 text-indigo-600" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleChannelChange('wa_me')}
+                className={`w-full p-3 rounded-xl border text-left transition flex items-center justify-between ${
+                  dispatchChannel === 'wa_me'
+                    ? 'bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 font-bold'
+                    : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Smartphone className="w-4 h-4 text-amber-600" />
+                  <div>
+                    <span className="text-xs font-bold block">Enlace Universal (wa.me)</span>
+                    <span className="text-[11px] text-slate-500 font-normal">Ideal para teléfonos móviles o tabletas</span>
+                  </div>
+                </div>
+                {dispatchChannel === 'wa_me' && <Check className="w-4 h-4 text-amber-600" />}
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100">
+              <label className="flex items-center gap-2.5 text-xs text-slate-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={reuseTab}
+                  onChange={(e) => handleReuseTabChange(e.target.checked)}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="font-medium">Reutilizar la misma pestaña de WhatsApp Web (evita abrir 50 pestañas)</span>
+              </label>
+            </div>
+
+            <button
+              onClick={() => setShowChannelModal(false)}
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition"
+            >
+              Guardar y Continuar
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

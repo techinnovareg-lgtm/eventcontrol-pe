@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { 
   Camera, QrCode, ShieldCheck, CheckCircle2, XCircle, AlertTriangle, 
   Users, MapPin, RefreshCw, ArrowLeft, Zap, Lock, Wifi, WifiOff, Download, CloudUpload, Home, LogOut,
-  Search, Check, Sparkles, ChevronDown
+  Search, Check, Sparkles, ChevronDown, X
 } from 'lucide-react';
 import { resolveQRToken, getOrCreateGroupQRToken, findTokenAndGroupForScannedInput, extractTokenFromInput } from '@/lib/qr-engine';
 import { executeAtomicCheckIn, executeAtomicCheckInAsync, simulateConcurrentScans, CheckInExecutionResult } from '@/lib/checkin';
@@ -228,6 +228,22 @@ export default function MobileScanCheckInPage() {
   const [resultModal, setResultModal] = useState<CheckInExecutionResult | null>(null);
   const [concurrencyResult, setConcurrencyResult] = useState<{ operatorA: CheckInExecutionResult; operatorB: CheckInExecutionResult } | null>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  // Google-style Predictive Guest Search for Manual Selector
+  const [manualSearchQuery, setManualSearchQuery] = useState<string>('');
+  const [isManualSearchFocused, setIsManualSearchFocused] = useState<boolean>(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Close search dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsManualSearchFocused(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Camera State
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
@@ -829,29 +845,161 @@ export default function MobileScanCheckInPage() {
             )}
           </div>
         ) : (
-          /* BACKUP / FALLBACK MANUAL SELECTOR */
-          <div className="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3">
+          /* GOOGLE-STYLE PREDICTIVE GUEST SEARCH / MANUAL SELECTOR */
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4.5 space-y-3.5 shadow-xl">
             <div className="text-center space-y-1">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wide block">
-                ¿Problema al leer el QR con la cámara?
+              <span className="text-xs font-bold text-[#C5A059] uppercase tracking-wider flex items-center justify-center gap-1.5">
+                <Search className="w-4 h-4 text-[#C5A059]" /> Búsqueda Manual de Invitados por Nombre
               </span>
-              <p className="text-[11px] text-slate-500">
-                Selecciona manualmente de la lista de invitados cargada ({groups.length} pases registrados):
+              <p className="text-[11px] text-slate-400">
+                Escribe como en Google para autocompletar rápidamente entre los {groups.length} invitados cargados:
               </p>
             </div>
 
-            <select
-              value=""
-              onChange={(e) => handleManualSelectGroup(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700 text-white text-xs py-2.5 px-3 rounded-xl focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-semibold"
-            >
-              <option value="" disabled>-- Seleccionar invitado manualmente por nombre --</option>
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.group_name} ({g.checked_in_count || 0}/{g.max_passes} pases - {g.status})
-                </option>
-              ))}
-            </select>
+            {/* Google Search Style Bar with Floating Autocomplete Dropdown */}
+            <div ref={searchContainerRef} className="relative w-full">
+              <div className={`relative flex items-center w-full rounded-2xl transition-all duration-200 ${
+                isManualSearchFocused
+                  ? 'ring-2 ring-[#C5A059] shadow-lg shadow-[#C5A059]/10 bg-slate-950 border-[#C5A059]'
+                  : 'bg-slate-950 border border-slate-700 hover:border-slate-600'
+              }`}>
+                <div className="pl-3.5 pr-2 flex items-center pointer-events-none text-slate-400">
+                  <Search className={`w-4 h-4 transition-colors ${isManualSearchFocused ? 'text-[#C5A059]' : 'text-slate-400'}`} />
+                </div>
+
+                <input
+                  type="text"
+                  value={manualSearchQuery}
+                  onChange={(e) => {
+                    setManualSearchQuery(e.target.value);
+                    setIsManualSearchFocused(true);
+                  }}
+                  onFocus={() => setIsManualSearchFocused(true)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const normalized = manualSearchQuery.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                      const matches = groups.filter((g) => {
+                        if (!normalized) return true;
+                        const nName = g.group_name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                        const ph = (g.responsible_phone || '').replace(/\D/g, '');
+                        return nName.includes(normalized) || ph.includes(normalized);
+                      });
+                      if (matches.length > 0) {
+                        handleManualSelectGroup(matches[0].id);
+                        setManualSearchQuery('');
+                        setIsManualSearchFocused(false);
+                      }
+                    } else if (e.key === 'Escape') {
+                      setIsManualSearchFocused(false);
+                    }
+                  }}
+                  placeholder="Escribe el nombre del invitado, familia o teléfono..."
+                  className="w-full bg-transparent text-white text-xs py-3 pr-9 focus:outline-none placeholder:text-slate-500 font-medium"
+                />
+
+                {manualSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setManualSearchQuery('');
+                      setIsManualSearchFocused(true);
+                    }}
+                    className="absolute right-3 p-1 text-slate-400 hover:text-white rounded-full hover:bg-slate-800 transition"
+                    title="Limpiar búsqueda"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Floating Dropdown Results */}
+              {isManualSearchFocused && (() => {
+                const normalized = manualSearchQuery.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                const filtered = groups.filter((g) => {
+                  if (!normalized) return true;
+                  const nName = g.group_name.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                  const ph = (g.responsible_phone || '').replace(/\D/g, '');
+                  const asgn = assignments.find(a => a.group_id === g.id);
+                  const tblName = asgn ? (tables.find(t => t.id === asgn.table_id)?.name || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "") : '';
+                  return nName.includes(normalized) || ph.includes(normalized) || tblName.includes(normalized);
+                });
+
+                return (
+                  <div className="absolute z-50 left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden max-h-72 flex flex-col animate-in fade-in zoom-in-95 duration-150">
+                    <div className="p-2.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between text-[11px] text-slate-400 font-semibold px-3.5">
+                      <span>
+                        {filtered.length} {filtered.length === 1 ? 'coincidencia' : 'coincidencias'} {manualSearchQuery ? `para "${manualSearchQuery}"` : 'en total'}
+                      </span>
+                      <span className="text-[10px] text-[#C5A059] uppercase tracking-wider font-bold">
+                        Toca o Presiona Enter
+                      </span>
+                    </div>
+
+                    <div className="overflow-y-auto divide-y divide-slate-800/80">
+                      {filtered.length === 0 ? (
+                        <div className="p-5 text-center text-slate-400 text-xs space-y-1">
+                          <p className="font-semibold text-slate-300">No se encontraron invitados</p>
+                          <p className="text-[11px] text-slate-500">Intenta con otro apellido o término de búsqueda.</p>
+                        </div>
+                      ) : (
+                        filtered.map((g) => {
+                          const asgn = assignments.find(a => a.group_id === g.id);
+                          const tblName = asgn ? (tables.find(t => t.id === asgn.table_id)?.name || 'Sin mesa') : 'Sin mesa';
+                          const isComp = g.status === 'COMPLETO' || (g.checked_in_count || 0) >= g.max_passes;
+                          const isPart = (g.checked_in_count || 0) > 0 && !isComp;
+
+                          return (
+                            <button
+                              key={g.id}
+                              type="button"
+                              onClick={() => {
+                                handleManualSelectGroup(g.id);
+                                setManualSearchQuery('');
+                                setIsManualSearchFocused(false);
+                              }}
+                              className="w-full text-left p-3 hover:bg-slate-800/90 active:bg-[#C5A059]/20 transition flex items-center justify-between gap-3 group"
+                            >
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-white text-xs truncate group-hover:text-[#C5A059] transition-colors">
+                                    {g.group_name}
+                                  </span>
+                                  {g.responsible_phone && (
+                                    <span className="text-[10px] text-slate-400 font-mono">
+                                      ({g.responsible_phone})
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5 text-[10px] text-slate-400">
+                                  <span className="flex items-center gap-1 text-purple-400 font-semibold">
+                                    <MapPin className="w-3 h-3" /> {tblName}
+                                  </span>
+                                  <span>•</span>
+                                  <span className="text-emerald-400 font-semibold">
+                                    {g.checked_in_count || 0}/{g.max_passes} pases
+                                  </span>
+                                </div>
+                              </div>
+
+                              <span className={`shrink-0 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                isComp
+                                  ? 'bg-red-950 text-red-400 border border-red-800'
+                                  : isPart
+                                  ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                                  : 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                              }`}>
+                                {isComp ? 'COMPLETO' : isPart ? 'PARCIAL' : 'PENDIENTE'}
+                              </span>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
           </div>
         )}
 

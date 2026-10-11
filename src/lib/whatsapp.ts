@@ -179,3 +179,39 @@ export function getWhatsAppSentLogMap(eventId: string): Record<string, WALogItem
   }
   return {};
 }
+
+/**
+ * Deletes a single sent log for a group, reverting it back to pending status
+ */
+export function deleteWhatsAppSentLog(eventId: string, groupId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(WA_LOGS_STORAGE_KEY);
+    if (!raw) return;
+    const logs = JSON.parse(raw);
+    if (logs[eventId] && logs[eventId][groupId]) {
+      delete logs[eventId][groupId];
+      localStorage.setItem(WA_LOGS_STORAGE_KEY, JSON.stringify(logs));
+    }
+  } catch (err) {
+    console.warn('[WhatsAppStore] Error deleting sent log', err);
+  }
+}
+
+/**
+ * Resets all sent logs for an entire event
+ */
+export function resetAllWhatsAppSentLogs(eventId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const raw = localStorage.getItem(WA_LOGS_STORAGE_KEY);
+    if (!raw) return;
+    const logs = JSON.parse(raw);
+    if (logs[eventId]) {
+      delete logs[eventId];
+      localStorage.setItem(WA_LOGS_STORAGE_KEY, JSON.stringify(logs));
+    }
+  } catch (err) {
+    console.warn('[WhatsAppStore] Error resetting event sent logs', err);
+  }
+}
