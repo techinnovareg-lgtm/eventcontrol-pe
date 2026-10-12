@@ -11,6 +11,7 @@ import {
 import { getWorkspaceEvents, getWorkspaceEventsAsync, createEvent, createEventAsync, updateEvent, updateEventAsync, deleteEvent, autoSyncEventsToServer, getLastActiveEventId, setLastActiveEventId } from '@/lib/events';
 import { Event, EventStatus } from '@/lib/supabase/types';
 import { getAccountForSession, getActiveSession, getAdminAccountByEmailAsync, setActiveSession } from '@/lib/superadmin-store';
+import { checkCanCreateEvent, PLAN_LIMITS } from '@/lib/plans';
 
 export default function EventsCrudPage() {
   const [currentWorkspaceId, setCurrentWorkspaceId] = useState<string>('ws-a-1111');
@@ -120,6 +121,15 @@ export default function EventsCrudPage() {
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !date) return;
+
+    // Enforce Plan Limits for Active Events
+    const contractAccount = getAccountForSession();
+    const activeEventsCount = events.filter(ev => ev.status !== 'FINALIZADO').length;
+    const planCheck = checkCanCreateEvent(contractAccount.planCode, activeEventsCount);
+    if (!planCheck.allowed) {
+      alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+      return;
+    }
 
     const newEvt = await createEventAsync({
       workspace_id: currentWorkspaceId,
@@ -266,7 +276,22 @@ export default function EventsCrudPage() {
         {/* Title Bar */}
         <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Catálogo de Bodas y Eventos</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest block">Catálogo de Bodas y Eventos</span>
+              {(() => {
+                const contractAccount = getAccountForSession();
+                const plan = PLAN_LIMITS[contractAccount.planCode] || PLAN_LIMITS.STARTER;
+                const activeCount = events.filter(e => e.status !== 'FINALIZADO').length;
+                const isLimitReached = plan.maxActiveEvents !== -1 && activeCount >= plan.maxActiveEvents;
+                return (
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${
+                    isLimitReached ? 'bg-red-50 text-red-700 border-red-300 font-extrabold' : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  }`}>
+                    Plan {plan.name}: {activeCount} de {plan.maxActiveEvents === -1 ? 'Ilimitados' : plan.maxActiveEvents} Eventos
+                  </span>
+                );
+              })()}
+            </div>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Gestión de Eventos del Workspace</h1>
             <p className="text-xs text-slate-500">Administra, edita e ingresa a cualquier evento para controlar sus asistencias y mesas.</p>
           </div>

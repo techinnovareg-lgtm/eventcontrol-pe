@@ -7,13 +7,13 @@ import {
   Building2, Users, ShieldCheck, UserPlus, Lock, Key, 
   ArrowLeft, CheckCircle2, AlertTriangle, Play, Calendar, 
   Clock, ShieldAlert, Check, User, Mail, Phone, Sparkles, CheckSquare,
-  X, MessageSquare
+  X, MessageSquare, Shield, HelpCircle, FileText, QrCode, MapPin, ExternalLink
 } from 'lucide-react';
 import { testCrossWorkspaceIsolation } from '@/lib/workspace';
-import { PLAN_LIMITS } from '@/lib/plans';
+import { PLAN_LIMITS, checkCanAddWorkspaceMember, ROLE_PERMISSIONS, RolePermissionDetail } from '@/lib/plans';
 import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
-import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole } from '@/lib/workspace-users';
-import { getWorkspaceEvents, getWorkspaceEventsAsync, getLastActiveEventId } from '@/lib/events';
+import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole, formatExpirationDate } from '@/lib/workspace-users';
+import { getWorkspaceEvents, getWorkspaceEventsAsync, getLastActiveEventId, getEventById } from '@/lib/events';
 import { generateWhatsAppLink } from '@/lib/whatsapp';
 
 export default function AccountProfilePage() {
@@ -21,8 +21,15 @@ export default function AccountProfilePage() {
   const contractInfo = getAccountForSession();
 
   const currentWorkspaceId = session?.user?.workspaceId || contractInfo.workspaceId || 'ws-a-1111';
-  const plan = PLAN_LIMITS[contractInfo.planCode];
+  const plan = PLAN_LIMITS[contractInfo.planCode] || PLAN_LIMITS.STARTER;
   const remainingDays = calculateRemainingDays(contractInfo.contractEndDate);
+
+  const userRole = session?.user?.role || 'OWNER';
+  const isOperator = userRole === 'OPERATOR';
+  const isCoordinator = userRole === 'COORDINADOR';
+  const isOwnerOrAdmin = userRole === 'OWNER' || userRole === 'ADMIN' || userRole === 'SUPER_USER';
+
+  const currentRolePermission: RolePermissionDetail = ROLE_PERMISSIONS[userRole] || ROLE_PERMISSIONS.OWNER;
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security' | 'team'>('profile');
 
@@ -30,18 +37,18 @@ export default function AccountProfilePage() {
   const [teamMembers, setTeamMembers] = useState<WorkspaceMemberUser[]>([]);
   const [activeEventsCount, setActiveEventsCount] = useState<number>(0);
 
+  // Assigned event details if user is coordinator
+  const assignedEventId = session?.user?.eventId;
+  const assignedEvent = assignedEventId ? getEventById(assignedEventId, currentWorkspaceId) : undefined;
+
   useEffect(() => {
-    const session = getActiveSession();
-    if (session?.user?.role === 'OPERATOR') {
-      const scanRoute = session.user.eventId ? `/scan?event=${session.user.eventId}` : '/scan';
+    const activeSess = getActiveSession();
+    if (activeSess?.user?.role === 'OPERATOR') {
+      const scanRoute = activeSess.user.eventId ? `/scan?event=${activeSess.user.eventId}` : '/scan';
       window.location.href = scanRoute;
       return;
     }
-    if (session?.user?.role === 'COORDINADOR') {
-      const dest = session.user.eventId ? `/dashboard?eventId=${session.user.eventId}` : '/dashboard';
-      window.location.href = dest;
-      return;
-    }
+
     setTeamMembers(getWorkspaceMembers(currentWorkspaceId));
     setActiveEventsCount(getWorkspaceEvents(currentWorkspaceId).length);
     getWorkspaceEventsAsync(currentWorkspaceId).then(evts => {
@@ -103,6 +110,13 @@ export default function AccountProfilePage() {
   const handleCreateSubUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMemberName.trim() || !newMemberEmail.trim()) return;
+
+    // Enforce Plan Limits on Workspace Users
+    const planCheck = checkCanAddWorkspaceMember(contractInfo.planCode, teamMembers.length);
+    if (!planCheck.allowed) {
+      alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+      return;
+    }
 
     const pass = newMemberPassword.trim() || 'puerta2026';
     const created = createWorkspaceMember({
@@ -190,15 +204,24 @@ export default function AccountProfilePage() {
     return generateWhatsAppLink(phoneCleaned, text);
   };
 
+  // Back link URL resolution
+  const backHref = (() => {
+    if (isCoordinator && assignedEventId) {
+      return `/dashboard?eventId=${encodeURIComponent(assignedEventId)}`;
+    }
+    const lastId = getLastActiveEventId(currentWorkspaceId);
+    return lastId ? `/dashboard?eventId=${encodeURIComponent(lastId)}` : '/dashboard';
+  })();
+
+  const activeUserName = session?.user?.name || contractInfo.adminName || contractInfo.companyName;
+  const activeUserEmail = session?.user?.email || contractInfo.contactEmail;
+
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white relative">
       {/* Top Navbar Header */}
       <header className="border-b border-[#C5A059]/40 bg-white/95 backdrop-blur-md sticky top-0 z-40 shadow-sm select-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <Link href={(() => {
-            const lastId = getLastActiveEventId(currentWorkspaceId);
-            return lastId ? `/dashboard?eventId=${encodeURIComponent(lastId)}` : '/dashboard';
-          })()} className="flex items-center gap-3 group">
+          <Link href={backHref} className="flex items-center gap-3 group">
             <div className="relative w-11 h-11 rounded-xl overflow-hidden shadow-md border border-[#C5A059]/40 group-hover:scale-105 transition-transform bg-white p-0.5">
               <Image 
                 src="/logo-eventcontrol.jpg" 
@@ -212,7 +235,7 @@ export default function AccountProfilePage() {
                 EventControl<span className="text-[#C5A059]">.pe</span>
               </span>
               <span className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold block">
-                Mi Perfil y Mi Cuenta
+                Detalles de Mi Cuenta & Perfil
               </span>
             </div>
           </Link>
@@ -221,22 +244,19 @@ export default function AccountProfilePage() {
             {/* USER PROFILE CARD */}
             <div className="flex items-center gap-2 bg-[#FAF8F5] px-3 py-1.5 rounded-xl border border-[#C5A059]/40">
               <div className="w-7.5 h-7.5 rounded-full bg-gradient-to-tr from-[#C5A059] to-[#B8860B] text-white flex items-center justify-center font-bold text-xs shadow-2xs border border-amber-200 shrink-0">
-                {(session?.user?.name || contractInfo.adminName || 'A').charAt(0).toUpperCase()}
+                {activeUserName.charAt(0).toUpperCase()}
               </div>
               <div className="text-left hidden sm:block leading-tight pr-1">
                 <span className="text-xs font-bold text-slate-900 block max-w-[180px] truncate">
-                  {session?.user?.name || contractInfo.adminName || contractInfo.companyName}
+                  {activeUserName}
                 </span>
                 <span className="text-[9px] text-slate-500 font-mono block max-w-[180px] truncate">
-                  {session?.user?.email || contractInfo.contactEmail}
+                  {activeUserEmail}
                 </span>
               </div>
             </div>
 
-            <Link href={(() => {
-              const lastId = getLastActiveEventId(currentWorkspaceId);
-              return lastId ? `/dashboard?eventId=${encodeURIComponent(lastId)}` : '/dashboard';
-            })()} className="text-xs text-[#B8860B] hover:underline font-bold flex items-center gap-1 bg-amber-50 px-3 py-2 rounded-xl border border-[#C5A059]/30">
+            <Link href={backHref} className="text-xs text-[#B8860B] hover:underline font-bold flex items-center gap-1 bg-amber-50 px-3 py-2 rounded-xl border border-[#C5A059]/30">
               <ArrowLeft className="w-4 h-4" /> Volver al Dashboard
             </Link>
           </div>
@@ -249,19 +269,25 @@ export default function AccountProfilePage() {
         {/* Account Title Bar */}
         <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex flex-wrap items-center gap-2 mb-1">
               <span className="text-xs font-bold text-[#B8860B] uppercase tracking-widest">
-                Información Oficial de la Cuenta
+                Detalles Oficiales de la Cuenta
+              </span>
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold border ${currentRolePermission.badgeColor}`}>
+                {currentRolePermission.title}
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-300">
                 CUENTA ACTIVA
               </span>
             </div>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A]">{contractInfo.companyName}</h1>
-            <p className="text-xs text-slate-500 mt-0.5">Administrador Principal: {contractInfo.adminName} ({contractInfo.contactEmail})</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Usuario en sesión: <strong>{activeUserName}</strong> ({activeUserEmail}) • Workspace: <code className="text-slate-700 font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">{currentWorkspaceId}</code>
+            </p>
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Navigation Tabs */}
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveTab('profile')}
               className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
@@ -270,7 +296,7 @@ export default function AccountProfilePage() {
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
               }`}
             >
-              <User className="w-3.5 h-3.5 inline mr-1" /> Mi Perfil & Contrato
+              <User className="w-3.5 h-3.5 inline mr-1" /> Mi Perfil & Restricciones
             </button>
             <button
               onClick={() => setActiveTab('security')}
@@ -282,24 +308,146 @@ export default function AccountProfilePage() {
             >
               <Lock className="w-3.5 h-3.5 inline mr-1" /> Cambiar Contraseña
             </button>
-            <button
-              onClick={() => setActiveTab('team')}
-              className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
-                activeTab === 'team'
-                  ? 'gold-button shadow-md'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 inline mr-1" /> Equipo & Roles ({teamMembers.length})
-            </button>
+            {isOwnerOrAdmin && (
+              <button
+                onClick={() => setActiveTab('team')}
+                className={`px-4 py-2 text-xs font-bold rounded-xl transition ${
+                  activeTab === 'team'
+                    ? 'gold-button shadow-md'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 inline mr-1" /> Equipo & Roles ({teamMembers.length})
+              </button>
+            )}
           </div>
         </div>
 
-        {/* TAB 1: MI PERFIL & DETALLES DEL CONTRATO */}
+        {/* TAB 1: MI PERFIL, MATRIZ DE PERMISOS & DETALLES DEL PLAN */}
         {activeTab === 'profile' && (
           <div className="space-y-6 animate-fade-in-up">
             
-            {/* Contract Key Info Grid */}
+            {/* 1. INDIVIDUAL USER PROFILE & ROLE PERMISSIONS CARD */}
+            <div className="card-luxury p-6 border-2 border-[#C5A059]/50 shadow-lg bg-gradient-to-r from-amber-50/30 via-white to-amber-50/10 space-y-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-amber-200/80 pb-4">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#C5A059] to-[#B8860B] text-white flex items-center justify-center font-bold text-xl shadow-md border border-amber-200 shrink-0">
+                    {activeUserName.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-lg font-serif font-bold text-slate-900">{activeUserName}</h2>
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${currentRolePermission.badgeColor}`}>
+                        {currentRolePermission.title}
+                      </span>
+                    </div>
+                    <span className="text-xs text-slate-500 font-mono block mt-0.5">{activeUserEmail}</span>
+                  </div>
+                </div>
+
+                <div className="text-left sm:text-right">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Alcance del Rol</span>
+                  <span className="text-xs font-semibold text-slate-800">{currentRolePermission.scope}</span>
+                </div>
+              </div>
+
+              {/* Special Context for Coordinator */}
+              {isCoordinator && (
+                <div className="p-3.5 bg-indigo-50/80 border border-indigo-200 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                  <div className="flex items-center gap-2.5">
+                    <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <div>
+                      <strong className="text-indigo-950 block font-bold">
+                        Evento Asignado: {assignedEvent ? assignedEvent.name : 'Asignación Global de Eventos'}
+                      </strong>
+                      <span className="text-indigo-800 text-[11px]">
+                        Tienes autorización para gestionar la lista de invitados, asignar mesas y supervisar el ingreso en este evento.
+                      </span>
+                    </div>
+                  </div>
+
+                  {assignedEvent && (
+                    <Link
+                      href={`/dashboard?eventId=${assignedEvent.id}`}
+                      className="px-3 py-1.5 bg-indigo-700 hover:bg-indigo-800 text-white font-bold text-xs rounded-lg transition shrink-0 inline-flex items-center gap-1 shadow-2xs"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" /> Ir al Evento
+                    </Link>
+                  )}
+                </div>
+              )}
+
+              {/* Role Permissions Breakdown: What you CAN and CANNOT do */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs pt-1">
+                {/* Permitted Actions */}
+                <div className="p-4 bg-emerald-50/60 border border-emerald-200 rounded-2xl space-y-2.5">
+                  <span className="font-bold text-emerald-950 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Funciones Permitidas para tu Perfil
+                  </span>
+                  <ul className="space-y-1.5 text-slate-700 text-[11px]">
+                    {currentRolePermission.canManageWorkspace && (
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Administración total del Espacio de Trabajo y Contrato
+                      </li>
+                    )}
+                    {currentRolePermission.canCreateEvents && (
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Creación y edición de nuevos eventos según límites del plan
+                      </li>
+                    )}
+                    {currentRolePermission.canManageTeam && (
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Invitación y gestión de personal (coordinadores y operadores)
+                      </li>
+                    )}
+                    {currentRolePermission.canManageGuestsAndTables && (
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Gestión de invitados, pases QR y asignación de mesas en plano
+                      </li>
+                    )}
+                    {currentRolePermission.canViewReports && (
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Cortes de asistencia de catering y reportes ejecutivos en PDF/Excel
+                      </li>
+                    )}
+                    {currentRolePermission.canScanQR && (
+                      <li className="flex items-center gap-2">
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Escáner QR de puerta con validación atómica y modo offline
+                      </li>
+                    )}
+                  </ul>
+                </div>
+
+                {/* Restricted Actions */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2.5">
+                  <span className="font-bold text-slate-700 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-600" /> Restricciones de Seguridad de este Perfil
+                  </span>
+                  <ul className="space-y-1.5 text-slate-600 text-[11px]">
+                    {!currentRolePermission.canManageWorkspace && (
+                      <li className="flex items-center gap-2 text-slate-500">
+                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" /> No puedes modificar datos fiscales ni el plan de la empresa
+                      </li>
+                    )}
+                    {!currentRolePermission.canCreateEvents && (
+                      <li className="flex items-center gap-2 text-slate-500">
+                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" /> No puedes crear nuevos eventos fuera de tu asignación
+                      </li>
+                    )}
+                    {!currentRolePermission.canManageTeam && (
+                      <li className="flex items-center gap-2 text-slate-500">
+                        <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" /> No puedes invitar ni eliminar a otros colaboradores del workspace
+                      </li>
+                    )}
+                    <li className="flex items-center gap-2 text-slate-500">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" /> Aislamiento estricto: cero acceso a datos de otras empresas o bodas
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. CONTRACT KEY INFO GRID */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
               <div className="card-luxury p-5 border-2 border-[#C5A059]">
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Plan Contratado</span>
@@ -330,77 +478,156 @@ export default function AccountProfilePage() {
               </div>
             </div>
 
-            {/* Plan Features & Limit Gauges */}
+            {/* 3. PLAN LIMIT GAUGES & CAPACITIES */}
             <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-6">
-              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-[#B8860B]" /> Funciones Habilitadas en tu Plan ({plan.name})
-                </h3>
-                <span className="text-xs text-[#B8860B] font-bold">Límites aplicados automáticamente</span>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                    <Sparkles className="w-5 h-5 text-[#B8860B]" /> Restricciones y Capacidades de tu Plan ({plan.name})
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Límites técnicos aplicados automáticamente en toda la plataforma según tu contrato.
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-[#B8860B] bg-amber-50 px-2.5 py-1 rounded-full border border-amber-200">
+                  Plan {plan.name} Activo
+                </span>
               </div>
 
-              {/* Limit Gauges */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* 4 Gauges Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Gauge 1: Active Events */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-700 uppercase">Eventos Activos</span>
+                    <span className="font-bold text-slate-700 uppercase text-[11px]">Eventos Activos</span>
                     <strong className="text-slate-900 font-bold">
                       {activeEventsCount} / {plan.maxActiveEvents === -1 ? 'Ilimitados' : plan.maxActiveEvents}
                     </strong>
                   </div>
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
                     <div 
-                      className="bg-[#C5A059] h-full transition-all duration-300"
+                      className={`h-full transition-all duration-300 ${
+                        plan.maxActiveEvents !== -1 && activeEventsCount >= plan.maxActiveEvents ? 'bg-red-500' : 'bg-[#C5A059]'
+                      }`}
                       style={{ 
                         width: plan.maxActiveEvents === -1 
-                          ? `${Math.min(100, Math.max(0, activeEventsCount * 20))}%` 
+                          ? `${Math.min(100, Math.max(20, activeEventsCount * 20))}%` 
                           : `${Math.min(100, (activeEventsCount / plan.maxActiveEvents) * 100)}%` 
                       }}
                     ></div>
                   </div>
-                  <span className="text-[10px] text-slate-500 block">Capacidad para gestionar bodas simultáneas</span>
+                  <span className="text-[10px] text-slate-500 block">
+                    {plan.maxActiveEvents === -1 
+                      ? 'Sin límite de eventos simultáneos' 
+                      : `Máximo ${plan.maxActiveEvents} eventos simultáneos`}
+                  </span>
                 </div>
 
+                {/* Gauge 2: Passes Per Event */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-700 uppercase">Pases por Evento</span>
-                    <strong className="text-slate-900 font-bold">Hasta {plan.maxPassesPerEvent} pases</strong>
+                    <span className="font-bold text-slate-700 uppercase text-[11px]">Pases por Evento</span>
+                    <strong className="text-slate-900 font-bold">Hasta {plan.maxPassesPerEvent}</strong>
                   </div>
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                    <div className="bg-emerald-600 h-full w-3/4"></div>
+                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                    <div className="bg-emerald-600 h-full w-full"></div>
                   </div>
-                  <span className="text-[10px] text-slate-500 block">Invitados y familias autorizadas por boda</span>
+                  <span className="text-[10px] text-slate-500 block">
+                    Límite máximo de personas autorizadas por evento
+                  </span>
                 </div>
 
+                {/* Gauge 3: Workspace Users */}
                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-slate-700 uppercase">Integrantes de Equipo</span>
+                    <span className="font-bold text-slate-700 uppercase text-[11px]">Usuarios Equipo</span>
                     <strong className="text-slate-900 font-bold">
-                      {teamMembers.length} / {plan.maxWorkspaceUsers} usuarios
+                      {teamMembers.length} / {plan.maxWorkspaceUsers === -1 ? 'Ilimitados' : plan.maxWorkspaceUsers}
                     </strong>
                   </div>
-                  <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                    <div className="bg-purple-600 h-full w-1/3"></div>
+                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                    <div 
+                      className={`h-full transition-all duration-300 ${
+                        plan.maxWorkspaceUsers !== -1 && teamMembers.length >= plan.maxWorkspaceUsers ? 'bg-red-500' : 'bg-purple-600'
+                      }`}
+                      style={{ 
+                        width: plan.maxWorkspaceUsers === -1 
+                          ? '30%' 
+                          : `${Math.min(100, (teamMembers.length / plan.maxWorkspaceUsers) * 100)}%` 
+                      }}
+                    ></div>
                   </div>
-                  <span className="text-[10px] text-slate-500 block">Accesos RBAC para coordinadores y seguridad</span>
+                  <span className="text-[10px] text-slate-500 block">
+                    {plan.maxWorkspaceUsers === 1 ? '1 Usuario (Planner independiente)' : `Hasta ${plan.maxWorkspaceUsers} coordinadores y operadores`}
+                  </span>
+                </div>
+
+                {/* Gauge 4: Cuts Per Event */}
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 space-y-2">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-slate-700 uppercase text-[11px]">Cortes de Catering</span>
+                    <strong className="text-slate-900 font-bold">
+                      {plan.maxCutsPerEvent === -1 ? 'Ilimitados' : `${plan.maxCutsPerEvent} por evento`}
+                    </strong>
+                  </div>
+                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                    <div className="bg-indigo-600 h-full w-full"></div>
+                  </div>
+                  <span className="text-[10px] text-slate-500 block">
+                    {plan.maxCutsPerEvent === -1 ? 'Snapshots ilimitados para catering' : `Hasta ${plan.maxCutsPerEvent} snapshots por boda`}
+                  </span>
                 </div>
               </div>
 
               {/* Complete Features Checklist */}
               <div className="pt-2">
                 <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-                  Detalle de Funciones Incluidas en tu Suscripción:
+                  Detalle de Funciones Incluidas en tu Suscripción ({plan.name}):
                 </h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                   {plan.features.map((feat, idx) => (
-                    <div key={idx} className="p-3 bg-white rounded-xl border border-slate-200 text-xs flex items-center gap-2.5">
+                    <div key={idx} className="p-2.5 bg-white rounded-xl border border-slate-200 text-xs flex items-center gap-2 shadow-2xs">
                       <CheckCircle2 className="w-4 h-4 text-[#B8860B] shrink-0" />
-                      <span className="font-semibold text-slate-800">{feat}</span>
+                      <span className="font-semibold text-slate-800 text-[11px]">{feat}</span>
                     </div>
                   ))}
                 </div>
               </div>
             </div>
+
+            {/* 4. PLATFORM ROLES HIERARCHY MATRIX (EDUCATIONAL UX) */}
+            <div className="card-luxury p-6 border border-slate-200 shadow-sm space-y-4 bg-white">
+              <div className="border-b border-slate-100 pb-3">
+                <h3 className="text-base font-serif font-bold text-slate-900 flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-600" /> Matriz de Perfiles y Roles del Sistema (RBAC)
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Conoce el alcance, funciones y responsabilidades de cada perfil dentro de la plataforma EventControl.pe.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+                {Object.values(ROLE_PERMISSIONS).map((rp) => (
+                  <div key={rp.role} className={`p-4 rounded-2xl border space-y-2 ${rp.role === userRole ? 'ring-2 ring-[#C5A059] bg-amber-50/40 border-amber-300' : 'bg-slate-50/70 border-slate-200'}`}>
+                    <div className="flex items-center justify-between">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${rp.badgeColor}`}>
+                        {rp.title}
+                      </span>
+                      {rp.role === userRole && (
+                        <span className="text-[10px] font-extrabold text-[#B8860B] uppercase">Tu Rol</span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      {rp.description}
+                    </p>
+                    <div className="pt-2 border-t border-slate-200/60 text-[10px] font-mono text-slate-500">
+                      <strong>Alcance:</strong> {rp.scope}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
           </div>
         )}
 
@@ -478,22 +705,35 @@ export default function AccountProfilePage() {
           </div>
         )}
 
-        {/* TAB 3: EQUIPO & ROLES RBAC */}
-        {activeTab === 'team' && (
+        {/* TAB 3: EQUIPO & ROLES RBAC (ONLY OWNER & ADMIN) */}
+        {activeTab === 'team' && isOwnerOrAdmin && (
           <div className="space-y-6 animate-fade-in-up">
             <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
-                    <Users className="w-5 h-5 text-[#B8860B]" /> Integrantes del Equipo ({contractInfo.companyName})
-                  </h3>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+                      <Users className="w-5 h-5 text-[#B8860B]" /> Integrantes del Equipo ({contractInfo.companyName})
+                    </h3>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-800 border border-purple-200">
+                      Capacidad: {teamMembers.length} / {plan.maxWorkspaceUsers === -1 ? 'Ilimitados' : plan.maxWorkspaceUsers} Usuarios
+                    </span>
+                  </div>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Gestiona los accesos de tu personal de coordinadores y escáner de puerta.
+                    Gestiona los accesos de tu personal de coordinadores y escáner de puerta para todos los eventos del workspace.
                   </p>
                 </div>
+
                 <button 
-                  onClick={() => setShowInviteModal(true)}
-                  className="gold-button font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-1.5"
+                  onClick={() => {
+                    const planCheck = checkCanAddWorkspaceMember(contractInfo.planCode, teamMembers.length);
+                    if (!planCheck.allowed) {
+                      alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+                      return;
+                    }
+                    setShowInviteModal(true);
+                  }}
+                  className="gold-button font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm flex items-center gap-1.5 self-start sm:self-auto"
                 >
                   <UserPlus className="w-4 h-4" /> Invitar Usuario / Operador
                 </button>
@@ -511,7 +751,14 @@ export default function AccountProfilePage() {
                     </p>
                   </div>
                   <button 
-                    onClick={() => setShowInviteModal(true)}
+                    onClick={() => {
+                      const planCheck = checkCanAddWorkspaceMember(contractInfo.planCode, teamMembers.length);
+                      if (!planCheck.allowed) {
+                        alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+                        return;
+                      }
+                      setShowInviteModal(true);
+                    }}
                     className="gold-button font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md inline-flex items-center gap-1.5"
                   >
                     <UserPlus className="w-4 h-4" /> Crear Primer Sub-usuario
@@ -626,6 +873,9 @@ export default function AccountProfilePage() {
                   <p className="text-xs text-slate-500">
                     Crea un acceso para tu personal de puerta (escáner) o coordinadores.
                   </p>
+                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200 inline-block mt-1">
+                    Plan {plan.name}: {teamMembers.length} de {plan.maxWorkspaceUsers} usuarios ocupados
+                  </span>
                 </div>
 
                 <form onSubmit={handleCreateSubUser} className="space-y-4 text-xs">
@@ -695,9 +945,9 @@ export default function AccountProfilePage() {
                       onChange={(e) => setNewMemberRole(e.target.value as WorkspaceUserRole)}
                       className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#C5A059]"
                     >
-                      <option value="OPERATOR">OPERADOR / SEGURIDAD (Escáner de Puerta únicamente)</option>
-                      <option value="COORDINADOR">COORDINADOR (Edición de Eventos, Mesas e Invitados)</option>
-                      <option value="ADMIN">ADMINISTRADOR (Acceso completo)</option>
+                      <option value="OPERATOR">SEGURIDAD (Puerta) - Escáner QR únicamente</option>
+                      <option value="COORDINADOR">COORDINADOR - Gestión de Eventos, Mesas e Invitados</option>
+                      <option value="ADMIN">ADMINISTRADOR - Acceso completo operativo</option>
                     </select>
                   </div>
 

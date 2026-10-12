@@ -128,3 +128,104 @@ export function checkCanImportPasses(planCode: PlanCode, passesCount: number): {
 
   return { allowed: true };
 }
+
+/**
+ * Checks if workspace can add more team members / collaborators based on plan limits
+ */
+export function checkCanAddWorkspaceMember(planCode: PlanCode, currentMembersCount: number): { allowed: boolean; reason?: string } {
+  const plan = PLAN_LIMITS[planCode] || PLAN_LIMITS.STARTER;
+
+  if (plan.maxWorkspaceUsers !== -1 && currentMembersCount >= plan.maxWorkspaceUsers) {
+    return {
+      allowed: false,
+      reason: `Has alcanzado el límite de ${plan.maxWorkspaceUsers} ${plan.maxWorkspaceUsers === 1 ? 'usuario' : 'usuarios'} de tu plan ${plan.name}. Para invitar más coordinadores u operadores de puerta, actualiza a un plan superior (Professional o Business).`,
+    };
+  }
+
+  return { allowed: true };
+}
+
+/**
+ * Checks if event can record more catering cuts based on plan limits
+ */
+export function checkCanCreateCut(planCode: PlanCode, currentCutsCount: number): { allowed: boolean; reason?: string } {
+  const plan = PLAN_LIMITS[planCode] || PLAN_LIMITS.STARTER;
+
+  if (plan.maxCutsPerEvent !== -1 && currentCutsCount >= plan.maxCutsPerEvent) {
+    return {
+      allowed: false,
+      reason: `Has alcanzado el límite de ${plan.maxCutsPerEvent} cortes de catering por evento de tu plan ${plan.name}. Actualiza a Plan Professional o Business para cortes ilimitados.`,
+    };
+  }
+
+  return { allowed: true };
+}
+
+export interface RolePermissionDetail {
+  role: 'OWNER' | 'ADMIN' | 'COORDINADOR' | 'OPERATOR';
+  title: string;
+  badgeColor: string;
+  scope: string;
+  canManageWorkspace: boolean;
+  canCreateEvents: boolean;
+  canManageTeam: boolean;
+  canManageGuestsAndTables: boolean;
+  canScanQR: boolean;
+  canViewReports: boolean;
+  description: string;
+}
+
+export const ROLE_PERMISSIONS: Record<string, RolePermissionDetail> = {
+  OWNER: {
+    role: 'OWNER',
+    title: 'PROPIETARIO (Titular)',
+    badgeColor: 'bg-amber-100 text-amber-900 border-amber-300',
+    scope: 'Acceso total a la cuenta, facturación, eventos y equipo.',
+    canManageWorkspace: true,
+    canCreateEvents: true,
+    canManageTeam: true,
+    canManageGuestsAndTables: true,
+    canScanQR: true,
+    canViewReports: true,
+    description: 'Control absoluto del espacio de trabajo, gestión de eventos según límites del plan, facturación y adición de usuarios.',
+  },
+  ADMIN: {
+    role: 'ADMIN',
+    title: 'ADMINISTRADOR',
+    badgeColor: 'bg-purple-100 text-purple-900 border-purple-300',
+    scope: 'Gestión completa de eventos, invitados, mesas y personal.',
+    canManageWorkspace: true,
+    canCreateEvents: true,
+    canManageTeam: true,
+    canManageGuestsAndTables: true,
+    canScanQR: true,
+    canViewReports: true,
+    description: 'Administración operativa completa de todos los eventos del workspace, coordinación de mesas y personal de puerta.',
+  },
+  COORDINADOR: {
+    role: 'COORDINADOR',
+    title: 'COORDINADOR (Gestión & Mesas)',
+    badgeColor: 'bg-indigo-100 text-indigo-900 border-indigo-300',
+    scope: 'Gestión operativa del evento asignado (mesas, pases, reportes).',
+    canManageWorkspace: false,
+    canCreateEvents: false,
+    canManageTeam: false,
+    canManageGuestsAndTables: true,
+    canScanQR: true,
+    canViewReports: true,
+    description: 'Coordinación directa de invitados, asignación de mesas en plano interactivo, envíos de WhatsApp y reportes ejecutivos del evento.',
+  },
+  OPERATOR: {
+    role: 'OPERATOR',
+    title: 'SEGURIDAD (Puerta)',
+    badgeColor: 'bg-emerald-100 text-emerald-900 border-emerald-300',
+    scope: 'Control de acceso y escáner de códigos QR en puerta exclusivamente.',
+    canManageWorkspace: false,
+    canCreateEvents: false,
+    canManageTeam: false,
+    canManageGuestsAndTables: false,
+    canScanQR: true,
+    canViewReports: false,
+    description: 'Personal de puerta con acceso exclusivo a la cámara y escáner QR para validación atómica y registro de asistencia en tiempo real.',
+  },
+};

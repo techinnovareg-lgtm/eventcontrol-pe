@@ -62,9 +62,7 @@ export default function EventNavHeader({
   const userInitial = userName ? userName.charAt(0).toUpperCase() : 'A';
 
   const isCoordinator = session?.user?.role === 'COORDINADOR';
-  const profileHref = isCoordinator 
-    ? (safeEventId ? `/dashboard?eventId=${safeEventId}` : '/dashboard') 
-    : '/workspace';
+  const profileHref = '/workspace';
   const catalogHref = (isCoordinator && session?.user?.eventId) 
     ? (safeEventId ? `/dashboard?eventId=${safeEventId}` : '/dashboard') 
     : '/events';

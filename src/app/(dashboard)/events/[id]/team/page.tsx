@@ -13,10 +13,11 @@ import { getEventById, getEventByIdAsync, updateEvent, updateEventAsync } from '
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
 import { 
-  getEventMembers, getEventMembersAsync, createWorkspaceMember, createWorkspaceMemberAsync, updateWorkspaceMember, deleteWorkspaceMember,
+  getEventMembers, getEventMembersAsync, getWorkspaceMembers, createWorkspaceMember, createWorkspaceMemberAsync, updateWorkspaceMember, deleteWorkspaceMember,
   WorkspaceMemberUser, WorkspaceUserRole, isCredentialsExpired, formatExpirationDate, syncWorkspaceMemberOnlineAsync
 } from '@/lib/workspace-users';
 import { generateWhatsAppLink } from '@/lib/whatsapp';
+import { checkCanAddWorkspaceMember, PLAN_LIMITS } from '@/lib/plans';
 
 export default function EventTeamPage() {
   const params = useParams();
@@ -147,6 +148,14 @@ export default function EventTeamPage() {
     e.preventDefault();
     if (!newMemberName.trim() || !newMemberEmail.trim()) return;
 
+    // Enforce Plan Limit on Workspace Users
+    const allWorkspaceMembers = getWorkspaceMembers(currentWorkspaceId);
+    const planCheck = checkCanAddWorkspaceMember(contractInfo.planCode, allWorkspaceMembers.length);
+    if (!planCheck.allowed) {
+      alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+      return;
+    }
+
     const pass = newMemberPassword.trim() || 'puerta2026';
     const created = await createWorkspaceMemberAsync({
       workspaceId: currentWorkspaceId,
@@ -255,12 +264,36 @@ export default function EventTeamPage() {
             </p>
           </div>
 
-          <button
-            onClick={() => setShowInviteModal(true)}
-            className="gold-button font-bold text-xs px-5 py-3 rounded-xl transition shadow-md flex items-center gap-2"
-          >
-            <UserPlus className="w-4 h-4" /> Invitar / Crear Operador de Puerta
-          </button>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            {(() => {
+              const plan = PLAN_LIMITS[contractInfo.planCode] || PLAN_LIMITS.STARTER;
+              const allWorkspaceMembers = getWorkspaceMembers(currentWorkspaceId);
+              const isLimitReached = plan.maxWorkspaceUsers !== -1 && allWorkspaceMembers.length >= plan.maxWorkspaceUsers;
+
+              return (
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border shadow-2xs ${
+                    isLimitReached ? 'bg-red-50 text-red-700 border-red-300 font-extrabold' : 'bg-purple-50 text-purple-800 border-purple-300'
+                  }`}>
+                    Plan {plan.name}: {allWorkspaceMembers.length} de {plan.maxWorkspaceUsers} Usuarios
+                  </span>
+                  <button
+                    onClick={() => {
+                      const planCheck = checkCanAddWorkspaceMember(contractInfo.planCode, allWorkspaceMembers.length);
+                      if (!planCheck.allowed) {
+                        alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+                        return;
+                      }
+                      setShowInviteModal(true);
+                    }}
+                    className="gold-button font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-md flex items-center gap-2"
+                  >
+                    <UserPlus className="w-4 h-4" /> Invitar Colaborador
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
         </div>
 
         {/* CONTINGENCY PIN & DOOR SECURITY POLICY CARD */}

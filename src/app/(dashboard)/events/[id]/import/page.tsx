@@ -14,6 +14,7 @@ import {
 } from '@/lib/excel-parser';
 import { getEventById, getEventByIdAsync, saveEventGuestGroups, saveEventGuestGroupsAsync, getEventGuestGroups, getEventGuestGroupsAsync, deleteEventGuestGroups, deleteEventGuestGroupsAsync } from '@/lib/events';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
+import { checkCanImportPasses, PLAN_LIMITS } from '@/lib/plans';
 import { GuestGroup, Event } from '@/lib/supabase/types';
 import EventNavHeader from '@/components/EventNavHeader';
 
@@ -196,6 +197,14 @@ export default function ExcelImportWizardPage() {
 
   const handleConfirmImport = async () => {
     if (!validationResult || validationResult.validCount === 0) return;
+
+    // Enforce Plan Limit on maximum passes per event
+    const contractAccount = getAccountForSession();
+    const planCheck = checkCanImportPasses(contractAccount.planCode, validationResult.totalPasses);
+    if (!planCheck.allowed) {
+      alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+      return;
+    }
 
     const guestGroups = validationResult.validRows.map(r => ({
       event_id: eventId,
@@ -678,21 +687,53 @@ export default function ExcelImportWizardPage() {
             </div>
 
             {/* Confirm Actions */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-              <button
-                onClick={() => setStep(2)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
-              >
-                Volver al Mapeo
-              </button>
-              <button
-                onClick={handleConfirmImport}
-                disabled={validationResult.validCount === 0}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-6 py-3 rounded-xl transition shadow-md disabled:opacity-50"
-              >
-                <FileCheck className="w-4 h-4" /> Confirmar e Importar {validationResult.validCount} Grupos
-              </button>
-            </div>
+            {(() => {
+              const contractAccount = getAccountForSession();
+              const plan = PLAN_LIMITS[contractAccount.planCode] || PLAN_LIMITS.STARTER;
+              const isPassLimitExceeded = validationResult.totalPasses > plan.maxPassesPerEvent;
+
+              return (
+                <>
+                  {isPassLimitExceeded && (
+                    <div className="p-4 bg-red-50 border-2 border-red-400 rounded-2xl flex items-start gap-3 text-xs text-red-900 shadow-sm animate-pulse">
+                      <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <strong className="block font-bold text-red-950 text-sm">
+                          ⚠️ LÍMITE DE PASES DEL PLAN EXCEDIDO
+                        </strong>
+                        <p>
+                          Tu archivo contiene <span className="font-extrabold text-red-800">{validationResult.totalPasses} pases autorizados</span>, pero el límite máximo de tu <strong className="font-bold">Plan {plan.name}</strong> es de <span className="font-extrabold text-red-800">{plan.maxPassesPerEvent} pases por evento</span>.
+                        </p>
+                        <p className="text-[11px] text-red-700">
+                          Para importar esta lista completa sin bloqueos, actualiza a <strong>Plan Professional</strong> (hasta 500 pases) o <strong>Plan Business</strong> (hasta 1,000 pases).
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+                    <button
+                      onClick={() => setStep(2)}
+                      className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-lg transition"
+                    >
+                      Volver al Mapeo
+                    </button>
+                    <button
+                      onClick={handleConfirmImport}
+                      disabled={validationResult.validCount === 0 || isPassLimitExceeded}
+                      className={`flex items-center gap-2 font-extrabold text-xs px-6 py-3 rounded-xl transition shadow-md ${
+                        isPassLimitExceeded 
+                          ? 'bg-slate-400 text-white cursor-not-allowed opacity-60' 
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                      title={isPassLimitExceeded ? `Excede el límite de ${plan.maxPassesPerEvent} pases del Plan ${plan.name}` : ''}
+                    >
+                      <FileCheck className="w-4 h-4" /> Confirmar e Importar {validationResult.validCount} Grupos
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         )}
 

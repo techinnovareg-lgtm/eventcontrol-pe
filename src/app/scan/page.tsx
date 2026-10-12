@@ -6,8 +6,9 @@ import Image from 'next/image';
 import { 
   Camera, QrCode, ShieldCheck, CheckCircle2, XCircle, AlertTriangle, 
   Users, MapPin, RefreshCw, ArrowLeft, Zap, Lock, Wifi, WifiOff, Download, CloudUpload, Home, LogOut,
-  Search, Check, Sparkles, ChevronDown, X
+  Search, Check, Sparkles, ChevronDown, X, User
 } from 'lucide-react';
+import { PLAN_LIMITS } from '@/lib/plans';
 import { resolveQRToken, getOrCreateGroupQRToken, findTokenAndGroupForScannedInput, extractTokenFromInput } from '@/lib/qr-engine';
 import { executeAtomicCheckIn, executeAtomicCheckInAsync, simulateConcurrentScans, CheckInExecutionResult } from '@/lib/checkin';
 import { 
@@ -228,6 +229,9 @@ export default function MobileScanCheckInPage() {
   const [resultModal, setResultModal] = useState<CheckInExecutionResult | null>(null);
   const [concurrencyResult, setConcurrencyResult] = useState<{ operatorA: CheckInExecutionResult; operatorB: CheckInExecutionResult } | null>(null);
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
+
+  // Operator Profile Modal State
+  const [showOperatorProfileModal, setShowOperatorProfileModal] = useState<boolean>(false);
 
   // Google-style Predictive Guest Search for Manual Selector
   const [manualSearchQuery, setManualSearchQuery] = useState<string>('');
@@ -526,6 +530,14 @@ export default function MobileScanCheckInPage() {
           <div className="flex items-center gap-2">
             {(!session || session?.user?.role === 'OPERATOR' || isOperator) && (
               <>
+                <button
+                  type="button"
+                  onClick={() => setShowOperatorProfileModal(true)}
+                  className="text-[11px] text-amber-300 font-bold hover:text-white px-2.5 py-1 bg-amber-950/60 rounded-lg border border-amber-800/60 transition flex items-center gap-1 shadow-sm"
+                  title="Ver Mi Cuenta y Restricciones"
+                >
+                  <User className="w-3 h-3 text-[#C5A059]" /> Mi Cuenta
+                </button>
                 <Link 
                   href="/" 
                   className="text-[11px] text-slate-300 font-bold hover:text-white px-2.5 py-1 bg-slate-800 rounded-lg border border-slate-700 transition flex items-center gap-1"
@@ -1333,6 +1345,99 @@ export default function MobileScanCheckInPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* OPERATOR ACCOUNT & RESTRICTIONS MODAL */}
+      {showOperatorProfileModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 max-w-md w-full shadow-2xl relative text-left space-y-4 max-h-[90vh] overflow-y-auto">
+            <button
+              onClick={() => setShowOperatorProfileModal(false)}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-white rounded-full bg-slate-800/80 transition"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-slate-800 pb-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
+                <ShieldCheck className="w-5 h-5 text-[#C5A059]" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-white">Detalles de Mi Cuenta</h3>
+                <p className="text-[11px] text-slate-400">Perfil de Operación y Restricciones del Sistema</p>
+              </div>
+            </div>
+
+            {/* Profile Identity Card */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3.5 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Identidad Activa</span>
+                <span className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold px-2 py-0.5 rounded-full">
+                  OPERADOR DE PUERTA
+                </span>
+              </div>
+              <div className="text-sm font-bold text-white">
+                {session?.user?.name || 'Operador de Control'}
+              </div>
+              <div className="text-xs text-slate-400">
+                {session?.user?.email || 'operador@eventcontrol.internal'}
+              </div>
+              {session?.user?.eventId && (
+                <div className="pt-1 border-t border-slate-800/80 text-[11px] text-emerald-400 flex items-center gap-1.5 font-medium">
+                  <Lock className="w-3.5 h-3.5 shrink-0" />
+                  <span>Evento Asignado: {activeEvent?.name || session.user.eventId}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Permissions & Restrictions */}
+            <div className="space-y-2">
+              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Alcance y Restricciones del Perfil
+              </div>
+              <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 space-y-2 text-xs">
+                <div className="flex items-start gap-2 text-emerald-400">
+                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-500" />
+                  <span><strong>Escaneo y Check-in QR:</strong> Autorizado para validar y registrar ingresos de invitados en tiempo real.</span>
+                </div>
+                <div className="flex items-start gap-2 text-emerald-400">
+                  <Check className="w-3.5 h-3.5 mt-0.5 shrink-0 text-emerald-500" />
+                  <span><strong>Soporte Offline PWA:</strong> Autorizado para validar ingresos sin conexión a internet y sincronizar posteriormente.</span>
+                </div>
+                <div className="flex items-start gap-2 text-rose-400">
+                  <X className="w-3.5 h-3.5 mt-0.5 shrink-0 text-rose-500" />
+                  <span><strong>Administración Bloqueada:</strong> No puede crear, editar o eliminar eventos, mesas, pases o colaboradores.</span>
+                </div>
+                <div className="flex items-start gap-2 text-rose-400">
+                  <X className="w-3.5 h-3.5 mt-0.5 shrink-0 text-rose-500" />
+                  <span><strong>Reportes y Exportación:</strong> No cuenta con acceso a descargas Excel, exportación de asistentes ni métricas de cuenta.</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Plan Info */}
+            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Plan del Workspace</div>
+                <div className="text-xs font-bold text-[#C5A059]">
+                  {account?.planCode ? PLAN_LIMITS[account.planCode as keyof typeof PLAN_LIMITS]?.name || account.planCode : 'Starter'}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Workspace ID</div>
+                <div className="text-xs font-mono text-slate-300">{currentWorkspaceId}</div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowOperatorProfileModal(false)}
+              className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs rounded-xl transition"
+            >
+              Entendido / Cerrar
+            </button>
           </div>
         </div>
       )}

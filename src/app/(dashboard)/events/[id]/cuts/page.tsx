@@ -14,6 +14,7 @@ import { getEventCuts, getEventCutsAsync, createEventCut, calculateCateringDiff 
 import { checkInRealtimeChannel } from '@/lib/realtime';
 import { Cut, Event } from '@/lib/supabase/types';
 import { getActiveSession, getAccountForSession } from '@/lib/superadmin-store';
+import { checkCanCreateCut, PLAN_LIMITS } from '@/lib/plans';
 
 export default function EventCutsPage() {
   const params = useParams();
@@ -61,6 +62,14 @@ export default function EventCutsPage() {
     e.preventDefault();
     if (!cutName) return;
 
+    // Enforce Plan Limits for Catering Cuts
+    const contractAccount = getAccountForSession();
+    const planCheck = checkCanCreateCut(contractAccount.planCode, cuts.length);
+    if (!planCheck.allowed) {
+      alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+      return;
+    }
+
     createEventCut(eventId, currentWorkspaceId, cutName);
     setCutName('');
     setShowCreateModal(false);
@@ -80,6 +89,19 @@ export default function EventCutsPage() {
               <span className="text-[11px] font-serif font-bold text-amber-900 bg-amber-50 px-2.5 py-0.5 rounded-full border border-[#C5A059]/40 shadow-2xs">
                 🍷 Evento: {event?.name}
               </span>
+              {(() => {
+                const contractAccount = getAccountForSession();
+                const plan = PLAN_LIMITS[contractAccount.planCode] || PLAN_LIMITS.STARTER;
+                const isCutLimitReached = plan.maxCutsPerEvent !== -1 && cuts.length >= plan.maxCutsPerEvent;
+
+                return (
+                  <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${
+                    isCutLimitReached ? 'bg-red-50 text-red-700 border-red-300 font-extrabold' : 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                  }`}>
+                    Plan {plan.name}: {cuts.length} de {plan.maxCutsPerEvent === -1 ? 'Ilimitados' : plan.maxCutsPerEvent} Cortes
+                  </span>
+                );
+              })()}
             </div>
             <h1 className="text-2xl font-serif font-bold text-[#1A1A1A] mt-1">Cortes de Asistencia y Control de Comida</h1>
             <p className="text-xs text-slate-500 mt-0.5">
@@ -88,7 +110,15 @@ export default function EventCutsPage() {
           </div>
 
           <button
-            onClick={() => setShowCreateModal(true)}
+            onClick={() => {
+              const contractAccount = getAccountForSession();
+              const planCheck = checkCanCreateCut(contractAccount.planCode, cuts.length);
+              if (!planCheck.allowed) {
+                alert(`⚠️ RESTRICCIÓN DE PLAN CONTRATADO\n\n${planCheck.reason}`);
+                return;
+              }
+              setShowCreateModal(true);
+            }}
             className="gold-button font-bold text-xs px-5 py-3 rounded-xl transition shadow-md flex items-center gap-2 self-start sm:self-auto"
           >
             <Plus className="w-4 h-4" /> Registrar Nuevo Corte
