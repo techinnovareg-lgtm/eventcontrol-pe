@@ -87,13 +87,13 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactEmail: 'ana@amgweddings.pe',
     contactPhone: '+51 987 654 321',
     planCode: 'STARTER',
-    contractStartDate: '2026-08-01T00:00:00.000Z',
-    contractEndDate: '2027-12-31T23:59:59.000Z',
+    contractStartDate: '2026-10-01T00:00:00.000Z',
+    contractEndDate: '2026-10-30T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
     passwordHashMasked: '••••••••••••',
-    created_at: '2026-08-01T00:00:00.000Z',
+    created_at: '2026-10-01T00:00:00.000Z',
   },
   {
     id: 'usr-admin-weddingsco',
@@ -104,7 +104,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 999 888 777',
     planCode: 'BUSINESS',
     contractStartDate: '2026-09-07T00:00:00.000Z',
-    contractEndDate: '2027-09-07T23:59:59.000Z',
+    contractEndDate: '2027-09-06T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -120,7 +120,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 912 345 678',
     planCode: 'PROFESSIONAL',
     contractStartDate: '2026-07-15T00:00:00.000Z',
-    contractEndDate: '2027-07-15T23:59:59.000Z',
+    contractEndDate: '2027-07-14T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -136,7 +136,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 955 443 322',
     planCode: 'BUSINESS',
     contractStartDate: '2026-08-20T00:00:00.000Z',
-    contractEndDate: '2027-08-20T23:59:59.000Z',
+    contractEndDate: '2027-08-19T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: true,
     initialPassword: 'EventControl2026!',
@@ -421,12 +421,63 @@ export function isAccountNearExpiration(endDateIso: string): boolean {
 }
 
 /**
- * Helper: Calculate expiration date automatically based on contract start date and chosen duration/plan
+ * Formatea una fecha de contrato en formato civil DD/MM/YYYY
+ * garantizando cero distorsiones de huso horario (GMT-5 vs UTC).
+ */
+export function formatContractDateCivil(dateStr: string): string {
+  if (!dateStr) return '—';
+  try {
+    const clean = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
+    const parts = clean.split('-');
+    if (parts.length === 3) {
+      const [y, m, d] = parts;
+      return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+  } catch (err) {}
+  return dateStr;
+}
+
+/**
+ * Calcula la duración exacta en días de un contrato entre dos fechas,
+ * considerando ambos extremos incluidos (día de inicio como Día 1 y día de fin inclusive).
+ * Ejemplo: Inicio 01/10 al 30/10 = 30 días exactos.
+ */
+export function calculateContractDurationDays(startDateIso: string, endDateIso: string): number {
+  try {
+    const sStr = startDateIso.includes('T') ? startDateIso.split('T')[0] : startDateIso;
+    const eStr = endDateIso.includes('T') ? endDateIso.split('T')[0] : endDateIso;
+    const [sY, sM, sD] = sStr.split('-').map(Number);
+    const [eY, eM, eD] = eStr.split('-').map(Number);
+    const sUtc = Date.UTC(sY, sM - 1, sD);
+    const eUtc = Date.UTC(eY, eM - 1, eD);
+    const diff = Math.round((eUtc - sUtc) / (24 * 60 * 60 * 1000));
+    return Math.max(1, diff + 1);
+  } catch (err) {
+    return 30;
+  }
+}
+
+/**
+ * Helper: Calcula la fecha de vencimiento automáticamente basada en la fecha de inicio del contrato
+ * y la duración en días (ej. 30 días para Starter mensual, 90 trimestral, 180 semestral, 365 anual).
+ * REGLA ESTRICTA DE NEGOCIO: La vigencia incluye el día de inicio como Día 1.
+ * Por lo tanto, un contrato de 30 días que inicia el 1 de octubre, termina el 30 de octubre a las 23:59:59 (exactamente 30 días).
  */
 export function calculateContractEndDate(startDateIso: string, durationDays: number): string {
-  const start = new Date(startDateIso);
-  const end = new Date(start.getTime() + durationDays * 24 * 60 * 60 * 1000);
-  return end.toISOString();
+  if (!startDateIso) {
+    startDateIso = new Date().toISOString().split('T')[0];
+  }
+  const clean = startDateIso.includes('T') ? startDateIso.split('T')[0] : startDateIso;
+  const [year, month, day] = clean.split('-').map(Number);
+  
+  // Creamos la fecha en UTC fijando 23:59:59.999
+  const d = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+  
+  // Si dura N días e incluye el día de inicio, sumamos (durationDays - 1)
+  const daysToAdd = Math.max(0, durationDays - 1);
+  d.setUTCDate(d.getUTCDate() + daysToAdd);
+  
+  return d.toISOString();
 }
 
 /**
@@ -444,9 +495,14 @@ export function extendAdminContract(
   const acc = store.find(a => a.id === accountId);
   if (!acc) return { success: false, newEndDate: '', message: 'Cuenta no encontrada.' };
 
-  const currentEnd = new Date(acc.contractEndDate);
-  const startFromDate = new Date(currentEnd.getTime() + 24 * 60 * 60 * 1000);
-  const newEndDate = new Date(startFromDate.getTime() + extensionDays * 24 * 60 * 60 * 1000);
+  // El nuevo período comienza al día siguiente de la fecha de vencimiento previa
+  const prevEndStr = acc.contractEndDate.includes('T') ? acc.contractEndDate.split('T')[0] : acc.contractEndDate;
+  const [eY, eM, eD] = prevEndStr.split('-').map(Number);
+  const nextStart = new Date(Date.UTC(eY, eM - 1, eD));
+  nextStart.setUTCDate(nextStart.getUTCDate() + 1); // día siguiente
+  const nextStartStr = nextStart.toISOString().split('T')[0];
+
+  const newEndDate = calculateContractEndDate(nextStartStr, extensionDays);
 
   const prevPlan = acc.planCode;
   const targetPlan = newPlanCode || acc.planCode;
@@ -460,7 +516,7 @@ export function extendAdminContract(
         planCode: prevPlan,
         startDate: acc.contractStartDate,
         endDate: acc.contractEndDate,
-        durationDays: Math.round((new Date(acc.contractEndDate).getTime() - new Date(acc.contractStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+        durationDays: calculateContractDurationDays(acc.contractStartDate, acc.contractEndDate),
         pricePEN: PLAN_LIMITS[prevPlan]?.monthlyPricePEN,
         notes: 'Suscripción inicial de contrato',
         created_at: acc.created_at || acc.contractStartDate,
@@ -473,8 +529,8 @@ export function extendAdminContract(
     id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
     type: targetPlan !== prevPlan ? 'PLAN_UPGRADE' : 'EXTENSION',
     planCode: targetPlan,
-    startDate: startFromDate.toISOString(),
-    endDate: newEndDate.toISOString(),
+    startDate: nextStart.toISOString(),
+    endDate: newEndDate,
     durationDays: extensionDays,
     pricePEN: PLAN_LIMITS[targetPlan]?.monthlyPricePEN,
     notes: notes || (targetPlan !== prevPlan ? `Migración de ${prevPlan} a ${targetPlan} (+${extensionDays} días)` : `Renovación de servicio (+${extensionDays} días)`),
@@ -482,7 +538,7 @@ export function extendAdminContract(
   };
 
   acc.contractHistory.push(historyEntry);
-  acc.contractEndDate = newEndDate.toISOString();
+  acc.contractEndDate = newEndDate;
   if (newPlanCode) {
     acc.planCode = newPlanCode;
   }
@@ -495,8 +551,8 @@ export function extendAdminContract(
 
   return {
     success: true,
-    newEndDate: newEndDate.toLocaleDateString('es-PE'),
-    message: `¡Contrato extendido con éxito! ${newPlanCode ? `Plan actualizado a ${PLAN_LIMITS[newPlanCode].name}.` : ''} La nueva fecha de vencimiento es el ${newEndDate.toLocaleDateString('es-PE')}, registrada en el histórico de métricas.`,
+    newEndDate: formatContractDateCivil(newEndDate),
+    message: `¡Contrato extendido con éxito! ${newPlanCode ? `Plan actualizado a ${PLAN_LIMITS[newPlanCode].name}.` : ''} La nueva fecha de vencimiento es el ${formatContractDateCivil(newEndDate)} (${extensionDays} días exactos de vigencia).`,
   };
 }
 
@@ -594,7 +650,7 @@ export function createAdminAccount(data: {
     planCode: data.planCode,
     startDate,
     endDate,
-    durationDays: Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (24 * 60 * 60 * 1000)),
+    durationDays: calculateContractDurationDays(startDate, endDate),
     pricePEN: PLAN_LIMITS[data.planCode]?.monthlyPricePEN,
     notes: 'Alta y apertura oficial de cuenta administradora',
     created_at: now.toISOString(),
@@ -656,7 +712,7 @@ export function updateAdminAccount(
           planCode: oldPlan,
           startDate: oldStartDate,
           endDate: oldEndDate,
-          durationDays: Math.round((new Date(oldEndDate).getTime() - new Date(oldStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+          durationDays: calculateContractDurationDays(oldStartDate, oldEndDate),
           pricePEN: PLAN_LIMITS[oldPlan]?.monthlyPricePEN,
           notes: 'Registro previo de suscripción',
           created_at: acc.created_at || oldStartDate,
@@ -671,7 +727,7 @@ export function updateAdminAccount(
         planCode: acc.planCode,
         startDate: acc.contractStartDate,
         endDate: acc.contractEndDate,
-        durationDays: Math.round((new Date(acc.contractEndDate).getTime() - new Date(acc.contractStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+        durationDays: calculateContractDurationDays(acc.contractStartDate, acc.contractEndDate),
         pricePEN: PLAN_LIMITS[acc.planCode]?.monthlyPricePEN,
         notes: 'Ajuste manual de atributos de vigencia o plan por Superadmin',
         created_at: new Date().toISOString(),

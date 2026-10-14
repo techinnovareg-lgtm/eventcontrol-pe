@@ -8,7 +8,7 @@ import {
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
   Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles,
   Copy, Check, Send, ExternalLink, Eye, EyeOff, Info, MessageSquare, Search, Filter, X,
-  Trash2, Archive, ArchiveRestore, History, TrendingUp, DollarSign, Users, Award
+  Trash2, Archive, ArchiveRestore, History, TrendingUp, DollarSign, Users, Award, Edit3
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
@@ -16,7 +16,8 @@ import {
   AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL, sendClientWelcomeEmail,
   setSuperAdminPassword, verifySuperAdminPassword,
   generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, syncAdminAccountOnlineAsync,
-  deleteAdminAccount, toggleArchiveAdminAccount, calculateContractEndDate, ContractSubscriptionRecord
+  deleteAdminAccount, toggleArchiveAdminAccount, calculateContractEndDate, calculateContractDurationDays,
+  formatContractDateCivil, ContractSubscriptionRecord
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 import { generateWhatsAppLink } from '@/lib/whatsapp';
@@ -92,9 +93,7 @@ export default function SuperAdminPage() {
   const [durationDays, setDurationDays] = useState(365);
   const [createContractStartDate, setCreateContractStartDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [createContractEndDate, setCreateContractEndDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 365);
-    return d.toISOString().split('T')[0];
+    return calculateContractEndDate(new Date().toISOString().split('T')[0], 365).split('T')[0];
   });
 
   // Edit Account Form State (for Date Pickers)
@@ -226,6 +225,11 @@ export default function SuperAdminPage() {
 
   const handleCreatePlanChange = (newPlan: PlanCode) => {
     setPlanCode(newPlan);
+    if (newPlan === 'STARTER' && durationDays !== 30) {
+      setDurationDays(30);
+      const newEnd = calculateContractEndDate(createContractStartDate, 30);
+      setCreateContractEndDate(newEnd.split('T')[0]);
+    }
   };
 
   // Filter accounts taking into consideration ARCHIVADA filter
@@ -420,7 +424,7 @@ export default function SuperAdminPage() {
           planCode: acc.planCode,
           startDate: acc.contractStartDate,
           endDate: acc.contractEndDate,
-          durationDays: 365,
+          durationDays: calculateContractDurationDays(acc.contractStartDate, acc.contractEndDate),
           pricePEN: acc.planCode === 'BUSINESS' ? 99.99 : acc.planCode === 'STARTER' ? 29.99 : 59.99,
           created_at: acc.created_at || acc.contractStartDate,
           notes: 'Contrato inicial de apertura',
@@ -711,14 +715,14 @@ export default function SuperAdminPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
-                  <tr className="bg-slate-100 border-b border-slate-300 font-bold text-slate-700 uppercase">
-                    <th className="py-3.5 px-4">Empresa / Planner</th>
-                    <th className="py-3.5 px-4">Administrador & Correo</th>
-                    <th className="py-3.5 px-4">Plan Contratado</th>
-                    <th className="py-3.5 px-4">Fecha Contrato</th>
-                    <th className="py-3.5 px-4">Vencimiento & Días</th>
-                    <th className="py-3.5 px-4">Estado</th>
-                    <th className="py-3.5 px-4 text-right">Acciones de Cuenta</th>
+                  <tr className="bg-slate-100/90 border-b border-slate-300 font-bold text-slate-700 uppercase text-[10px] tracking-wider">
+                    <th className="py-2.5 px-3">Empresa / Planner</th>
+                    <th className="py-2.5 px-3">Administrador & Correo</th>
+                    <th className="py-2.5 px-3">Plan Contratado</th>
+                    <th className="py-2.5 px-3">Fecha Contrato</th>
+                    <th className="py-2.5 px-3">Vencimiento & Días</th>
+                    <th className="py-2.5 px-3">Estado</th>
+                    <th className="py-2.5 px-3 text-right">Acciones de Cuenta</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-200">
@@ -732,67 +736,67 @@ export default function SuperAdminPage() {
                       <tr key={acc.id} className={`hover:bg-amber-50/40 transition ${isNearExpiration ? 'bg-amber-50/70' : acc.isArchived ? 'bg-slate-100/60 opacity-80' : ''}`}>
                       
                       {/* Empresa / Planner */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-2.5 px-3">
                         <div className="flex items-center gap-1.5">
-                          <strong className="font-bold text-slate-900 block text-sm">{acc.companyName}</strong>
+                          <strong className="font-bold text-slate-900 block text-xs max-w-[170px] truncate" title={acc.companyName}>{acc.companyName}</strong>
                           {acc.isArchived && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 border border-slate-300">
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 border border-slate-300 shrink-0">
                               ARCHIVADA
                             </span>
                           )}
                         </div>
-                        <span className="text-[10px] text-slate-400 font-mono">Workspace: {acc.workspaceId}</span>
+                        <span className="text-[10px] text-slate-400 font-mono block max-w-[170px] truncate">WS: {acc.workspaceId}</span>
                       </td>
 
                       {/* Administrador & Correo */}
-                      <td className="py-3.5 px-4">
-                        <span className="font-semibold text-slate-800 block">{acc.adminName}</span>
-                        <span className="text-[11px] text-slate-500 font-mono flex items-center gap-1">
-                          <Mail className="w-3 h-3 text-[#B8860B]" /> {acc.contactEmail}
+                      <td className="py-2.5 px-3">
+                        <span className="font-semibold text-slate-800 block text-xs max-w-[170px] truncate" title={acc.adminName}>{acc.adminName}</span>
+                        <span className="text-[10px] text-slate-500 font-mono flex items-center gap-1 max-w-[170px] truncate" title={acc.contactEmail}>
+                          <Mail className="w-3 h-3 text-[#B8860B] shrink-0" /> {acc.contactEmail}
                         </span>
                         {acc.contactPhone && (
-                          <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                            <Phone className="w-3 h-3 text-slate-400" /> {acc.contactPhone}
+                          <span className="text-[9px] text-slate-400 flex items-center gap-1 mt-0.5">
+                            <Phone className="w-2.5 h-2.5 text-slate-400 shrink-0" /> {acc.contactPhone}
                           </span>
                         )}
                       </td>
 
                       {/* Plan Contratado */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border font-bold text-xs shadow-sm bg-amber-50 text-[#B8860B] border-[#DBBB6E]/50">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border font-bold text-[11px] shadow-2xs bg-amber-50 text-[#B8860B] border-[#DBBB6E]/50">
                           <span>Plan {plan.name}</span>
-                          <span className="text-[10px] font-normal text-slate-500">(S/{plan.monthlyPricePEN}/mes)</span>
+                          <span className="text-[9px] font-normal text-slate-500">(S/{plan.monthlyPricePEN})</span>
                         </div>
-                        <span className="text-[10px] text-slate-500 block mt-1">
-                          Evts: {plan.maxActiveEvents === -1 ? 'Ilimitados' : plan.maxActiveEvents} • Pases: {plan.maxPassesPerEvent}
+                        <span className="text-[9px] text-slate-400 block mt-0.5">
+                          {plan.maxActiveEvents === -1 ? 'Ilimitados' : plan.maxActiveEvents} evts • {plan.maxPassesPerEvent} pases
                         </span>
                       </td>
 
                       {/* Fecha Contrato */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="font-mono text-slate-800 block font-bold text-xs flex items-center gap-1">
-                          <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
-                          {new Date(acc.contractStartDate).toLocaleDateString('es-PE')}
+                          <Calendar className="w-3 h-3 text-[#B8860B]" />
+                          {formatContractDateCivil(acc.contractStartDate)}
                         </span>
-                        <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">Inicio de vigencia</span>
+                        <span className="text-[9px] text-slate-400 block mt-0.5 font-medium">Inicio oficial</span>
                       </td>
 
                       {/* Vencimiento & Días */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
+                      <td className="py-2.5 px-3 whitespace-nowrap">
                         <span className="font-mono text-slate-800 block font-bold text-xs">
-                          {new Date(acc.contractEndDate).toLocaleDateString('es-PE')}
+                          {formatContractDateCivil(acc.contractEndDate)}
                         </span>
-                        <span className={`text-[10px] font-extrabold block ${
+                        <span className={`text-[9px] font-extrabold block ${
                           acc.status === 'ARCHIVADA' ? 'text-slate-500' :
                           remDays <= 7 ? 'text-red-600 animate-pulse' : 'text-emerald-700'
                         }`}>
-                          {acc.status === 'ARCHIVADA' ? 'Archivada' : remDays <= 7 ? `⚠️ Alerta: ${remDays} días` : `${remDays} días restantes`}
+                          {acc.status === 'ARCHIVADA' ? 'Archivada' : remDays <= 7 ? `⚠️ Alerta: ${remDays}d` : `${remDays}d restantes`}
                         </span>
                       </td>
 
                       {/* Estado */}
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
+                      <td className="py-2.5 px-3 whitespace-nowrap">
+                        <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${
                           acc.status === 'ACTIVA' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
                           acc.status === 'ARCHIVADA' ? 'bg-slate-200 text-slate-800 border-slate-300' :
                           'bg-red-100 text-red-800 border-red-300'
@@ -801,91 +805,94 @@ export default function SuperAdminPage() {
                         </span>
                       </td>
 
-                      {/* Acciones de Cuenta */}
-                      <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
-                        {/* Ver Historial de Suscripciones */}
-                        <button
-                          onClick={() => setHistoryModalAccount(acc)}
-                          className="px-2 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg border border-indigo-200 transition text-[11px] inline-flex items-center gap-1 shadow-2xs"
-                          title="Ver histórico de extensiones y renovaciones"
-                        >
-                          <History className="w-3.5 h-3.5 text-indigo-600" /> Histórico ({historyCount})
-                        </button>
+                      {/* Acciones de Cuenta - Compact Executive Action Bar */}
+                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1">
+                          {/* Extender Contrato */}
+                          <button
+                            onClick={() => handleOpenExtendModal(acc)}
+                            style={{ backgroundColor: '#DBBB6E' }}
+                            className="px-2 py-1 text-white font-bold rounded-lg transition text-[11px] shadow-2xs hover:brightness-110 flex items-center gap-1"
+                            title="Extender Contrato / Renovar Plan tras Pago"
+                          >
+                            <Plus className="w-3 h-3" /> Extender
+                          </button>
 
-                        <button
-                          onClick={() => {
-                            setResendWhatsAppAccount({ account: acc });
-                            setSuperadminWhatsAppPhone(acc.contactPhone || '');
-                          }}
-                          className="px-2 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-emerald-800 font-bold rounded-lg border border-[#25D366]/40 transition text-[11px] inline-flex items-center gap-1 shadow-2xs"
-                          title="Enviar o Re-enviar Credenciales por WhatsApp"
-                        >
-                          <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
-                        </button>
+                          {/* Ver Historial de Suscripciones */}
+                          <button
+                            onClick={() => setHistoryModalAccount(acc)}
+                            className="px-2 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg border border-indigo-200 transition text-[11px] inline-flex items-center gap-1 shadow-2xs"
+                            title="Ver histórico de extensiones y renovaciones"
+                          >
+                            <History className="w-3 h-3 text-indigo-600" /> Histórico ({historyCount})
+                          </button>
 
-                        <button
-                          onClick={() => handleResendEmail(acc)}
-                          disabled={isSubmitting}
-                          className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition text-[11px] inline-flex items-center gap-1"
-                          title="Enviar o Re-enviar Correo de Bienvenida con Credenciales"
-                        >
-                          <Send className="w-3.5 h-3.5 text-emerald-600" /> Correo
-                        </button>
+                          {/* Enviar Credenciales por WhatsApp */}
+                          <button
+                            onClick={() => {
+                              setResendWhatsAppAccount({ account: acc });
+                              setSuperadminWhatsAppPhone(acc.contactPhone || '');
+                            }}
+                            className="w-7 h-7 inline-flex items-center justify-center bg-[#25D366]/10 hover:bg-[#25D366]/20 text-emerald-800 rounded-lg border border-[#25D366]/40 transition shadow-2xs"
+                            title="Enviar credenciales de acceso por WhatsApp"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5 text-emerald-600" />
+                          </button>
 
-                        <button
-                          onClick={() => handleOpenExtendModal(acc)}
-                          style={{ backgroundColor: '#DBBB6E' }}
-                          className="px-2.5 py-1.5 text-white font-bold rounded-lg transition text-[11px] shadow-sm hover:brightness-110"
-                          title="Extender Contrato / Renovar Plan"
-                        >
-                          Extender
-                        </button>
+                          {/* Re-enviar Correo de Bienvenida */}
+                          <button
+                            onClick={() => handleResendEmail(acc)}
+                            disabled={isSubmitting}
+                            className="w-7 h-7 inline-flex items-center justify-center bg-sky-50 hover:bg-sky-100 text-sky-700 rounded-lg border border-sky-300 transition shadow-2xs disabled:opacity-50"
+                            title="Re-enviar Correo de Bienvenida con Credenciales"
+                          >
+                            <Mail className="w-3.5 h-3.5 text-sky-600" />
+                          </button>
 
-                        <button
-                          onClick={() => handleOpenEditAccount(acc)}
-                          className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
-                          title="Editar Atributos de Cuenta (fechas, plan, datos)"
-                        >
-                          Editar
-                        </button>
+                          {/* Editar Atributos de Cuenta */}
+                          <button
+                            onClick={() => handleOpenEditAccount(acc)}
+                            className="w-7 h-7 inline-flex items-center justify-center bg-amber-50 hover:bg-amber-100 text-[#B8860B] rounded-lg border border-[#C5A059]/40 transition shadow-2xs"
+                            title="Editar Atributos de Cuenta (fechas de contrato, plan, datos)"
+                          >
+                            <Edit3 className="w-3.5 h-3.5 text-[#B8860B]" />
+                          </button>
 
-                        <button
-                          onClick={() => handleTriggerReset(acc)}
-                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
-                          title="Restablecer Contraseña Privada del Cliente"
-                        >
-                          Reset Clave
-                        </button>
+                          {/* Reset Clave de Acceso */}
+                          <button
+                            onClick={() => handleTriggerReset(acc)}
+                            className="w-7 h-7 inline-flex items-center justify-center bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-300 transition shadow-2xs"
+                            title="Restablecer Contraseña Privada del Cliente"
+                          >
+                            <KeyRound className="w-3.5 h-3.5 text-slate-600" />
+                          </button>
 
-                        {/* Archivar / Restaurar */}
-                        <button
-                          onClick={() => handleToggleArchive(acc)}
-                          className={`px-2 py-1.5 font-bold rounded-lg border transition text-[11px] inline-flex items-center gap-1 ${
-                            acc.isArchived
-                              ? 'bg-sky-50 hover:bg-sky-100 text-sky-800 border-sky-300'
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300'
-                          }`}
-                          title={acc.isArchived ? 'Restaurar Cuenta del Archivo' : 'Archivar Cuenta (Ocultar sin borrar histórico)'}
-                        >
-                          {acc.isArchived ? (
-                            <>
-                              <ArchiveRestore className="w-3.5 h-3.5 text-sky-600" /> Restaurar
-                            </>
-                          ) : (
-                            <>
-                              <Archive className="w-3.5 h-3.5 text-slate-500" /> Archivar
-                            </>
-                          )}
-                        </button>
+                          {/* Archivar / Restaurar */}
+                          <button
+                            onClick={() => handleToggleArchive(acc)}
+                            className={`w-7 h-7 inline-flex items-center justify-center rounded-lg border transition shadow-2xs ${
+                              acc.isArchived
+                                ? 'bg-sky-50 hover:bg-sky-100 text-sky-800 border-sky-300'
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300'
+                            }`}
+                            title={acc.isArchived ? 'Restaurar Cuenta del Archivo' : 'Archivar Cuenta (Ocultar sin borrar histórico)'}
+                          >
+                            {acc.isArchived ? (
+                              <ArchiveRestore className="w-3.5 h-3.5 text-sky-600" />
+                            ) : (
+                              <Archive className="w-3.5 h-3.5 text-slate-500" />
+                            )}
+                          </button>
 
-                        {/* Eliminar permanentemente */}
-                        <button
-                          onClick={() => setAccountToDelete(acc)}
-                          className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg border border-rose-300 transition text-[11px] inline-flex items-center gap-1"
-                          title="Eliminar Cuenta Permanentemente"
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                        </button>
+                          {/* Eliminar Permanentemente */}
+                          <button
+                            onClick={() => setAccountToDelete(acc)}
+                            className="w-7 h-7 inline-flex items-center justify-center bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg border border-rose-300 transition shadow-2xs"
+                            title="Eliminar Cuenta Permanentemente"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -1073,13 +1080,13 @@ export default function SuperAdminPage() {
               <thead className="bg-slate-100/90 text-slate-700 uppercase tracking-wider font-bold text-[10px] border-b border-slate-200">
                 <tr>
                   <th className="py-3 px-4">Empresa / Planner</th>
-                  <th className="py-3 px-3">Tipo Movimiento</th>
-                  <th className="py-3 px-3">Plan Contratado</th>
-                  <th className="py-3 px-3">Vigencia Contrato</th>
-                  <th className="py-3 px-3">Duración</th>
-                  <th className="py-3 px-3">Monto Est.</th>
+                  <th className="py-3 px-3.5 whitespace-nowrap min-w-[155px]">Tipo Movimiento</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Plan Contratado</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Vigencia Contrato</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Duración</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Monto Est.</th>
                   <th className="py-3 px-3">Notas / Referencia</th>
-                  <th className="py-3 px-4">Fecha de Registro</th>
+                  <th className="py-3 px-4 whitespace-nowrap">Fecha de Registro</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1087,38 +1094,38 @@ export default function SuperAdminPage() {
                   return (
                     <tr key={rec.id} className="hover:bg-amber-50/40 transition">
                       <td className="py-3 px-4">
-                        <strong className="text-slate-900 block font-bold">{rec.companyName}</strong>
-                        <span className="text-[11px] text-slate-500">{rec.contactEmail}</span>
+                        <strong className="text-slate-900 block font-bold text-xs">{rec.companyName}</strong>
+                        <span className="text-[11px] text-slate-500 font-mono">{rec.contactEmail}</span>
                       </td>
-                      <td className="py-3 px-3">
+                      <td className="py-3 px-3.5 whitespace-nowrap min-w-[155px]">
                         {rec.type === 'INITIAL' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
-                            Contrato Inicial
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap shadow-2xs">
+                            <Sparkles className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Contrato Inicial
                           </span>
                         )}
                         {rec.type === 'EXTENSION' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
-                            Renovación (+{rec.durationDays}d)
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 border border-blue-300 whitespace-nowrap shadow-2xs">
+                            <RefreshCw className="w-3.5 h-3.5 text-blue-600 shrink-0" /> Renovación (+{rec.durationDays}d)
                           </span>
                         )}
                         {rec.type === 'PLAN_UPGRADE' && (
-                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
-                            Upgrade de Plan
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold bg-purple-100 text-purple-800 border border-purple-300 whitespace-nowrap shadow-2xs">
+                            <TrendingUp className="w-3.5 h-3.5 text-purple-600 shrink-0" /> Upgrade de Plan
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-3">
-                        <span className="font-bold text-slate-800">
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className="font-bold text-slate-800 text-xs">
                           Plan {PLAN_LIMITS[rec.planCode].name}
                         </span>
                       </td>
                       <td className="py-3 px-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
-                        {new Date(rec.startDate).toLocaleDateString('es-PE')} ➔ {new Date(rec.endDate).toLocaleDateString('es-PE')}
+                        {formatContractDateCivil(rec.startDate)} ➔ {formatContractDateCivil(rec.endDate)}
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-600">
+                      <td className="py-3 px-3 font-semibold text-slate-600 whitespace-nowrap">
                         {rec.durationDays} días
                       </td>
-                      <td className="py-3 px-3 font-bold font-mono text-emerald-700">
+                      <td className="py-3 px-3 font-bold font-mono text-emerald-700 whitespace-nowrap">
                         S/ {(rec.pricePEN || (rec.planCode === 'BUSINESS' ? 99.99 : rec.planCode === 'STARTER' ? 29.99 : 59.99)).toFixed(2)}
                       </td>
                       <td className="py-3 px-3 text-slate-600 italic text-[11px] max-w-xs truncate" title={rec.notes || 'Sin notas'}>
@@ -1617,7 +1624,9 @@ export default function SuperAdminPage() {
                         setEditStartDate(s);
                         // Recalculate end date with 365 days
                         if (s) {
-                          const newEnd = calculateContractEndDate(s, 365);
+                          const currentDur = calculateContractDurationDays(editingAccount.contractStartDate, editingAccount.contractEndDate);
+                          const durToApply = editingAccount.planCode === 'STARTER' ? 30 : currentDur;
+                          const newEnd = calculateContractEndDate(s, durToApply);
                           setEditEndDate(newEnd.split('T')[0]);
                         }
                       }}
@@ -1956,7 +1965,7 @@ export default function SuperAdminPage() {
               <div>
                 <span className="text-[10px] text-slate-500 uppercase font-bold block">Vencimiento Vigente</span>
                 <strong className="text-slate-800 font-mono text-[11px] font-bold">
-                  {new Date(historyModalAccount.contractEndDate).toLocaleDateString('es-PE')}
+                  {formatContractDateCivil(historyModalAccount.contractEndDate)}
                 </strong>
               </div>
               <div>
@@ -1983,7 +1992,7 @@ export default function SuperAdminPage() {
                         planCode: historyModalAccount.planCode,
                         startDate: historyModalAccount.contractStartDate,
                         endDate: historyModalAccount.contractEndDate,
-                        durationDays: Math.round((new Date(historyModalAccount.contractEndDate).getTime() - new Date(historyModalAccount.contractStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+                        durationDays: calculateContractDurationDays(historyModalAccount.contractStartDate, historyModalAccount.contractEndDate),
                         pricePEN: PLAN_LIMITS[historyModalAccount.planCode]?.monthlyPricePEN,
                         notes: 'Alta y apertura oficial de cuenta administradora',
                         created_at: historyModalAccount.created_at || historyModalAccount.contractStartDate,
@@ -2012,11 +2021,11 @@ export default function SuperAdminPage() {
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] pt-1 border-t border-slate-200/60 font-mono">
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase">Desde</span>
-                        <span className="text-slate-800 font-bold">{new Date(sub.startDate).toLocaleDateString('es-PE')}</span>
+                        <span className="text-slate-800 font-bold">{formatContractDateCivil(sub.startDate)}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase">Hasta</span>
-                        <span className="text-indigo-900 font-bold">{new Date(sub.endDate).toLocaleDateString('es-PE')}</span>
+                        <span className="text-indigo-900 font-bold">{formatContractDateCivil(sub.endDate)}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[9px] uppercase">Período</span>

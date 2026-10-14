@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { testCrossWorkspaceIsolation } from '@/lib/workspace';
 import { PLAN_LIMITS, checkCanAddWorkspaceMember, ROLE_PERMISSIONS, RolePermissionDetail } from '@/lib/plans';
-import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession } from '@/lib/superadmin-store';
+import { getActiveSession, calculateRemainingDays, changeUserPassword, getAccountForSession, formatContractDateCivil } from '@/lib/superadmin-store';
 import { getWorkspaceMembers, createWorkspaceMember, WorkspaceMemberUser, WorkspaceUserRole, formatExpirationDate } from '@/lib/workspace-users';
 import { getWorkspaceEvents, getWorkspaceEventsAsync, getLastActiveEventId, getEventById } from '@/lib/events';
 import { generateWhatsAppLink } from '@/lib/whatsapp';
@@ -458,7 +458,7 @@ export default function AccountProfilePage() {
               <div className="card-luxury p-5 border border-slate-200">
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Fecha de Contratación</span>
                 <strong className="text-lg font-bold text-slate-900 mt-2 block font-mono">
-                  {new Date(contractInfo.contractStartDate).toLocaleDateString()}
+                  {formatContractDateCivil(contractInfo.contractStartDate)}
                 </strong>
                 <span className="text-[10px] text-slate-400 block">Fecha oficial de inicio</span>
               </div>
@@ -466,7 +466,7 @@ export default function AccountProfilePage() {
               <div className="card-luxury p-5 border border-slate-200">
                 <span className="text-xs text-slate-500 uppercase font-semibold block">Fecha de Vencimiento</span>
                 <strong className="text-lg font-bold text-slate-900 mt-2 block font-mono">
-                  {new Date(contractInfo.contractEndDate).toLocaleDateString()}
+                  {formatContractDateCivil(contractInfo.contractEndDate)}
                 </strong>
                 <span className="text-[10px] text-slate-400 block">Término de la suscripción</span>
               </div>
