@@ -7,14 +7,16 @@ import {
   ShieldCheck, Plus, Calendar, Clock, Mail, Phone, Lock, 
   KeyRound, RefreshCw, CheckCircle2, AlertTriangle, UserCheck, 
   Building, LayoutGrid, BarChart3, LogOut, ArrowRight, ShieldAlert, Sparkles,
-  Copy, Check, Send, ExternalLink, Eye, EyeOff, Info, MessageSquare, Search, Filter, X
+  Copy, Check, Send, ExternalLink, Eye, EyeOff, Info, MessageSquare, Search, Filter, X,
+  Trash2, Archive, ArchiveRestore, History, TrendingUp, DollarSign, Users, Award
 } from 'lucide-react';
 import { 
   getAllAdminAccounts, createAdminAccount, updateAdminAccount, 
   triggerPasswordReset, calculateRemainingDays, extendAdminContract, 
   AdminAccount, getActiveSession, SUPER_ADMIN_EMAIL, sendClientWelcomeEmail,
   setSuperAdminPassword, verifySuperAdminPassword,
-  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, syncAdminAccountOnlineAsync
+  generateAndSendSuperAdmin2FAPin, verifySuperAdmin2FAPin, syncAdminAccountOnlineAsync,
+  deleteAdminAccount, toggleArchiveAdminAccount, calculateContractEndDate, ContractSubscriptionRecord
 } from '@/lib/superadmin-store';
 import { PLAN_LIMITS, PlanCode } from '@/lib/plans';
 import { generateWhatsAppLink } from '@/lib/whatsapp';
@@ -48,9 +50,12 @@ export default function SuperAdminPage() {
   const [super2FATimestamp, setSuper2FATimestamp] = useState<number | undefined>(undefined);
   const [isSending2FAPin, setIsSending2FAPin] = useState(false);
 
+  // Section View Tab State
+  const [activeAdminTab, setActiveAdminTab] = useState<'ACCOUNTS' | 'METRICS'>('ACCOUNTS');
+
   // Filters State
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVA' | 'EXPIRING_SOON' | 'VENCIDA'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVA' | 'EXPIRING_SOON' | 'VENCIDA' | 'ARCHIVADA'>('ALL');
   const [planFilter, setPlanFilter] = useState<'ALL' | PlanCode>('ALL');
 
   // Notice & Feedback States
@@ -63,17 +68,38 @@ export default function SuperAdminPage() {
     emailStatus: { success: boolean; message: string; isSandboxRestriction?: boolean; error?: string };
   } | null>(null);
 
+  // Contract History Modal State
+  const [historyModalAccount, setHistoryModalAccount] = useState<AdminAccount | null>(null);
+
+  // Delete & Archive Confirmation State
+  const [accountToDelete, setAccountToDelete] = useState<AdminAccount | null>(null);
+
   // Extension Modal State
   const [extensionDays, setExtensionDays] = useState(365);
   const [selectedExtensionPlan, setSelectedExtensionPlan] = useState<PlanCode>('PROFESSIONAL');
+  const [extensionNotes, setExtensionNotes] = useState('');
 
-  // New Account Form State
+  // Metrics Tab State
+  const [historySearchTerm, setHistorySearchTerm] = useState('');
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<'ALL' | 'INITIAL' | 'EXTENSION' | 'PLAN_UPGRADE'>('ALL');
+
+  // New Account Form State (with interactive Date Pickers and auto calculation)
   const [companyName, setCompanyName] = useState('');
   const [adminName, setAdminName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [planCode, setPlanCode] = useState<PlanCode>('PROFESSIONAL');
   const [durationDays, setDurationDays] = useState(365);
+  const [createContractStartDate, setCreateContractStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [createContractEndDate, setCreateContractEndDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 365);
+    return d.toISOString().split('T')[0];
+  });
+
+  // Edit Account Form State (for Date Pickers)
+  const [editStartDate, setEditStartDate] = useState('');
+  const [editEndDate, setEditEndDate] = useState('');
 
   // WhatsApp Resend Modal State
   const [resendWhatsAppAccount, setResendWhatsAppAccount] = useState<{ account: AdminAccount; rawPass?: string } | null>(null);
@@ -185,6 +211,24 @@ export default function SuperAdminPage() {
     }, 2500);
   };
 
+  // Auto calculate expiration date when create contract start date or duration changes
+  const handleCreateStartDateChange = (newStartDate: string) => {
+    setCreateContractStartDate(newStartDate);
+    const newEnd = calculateContractEndDate(newStartDate, durationDays);
+    setCreateContractEndDate(newEnd.split('T')[0]);
+  };
+
+  const handleCreateDurationChange = (newDuration: number) => {
+    setDurationDays(newDuration);
+    const newEnd = calculateContractEndDate(createContractStartDate, newDuration);
+    setCreateContractEndDate(newEnd.split('T')[0]);
+  };
+
+  const handleCreatePlanChange = (newPlan: PlanCode) => {
+    setPlanCode(newPlan);
+  };
+
+  // Filter accounts taking into consideration ARCHIVADA filter
   const filteredAccounts = accounts.filter((acc) => {
     const term = searchTerm.trim().toLowerCase();
     if (term) {
@@ -195,9 +239,18 @@ export default function SuperAdminPage() {
     }
 
     const remDays = calculateRemainingDays(acc.contractEndDate);
-    if (statusFilter === 'ACTIVA' && acc.status !== 'ACTIVA') return false;
-    if (statusFilter === 'EXPIRING_SOON' && (remDays > 7 || acc.status === 'VENCIDA')) return false;
-    if (statusFilter === 'VENCIDA' && acc.status === 'ACTIVA') return false;
+    if (statusFilter === 'ACTIVA') {
+      if (acc.status !== 'ACTIVA' || acc.isArchived) return false;
+    } else if (statusFilter === 'EXPIRING_SOON') {
+      if (acc.isArchived || remDays > 7 || acc.status === 'VENCIDA') return false;
+    } else if (statusFilter === 'VENCIDA') {
+      if (acc.isArchived || acc.status === 'ACTIVA') return false;
+    } else if (statusFilter === 'ARCHIVADA') {
+      if (!acc.isArchived && acc.status !== 'ARCHIVADA') return false;
+    } else if (statusFilter === 'ALL') {
+      // By default in ALL, hide archived unless specifically searching or selecting ARCHIVADA
+      if (acc.isArchived && !searchTerm) return false;
+    }
 
     if (planFilter !== 'ALL' && acc.planCode !== planFilter) return false;
 
@@ -222,6 +275,8 @@ export default function SuperAdminPage() {
       contactPhone,
       planCode,
       durationDays,
+      contractStartDate: createContractStartDate ? new Date(createContractStartDate).toISOString() : undefined,
+      contractEndDate: createContractEndDate ? new Date(createContractEndDate).toISOString() : undefined,
     });
 
     await syncAdminAccountOnlineAsync(account);
@@ -274,13 +329,14 @@ export default function SuperAdminPage() {
   const handleOpenExtendModal = (account: AdminAccount) => {
     setExtendingAccount(account);
     setSelectedExtensionPlan(account.planCode);
+    setExtensionNotes('');
   };
 
   const handleExtendContractSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!extendingAccount) return;
 
-    const result = extendAdminContract(extendingAccount.id, extensionDays, selectedExtensionPlan);
+    const result = extendAdminContract(extendingAccount.id, extensionDays, selectedExtensionPlan, extensionNotes);
     setExtendingAccount(null);
     refreshList();
     setNoticeMessage(result.message);
@@ -296,9 +352,25 @@ export default function SuperAdminPage() {
     }
   };
 
+  const handleOpenEditAccount = (acc: AdminAccount) => {
+    setEditingAccount({ ...acc });
+    try {
+      const s = new Date(acc.contractStartDate).toISOString().split('T')[0];
+      const e = new Date(acc.contractEndDate).toISOString().split('T')[0];
+      setEditStartDate(s);
+      setEditEndDate(e);
+    } catch (err) {
+      setEditStartDate('');
+      setEditEndDate('');
+    }
+  };
+
   const handleSaveEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAccount) return;
+
+    const finalStartDate = editStartDate ? new Date(editStartDate).toISOString() : editingAccount.contractStartDate;
+    const finalEndDate = editEndDate ? new Date(editEndDate).toISOString() : editingAccount.contractEndDate;
 
     updateAdminAccount(editingAccount.id, {
       companyName: editingAccount.companyName,
@@ -307,7 +379,8 @@ export default function SuperAdminPage() {
       contactPhone: editingAccount.contactPhone,
       planCode: editingAccount.planCode,
       status: editingAccount.status,
-      contractEndDate: editingAccount.contractEndDate,
+      contractStartDate: finalStartDate,
+      contractEndDate: finalEndDate,
     });
 
     setEditingAccount(null);
@@ -315,6 +388,91 @@ export default function SuperAdminPage() {
     setNoticeMessage(`¡Atributos de la cuenta "${editingAccount.companyName}" actualizados exitosamente!`);
     setTimeout(() => setNoticeMessage(null), 6000);
   };
+
+  const handleToggleArchive = (account: AdminAccount) => {
+    const actionLabel = account.isArchived ? 'restaurar' : 'archivar';
+    if (confirm(`¿Estás seguro de ${actionLabel} la cuenta de "${account.companyName}"?`)) {
+      const res = toggleArchiveAdminAccount(account.id);
+      refreshList();
+      setNoticeMessage(res.message);
+      setTimeout(() => setNoticeMessage(null), 8000);
+    }
+  };
+
+  const handleConfirmDelete = () => {
+    if (!accountToDelete) return;
+    const res = deleteAdminAccount(accountToDelete.id);
+    setAccountToDelete(null);
+    refreshList();
+    setNoticeMessage(res.message);
+    setTimeout(() => setNoticeMessage(null), 8000);
+  };
+
+  // ==========================================
+  // SUBSCRIPTIONS & FINANCIAL METRICS COMPUTATIONS
+  // ==========================================
+  const allHistoryRecords = accounts.flatMap((acc) => {
+    const list = acc.contractHistory && acc.contractHistory.length > 0
+      ? acc.contractHistory
+      : [{
+          id: `${acc.id}-initial`,
+          type: 'INITIAL' as const,
+          planCode: acc.planCode,
+          startDate: acc.contractStartDate,
+          endDate: acc.contractEndDate,
+          durationDays: 365,
+          pricePEN: acc.planCode === 'BUSINESS' ? 99.99 : acc.planCode === 'STARTER' ? 29.99 : 59.99,
+          created_at: acc.created_at || acc.contractStartDate,
+          notes: 'Contrato inicial de apertura',
+        }];
+    return list.map((rec) => ({
+      ...rec,
+      companyName: acc.companyName,
+      adminName: acc.adminName,
+      contactEmail: acc.contactEmail,
+      accountStatus: acc.status,
+      isArchived: acc.isArchived,
+    }));
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  // Filtered subscriptions for Metrics Table
+  const filteredHistoryRecords = allHistoryRecords.filter((rec) => {
+    if (historyTypeFilter !== 'ALL' && rec.type !== historyTypeFilter) return false;
+    const term = historySearchTerm.trim().toLowerCase();
+    if (term) {
+      const matchComp = rec.companyName.toLowerCase().includes(term);
+      const matchAdmin = rec.adminName.toLowerCase().includes(term);
+      const matchEmail = rec.contactEmail.toLowerCase().includes(term);
+      const matchNotes = (rec.notes || '').toLowerCase().includes(term);
+      if (!matchComp && !matchAdmin && !matchEmail && !matchNotes) return false;
+    }
+    return true;
+  });
+
+  // Financial & Operational Aggregates
+  const activeAccountsCount = accounts.filter(a => a.status === 'ACTIVA' && !a.isArchived).length;
+  const archivedAccountsCount = accounts.filter(a => a.isArchived || a.status === 'ARCHIVADA').length;
+  const expiredAccountsCount = accounts.filter(a => a.status === 'VENCIDA' && !a.isArchived).length;
+
+  // Monthly Recurring Revenue (MRR) estimated from active accounts
+  const estimatedMRR = accounts
+    .filter(a => a.status === 'ACTIVA' && !a.isArchived)
+    .reduce((sum, a) => {
+      const price = a.planCode === 'BUSINESS' ? 99.99 : a.planCode === 'STARTER' ? 29.99 : 59.99;
+      return sum + price;
+    }, 0);
+
+  // Total Lifetime Billing estimated from all recorded transactions
+  const totalLifetimeRevenue = allHistoryRecords.reduce((sum, rec) => {
+    return sum + (rec.pricePEN || (rec.planCode === 'BUSINESS' ? 99.99 : rec.planCode === 'STARTER' ? 29.99 : 59.99));
+  }, 0);
+
+  const totalExtensionsCount = allHistoryRecords.filter(r => r.type === 'EXTENSION' || r.type === 'PLAN_UPGRADE').length;
+
+  // Plan Breakdown for Active Accounts
+  const starterCount = accounts.filter(a => a.planCode === 'STARTER' && !a.isArchived).length;
+  const proCount = accounts.filter(a => a.planCode === 'PROFESSIONAL' && !a.isArchived).length;
+  const bizCount = accounts.filter(a => a.planCode === 'BUSINESS' && !a.isArchived).length;
 
   return (
     <div className="min-h-screen bg-[#FAF8F5] text-[#1A1A1A] flex flex-col selection:bg-[#C5A059] selection:text-white">
@@ -409,8 +567,41 @@ export default function SuperAdminPage() {
           </button>
         </div>
 
-        {/* Executive KPI Summary Cards with Interactive Filter Triggers */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-center">
+        {/* TABS SELECTOR: ACCOUNTS DIRECTORY VS METRICS DASHBOARD */}
+        <div className="flex border-b border-slate-200 gap-2 overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('ACCOUNTS')}
+            className={`pb-3 px-4 font-serif text-sm font-bold flex items-center gap-2 border-b-2 transition shrink-0 ${
+              activeAdminTab === 'ACCOUNTS'
+                ? 'border-[#B8860B] text-[#B8860B]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Building className="w-4 h-4" />
+            Directorio de Cuentas ({accounts.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveAdminTab('METRICS')}
+            className={`pb-3 px-4 font-serif text-sm font-bold flex items-center gap-2 border-b-2 transition shrink-0 ${
+              activeAdminTab === 'METRICS'
+                ? 'border-[#B8860B] text-[#B8860B]'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Dashboard & Métricas de Suscripciones
+            <span className="text-[10px] bg-amber-100 text-[#B8860B] font-mono px-2 py-0.5 rounded-full border border-amber-300">
+              {allHistoryRecords.length} movimientos
+            </span>
+          </button>
+        </div>
+
+        {activeAdminTab === 'ACCOUNTS' ? (
+          <>
+            {/* Executive KPI Summary Cards with Interactive Filter Triggers */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 text-center">
           <div 
             onClick={() => { setStatusFilter('ALL'); setPlanFilter('ALL'); setSearchTerm(''); }}
             className={`card-luxury p-5 border cursor-pointer transition hover-lift ${statusFilter === 'ALL' && planFilter === 'ALL' && !searchTerm ? 'border-[#C5A059] bg-amber-50/60 ring-2 ring-[#C5A059]/40' : 'border-[#C5A059]/30'}`}
@@ -476,6 +667,7 @@ export default function SuperAdminPage() {
               <option value="ACTIVA">Cuentas Activas</option>
               <option value="EXPIRING_SOON">⚠️ Próximos a Vencer (&lt;= 7 días)</option>
               <option value="VENCIDA">Vencidas / Suspendidas</option>
+              <option value="ARCHIVADA">📦 Cuentas Archivadas ({accounts.filter(a => a.isArchived || a.status === 'ARCHIVADA').length})</option>
             </select>
           </div>
 
@@ -523,6 +715,7 @@ export default function SuperAdminPage() {
                     <th className="py-3.5 px-4">Empresa / Planner</th>
                     <th className="py-3.5 px-4">Administrador & Correo</th>
                     <th className="py-3.5 px-4">Plan Contratado</th>
+                    <th className="py-3.5 px-4">Fecha Contrato</th>
                     <th className="py-3.5 px-4">Vencimiento & Días</th>
                     <th className="py-3.5 px-4">Estado</th>
                     <th className="py-3.5 px-4 text-right">Acciones de Cuenta</th>
@@ -532,14 +725,22 @@ export default function SuperAdminPage() {
                   {filteredAccounts.map((acc) => {
                     const remDays = calculateRemainingDays(acc.contractEndDate);
                     const plan = PLAN_LIMITS[acc.planCode];
-                    const isNearExpiration = remDays <= 7;
+                    const isNearExpiration = remDays <= 7 && acc.status === 'ACTIVA';
+                    const historyCount = acc.contractHistory?.length || 1;
 
                     return (
-                      <tr key={acc.id} className={`hover:bg-amber-50/40 transition ${isNearExpiration ? 'bg-amber-50/70' : ''}`}>
+                      <tr key={acc.id} className={`hover:bg-amber-50/40 transition ${isNearExpiration ? 'bg-amber-50/70' : acc.isArchived ? 'bg-slate-100/60 opacity-80' : ''}`}>
                       
                       {/* Empresa / Planner */}
                       <td className="py-3.5 px-4">
-                        <strong className="font-bold text-slate-900 block text-sm">{acc.companyName}</strong>
+                        <div className="flex items-center gap-1.5">
+                          <strong className="font-bold text-slate-900 block text-sm">{acc.companyName}</strong>
+                          {acc.isArchived && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-slate-200 text-slate-700 border border-slate-300">
+                              ARCHIVADA
+                            </span>
+                          )}
+                        </div>
                         <span className="text-[10px] text-slate-400 font-mono">Workspace: {acc.workspaceId}</span>
                       </td>
 
@@ -567,13 +768,25 @@ export default function SuperAdminPage() {
                         </span>
                       </td>
 
+                      {/* Fecha Contrato */}
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <span className="font-mono text-slate-800 block font-bold text-xs flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5 text-[#B8860B]" />
+                          {new Date(acc.contractStartDate).toLocaleDateString('es-PE')}
+                        </span>
+                        <span className="text-[10px] text-slate-400 block mt-0.5 font-medium">Inicio de vigencia</span>
+                      </td>
+
                       {/* Vencimiento & Días */}
                       <td className="py-3.5 px-4 whitespace-nowrap">
-                        <span className="font-mono text-slate-800 block font-bold">
-                          {new Date(acc.contractEndDate).toLocaleDateString()}
+                        <span className="font-mono text-slate-800 block font-bold text-xs">
+                          {new Date(acc.contractEndDate).toLocaleDateString('es-PE')}
                         </span>
-                        <span className={`text-[10px] font-extrabold block ${remDays <= 7 ? 'text-red-600 animate-pulse' : 'text-emerald-700'}`}>
-                          {remDays <= 7 ? `⚠️ Alerta: ${remDays} días` : `${remDays} días restantes`}
+                        <span className={`text-[10px] font-extrabold block ${
+                          acc.status === 'ARCHIVADA' ? 'text-slate-500' :
+                          remDays <= 7 ? 'text-red-600 animate-pulse' : 'text-emerald-700'
+                        }`}>
+                          {acc.status === 'ARCHIVADA' ? 'Archivada' : remDays <= 7 ? `⚠️ Alerta: ${remDays} días` : `${remDays} días restantes`}
                         </span>
                       </td>
 
@@ -581,19 +794,30 @@ export default function SuperAdminPage() {
                       <td className="py-3.5 px-4 whitespace-nowrap">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border ${
                           acc.status === 'ACTIVA' ? 'bg-emerald-100 text-emerald-800 border-emerald-300' :
+                          acc.status === 'ARCHIVADA' ? 'bg-slate-200 text-slate-800 border-slate-300' :
                           'bg-red-100 text-red-800 border-red-300'
                         }`}>
                           {acc.status}
                         </span>
                       </td>
-                      {/* Acciones */}
+
+                      {/* Acciones de Cuenta */}
                       <td className="py-3.5 px-4 text-right space-x-1.5 whitespace-nowrap">
+                        {/* Ver Historial de Suscripciones */}
+                        <button
+                          onClick={() => setHistoryModalAccount(acc)}
+                          className="px-2 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 font-bold rounded-lg border border-indigo-200 transition text-[11px] inline-flex items-center gap-1 shadow-2xs"
+                          title="Ver histórico de extensiones y renovaciones"
+                        >
+                          <History className="w-3.5 h-3.5 text-indigo-600" /> Histórico ({historyCount})
+                        </button>
+
                         <button
                           onClick={() => {
                             setResendWhatsAppAccount({ account: acc });
                             setSuperadminWhatsAppPhone(acc.contactPhone || '');
                           }}
-                          className="px-2.5 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-emerald-800 font-bold rounded-lg border border-[#25D366]/40 transition text-[11px] inline-flex items-center gap-1 shadow-2xs"
+                          className="px-2 py-1.5 bg-[#25D366]/10 hover:bg-[#25D366]/20 text-emerald-800 font-bold rounded-lg border border-[#25D366]/40 transition text-[11px] inline-flex items-center gap-1 shadow-2xs"
                           title="Enviar o Re-enviar Credenciales por WhatsApp"
                         >
                           <MessageSquare className="w-3.5 h-3.5 text-emerald-600" /> WhatsApp
@@ -602,10 +826,10 @@ export default function SuperAdminPage() {
                         <button
                           onClick={() => handleResendEmail(acc)}
                           disabled={isSubmitting}
-                          className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition text-[11px] inline-flex items-center gap-1"
+                          className="px-2 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold rounded-lg border border-emerald-300 transition text-[11px] inline-flex items-center gap-1"
                           title="Enviar o Re-enviar Correo de Bienvenida con Credenciales"
                         >
-                          <Send className="w-3.5 h-3.5 text-emerald-600" /> Reenviar Correo
+                          <Send className="w-3.5 h-3.5 text-emerald-600" /> Correo
                         </button>
 
                         <button
@@ -618,19 +842,49 @@ export default function SuperAdminPage() {
                         </button>
 
                         <button
-                          onClick={() => setEditingAccount({ ...acc })}
+                          onClick={() => handleOpenEditAccount(acc)}
                           className="px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-[#B8860B] font-bold rounded-lg border border-[#C5A059]/40 transition text-[11px]"
-                          title="Editar Atributos de Cuenta"
+                          title="Editar Atributos de Cuenta (fechas, plan, datos)"
                         >
                           Editar
                         </button>
 
                         <button
                           onClick={() => handleTriggerReset(acc)}
-                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
+                          className="px-2 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg border border-slate-300 transition text-[11px]"
                           title="Restablecer Contraseña Privada del Cliente"
                         >
                           Reset Clave
+                        </button>
+
+                        {/* Archivar / Restaurar */}
+                        <button
+                          onClick={() => handleToggleArchive(acc)}
+                          className={`px-2 py-1.5 font-bold rounded-lg border transition text-[11px] inline-flex items-center gap-1 ${
+                            acc.isArchived
+                              ? 'bg-sky-50 hover:bg-sky-100 text-sky-800 border-sky-300'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-600 border-slate-300'
+                          }`}
+                          title={acc.isArchived ? 'Restaurar Cuenta del Archivo' : 'Archivar Cuenta (Ocultar sin borrar histórico)'}
+                        >
+                          {acc.isArchived ? (
+                            <>
+                              <ArchiveRestore className="w-3.5 h-3.5 text-sky-600" /> Restaurar
+                            </>
+                          ) : (
+                            <>
+                              <Archive className="w-3.5 h-3.5 text-slate-500" /> Archivar
+                            </>
+                          )}
+                        </button>
+
+                        {/* Eliminar permanentemente */}
+                        <button
+                          onClick={() => setAccountToDelete(acc)}
+                          className="px-2 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-lg border border-rose-300 transition text-[11px] inline-flex items-center gap-1"
+                          title="Eliminar Cuenta Permanentemente"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-rose-600" />
                         </button>
                       </td>
                     </tr>
@@ -641,7 +895,249 @@ export default function SuperAdminPage() {
           </div>
         )}
       </div>
-    </main>
+    </>
+  ) : (
+    <div className="space-y-6 animate-fade-in-up">
+      {/* Top Financial & Operational Metric Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+        <div className="card-luxury p-5 border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-slate-500 text-xs">
+            <span className="font-bold uppercase tracking-wider text-emerald-800">Facturación Acumulada</span>
+            <DollarSign className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="text-2xl font-serif font-bold text-emerald-700">
+            S/ {totalLifetimeRevenue.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </div>
+          <p className="text-[11px] text-slate-500">Total histórico de contratos e ingresos registrados</p>
+        </div>
+
+        <div className="card-luxury p-5 border border-[#C5A059]/40 bg-gradient-to-br from-amber-50 to-white shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-slate-500 text-xs">
+            <span className="font-bold uppercase tracking-wider text-[#B8860B]">MRR Estimado</span>
+            <TrendingUp className="w-4 h-4 text-[#B8860B]" />
+          </div>
+          <div className="text-2xl font-serif font-bold text-[#1A1A1A]">
+            S/ {estimatedMRR.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <span className="text-xs text-slate-500 font-sans font-normal"> / mes</span>
+          </div>
+          <p className="text-[11px] text-slate-500">{activeAccountsCount} cuentas activas recurrentes</p>
+        </div>
+
+        <div className="card-luxury p-5 border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-slate-500 text-xs">
+            <span className="font-bold uppercase tracking-wider text-blue-800">Transacciones Históricas</span>
+            <Award className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="text-2xl font-serif font-bold text-blue-700">
+            {allHistoryRecords.length}
+          </div>
+          <p className="text-[11px] text-slate-500">{totalExtensionsCount} renovaciones y upgrades</p>
+        </div>
+
+        <div className="card-luxury p-5 border border-purple-200 bg-gradient-to-br from-purple-50 to-white shadow-sm space-y-1">
+          <div className="flex items-center justify-between text-slate-500 text-xs">
+            <span className="font-bold uppercase tracking-wider text-purple-800">Estado de Cartera</span>
+            <Users className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="text-2xl font-serif font-bold text-purple-900">
+            {accounts.length}
+            <span className="text-xs text-slate-500 font-sans font-normal"> cuentas</span>
+          </div>
+          <div className="flex items-center gap-2 text-[10px] text-slate-600 font-semibold pt-0.5">
+            <span className="text-emerald-700 font-bold">✓ {activeAccountsCount} Activas</span>
+            <span className="text-slate-400">|</span>
+            <span className="text-amber-700 font-bold">⚠️ {expiredAccountsCount} Vencidas</span>
+            <span className="text-slate-400">|</span>
+            <span className="text-sky-700 font-bold">📦 {archivedAccountsCount} Arch.</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Plan Breakdown Progress Cards */}
+      <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-[#B8860B]" /> Desglose de Suscripciones por Plan
+            </h3>
+            <p className="text-xs text-slate-500">Distribución de clientes activos según el nivel de suscripción y límites de operación</p>
+          </div>
+          <span className="text-xs font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-full">
+            {activeAccountsCount} Cuentas Activas
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Starter */}
+          <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs uppercase text-slate-700">Plan Starter</span>
+              <span className="text-xs font-bold text-slate-900 font-mono">S/ 29.99/mes</span>
+            </div>
+            <div className="text-2xl font-serif font-bold text-slate-800">
+              {starterCount} <span className="text-xs text-slate-500 font-sans font-normal">empresas ({activeAccountsCount > 0 ? Math.round((starterCount / activeAccountsCount) * 100) : 0}%)</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-2">
+              <div 
+                className="bg-slate-600 h-2 rounded-full transition-all duration-500" 
+                style={{ width: `${activeAccountsCount > 0 ? (starterCount / activeAccountsCount) * 100 : 0}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500">Hasta 3 eventos simultáneos y 150 pases QR por evento.</p>
+          </div>
+
+          {/* Professional */}
+          <div className="p-4 rounded-xl border border-amber-300 bg-amber-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs uppercase text-amber-900">Plan Professional</span>
+              <span className="text-xs font-bold text-amber-900 font-mono">S/ 59.99/mes</span>
+            </div>
+            <div className="text-2xl font-serif font-bold text-amber-800">
+              {proCount} <span className="text-xs text-amber-900/70 font-sans font-normal">empresas ({activeAccountsCount > 0 ? Math.round((proCount / activeAccountsCount) * 100) : 0}%)</span>
+            </div>
+            <div className="w-full bg-amber-200 rounded-full h-2">
+              <div 
+                className="bg-[#B8860B] h-2 rounded-full transition-all duration-500" 
+                style={{ width: `${activeAccountsCount > 0 ? (proCount / activeAccountsCount) * 100 : 0}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-amber-900/80">Hasta 10 eventos simultáneos y 500 pases QR por evento.</p>
+          </div>
+
+          {/* Business */}
+          <div className="p-4 rounded-xl border border-purple-300 bg-purple-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs uppercase text-purple-900">Plan Business</span>
+              <span className="text-xs font-bold text-purple-900 font-mono">S/ 99.99/mes</span>
+            </div>
+            <div className="text-2xl font-serif font-bold text-purple-800">
+              {bizCount} <span className="text-xs text-purple-900/70 font-sans font-normal">empresas ({activeAccountsCount > 0 ? Math.round((bizCount / activeAccountsCount) * 100) : 0}%)</span>
+            </div>
+            <div className="w-full bg-purple-200 rounded-full h-2">
+              <div 
+                className="bg-purple-700 h-2 rounded-full transition-all duration-500" 
+                style={{ width: `${activeAccountsCount > 0 ? (bizCount / activeAccountsCount) * 100 : 0}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-purple-900/80">Eventos ilimitados y hasta 1,000 pases QR por evento.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Global Historical Audit Log Table */}
+      <div className="card-luxury p-6 border border-[#C5A059]/30 shadow-md space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+          <div>
+            <h3 className="text-base font-serif font-bold text-[#1A1A1A] flex items-center gap-2">
+              <History className="w-5 h-5 text-[#B8860B]" /> Auditoría Consolidada de Suscripciones & Contratos
+            </h3>
+            <p className="text-xs text-slate-500">
+              Trazabilidad inmutable de aperturas de contratos, renovaciones y upgrades de todas las empresas ({filteredHistoryRecords.length} movimientos)
+            </p>
+          </div>
+
+          {/* Filters for History Table */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative">
+              <input
+                type="text"
+                value={historySearchTerm}
+                onChange={(e) => setHistorySearchTerm(e.target.value)}
+                placeholder="Buscar empresa, admin o nota..."
+                className="pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-medium focus:ring-2 focus:ring-[#C5A059] focus:outline-none w-48 sm:w-60"
+              />
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+            </div>
+
+            <select
+              value={historyTypeFilter}
+              onChange={(e) => setHistoryTypeFilter(e.target.value as any)}
+              className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-700 focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+            >
+              <option value="ALL">Todos los Movimientos</option>
+              <option value="INITIAL">Apertura (INITIAL)</option>
+              <option value="EXTENSION">Renovación (EXTENSION)</option>
+              <option value="PLAN_UPGRADE">Cambio Plan (UPGRADE)</option>
+            </select>
+          </div>
+        </div>
+
+        {filteredHistoryRecords.length === 0 ? (
+          <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300 text-xs text-slate-500">
+            <Filter className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+            No se encontraron movimientos históricos con los filtros aplicados.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead className="bg-slate-100/90 text-slate-700 uppercase tracking-wider font-bold text-[10px] border-b border-slate-200">
+                <tr>
+                  <th className="py-3 px-4">Empresa / Planner</th>
+                  <th className="py-3 px-3">Tipo Movimiento</th>
+                  <th className="py-3 px-3">Plan Contratado</th>
+                  <th className="py-3 px-3">Vigencia Contrato</th>
+                  <th className="py-3 px-3">Duración</th>
+                  <th className="py-3 px-3">Monto Est.</th>
+                  <th className="py-3 px-3">Notas / Referencia</th>
+                  <th className="py-3 px-4">Fecha de Registro</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredHistoryRecords.map((rec) => {
+                  return (
+                    <tr key={rec.id} className="hover:bg-amber-50/40 transition">
+                      <td className="py-3 px-4">
+                        <strong className="text-slate-900 block font-bold">{rec.companyName}</strong>
+                        <span className="text-[11px] text-slate-500">{rec.contactEmail}</span>
+                      </td>
+                      <td className="py-3 px-3">
+                        {rec.type === 'INITIAL' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Contrato Inicial
+                          </span>
+                        )}
+                        {rec.type === 'EXTENSION' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800 border border-blue-300">
+                            Renovación (+{rec.durationDays}d)
+                          </span>
+                        )}
+                        {rec.type === 'PLAN_UPGRADE' && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-300">
+                            Upgrade de Plan
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3">
+                        <span className="font-bold text-slate-800">
+                          Plan {PLAN_LIMITS[rec.planCode].name}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 font-mono text-[11px] text-slate-700 whitespace-nowrap">
+                        {new Date(rec.startDate).toLocaleDateString('es-PE')} ➔ {new Date(rec.endDate).toLocaleDateString('es-PE')}
+                      </td>
+                      <td className="py-3 px-3 font-semibold text-slate-600">
+                        {rec.durationDays} días
+                      </td>
+                      <td className="py-3 px-3 font-bold font-mono text-emerald-700">
+                        S/ {(rec.pricePEN || (rec.planCode === 'BUSINESS' ? 99.99 : rec.planCode === 'STARTER' ? 29.99 : 59.99)).toFixed(2)}
+                      </td>
+                      <td className="py-3 px-3 text-slate-600 italic text-[11px] max-w-xs truncate" title={rec.notes || 'Sin notas'}>
+                        {rec.notes || '—'}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                        {new Date(rec.created_at).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )}
+      </main>
 
       {/* MODAL: POST-CREATION NOTICE & EMAIL / WHATSAPP STATUS FEEDBACK */}
       {createdNoticeModal && (
@@ -780,8 +1276,22 @@ export default function SuperAdminPage() {
                 >
                   <option value={30}>+ 30 Días (Renovación Mensual)</option>
                   <option value={90}>+ 90 Días (Renovación Trimestral)</option>
+                  <option value={180}>+ 180 Días (Renovación Semestral)</option>
                   <option value={365}>+ 365 Días (Renovación Anual Oficial)</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
+                  Notas de la Extensión (opcional)
+                </label>
+                <input
+                  type="text"
+                  value={extensionNotes}
+                  onChange={(e) => setExtensionNotes(e.target.value)}
+                  placeholder="Ej. Pago confirmado vía BCP / Factura F001-2026"
+                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                />
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -881,12 +1391,12 @@ export default function SuperAdminPage() {
                   </label>
                   <select
                     value={planCode}
-                    onChange={(e) => setPlanCode(e.target.value as PlanCode)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    onChange={(e) => handleCreatePlanChange(e.target.value as PlanCode)}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-semibold text-slate-800"
                   >
-                    <option value="STARTER">Starter (3 eventos, 150 pases/evt)</option>
-                    <option value="PROFESSIONAL">Professional (10 eventos, 500 pases/evt)</option>
-                    <option value="BUSINESS">Business (Ilimitados evts, 1,000 pases/evt)</option>
+                    <option value="STARTER">Starter (3 eventos, 150 pases/evt - S/29.99/mes)</option>
+                    <option value="PROFESSIONAL">Professional (10 eventos, 500 pases/evt - S/59.99/mes)</option>
+                    <option value="BUSINESS">Business (Ilimitados evts, 1,000 pases/evt - S/99.99/mes)</option>
                   </select>
                 </div>
 
@@ -896,18 +1406,62 @@ export default function SuperAdminPage() {
                   </label>
                   <select
                     value={durationDays}
-                    onChange={(e) => setDurationDays(Number(e.target.value))}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    onChange={(e) => handleCreateDurationChange(Number(e.target.value))}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-semibold text-slate-800"
                   >
-                    <option value={30}>30 Días (Prueba / Mensual)</option>
-                    <option value={90}>90 Días (Trimestral)</option>
-                    <option value={365}>365 Días (Anual Oficial)</option>
+                    <option value={30}>30 Días (Suscripción Mensual)</option>
+                    <option value={90}>90 Días (Suscripción Trimestral)</option>
+                    <option value={180}>180 Días (Suscripción Semestral)</option>
+                    <option value={365}>365 Días (Suscripción Anual Oficial)</option>
                   </select>
                 </div>
               </div>
 
-              <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900">
-                🔒 <strong>Asignación Automática:</strong> Se generará una contraseña inicial (por defecto <code className="font-mono font-bold">EventControl2026!</code>) y se despachará el correo de bienvenida. Podrás copiar las credenciales inmediatamente tras crear la cuenta.
+              {/* CONTRACT DATES WITH INTERACTIVE DATE PICKERS AND AUTOMATIC CALCULATION */}
+              <div className="p-3.5 bg-amber-50/80 rounded-2xl border border-amber-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-amber-950 uppercase tracking-wider flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#B8860B]" /> Vigencia Oficial del Contrato
+                  </span>
+                  <span className="text-[10px] bg-amber-100 text-[#B8860B] font-bold px-2 py-0.5 rounded-full border border-amber-300">
+                    Cálculo Automático
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[10px]">
+                      Fecha de Contrato (Inicio)
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={createContractStartDate}
+                      onChange={(e) => handleCreateStartDateChange(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[10px]">
+                      Fecha de Vencimiento (Fin)
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={createContractEndDate}
+                      onChange={(e) => setCreateContractEndDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono font-bold text-amber-900 focus:ring-2 focus:ring-[#C5A059] focus:outline-none bg-amber-50/40"
+                    />
+                  </div>
+                </div>
+                <p className="text-[10px] text-amber-800 leading-tight">
+                  💡 Al seleccionar la <strong>Fecha de Contrato</strong> y la <strong>Duración/Plan</strong>, la Fecha de Vencimiento se calcula automáticamente. También puedes ajustarla manualmente con el selector de calendario.
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-[11px] text-slate-700">
+                🔒 <strong>Asignación Automática:</strong> Se generará una contraseña inicial (por defecto <code className="font-mono font-bold">EventControl2026!</code>) y se registrará la primera suscripción en el histórico del cliente.
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -939,12 +1493,12 @@ export default function SuperAdminPage() {
         </div>
       )}
 
-      {/* EDIT ALL USER ATTRIBUTES MODAL */}
+      {/* EDIT ALL USER ATTRIBUTES MODAL (WITH DATE PICKERS & HISTORIC TRACE) */}
       {editingAccount && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="max-w-lg w-full card-luxury p-6 shadow-2xl border border-[#C5A059]/40 space-y-4">
             <h3 className="text-xl font-serif font-bold text-[#1A1A1A]">Editar Atributos de la Cuenta</h3>
-            <p className="text-xs text-slate-500">Modifica cualquier dato del cliente (empresa, administrador, correo, teléfono, plan o estado).</p>
+            <p className="text-xs text-slate-500">Modifica cualquier dato del cliente (empresa, administrador, correo, teléfono, plan, fechas de contrato o estado).</p>
 
             <form onSubmit={handleSaveEditSubmit} className="space-y-4 text-xs">
               <div className="grid grid-cols-2 gap-3">
@@ -1009,8 +1563,16 @@ export default function SuperAdminPage() {
                   </label>
                   <select
                     value={editingAccount.planCode}
-                    onChange={(e) => setEditingAccount({ ...editingAccount, planCode: e.target.value as PlanCode })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    onChange={(e) => {
+                      const newP = e.target.value as PlanCode;
+                      setEditingAccount({ ...editingAccount, planCode: newP });
+                      // If start date exists, recalculate end date automatically based on a 365 days term
+                      if (editStartDate) {
+                        const newEnd = calculateContractEndDate(editStartDate, 365);
+                        setEditEndDate(newEnd.split('T')[0]);
+                      }
+                    }}
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-bold"
                   >
                     <option value="STARTER">Starter</option>
                     <option value="PROFESSIONAL">Professional</option>
@@ -1025,26 +1587,57 @@ export default function SuperAdminPage() {
                   <select
                     value={editingAccount.status}
                     onChange={(e) => setEditingAccount({ ...editingAccount, status: e.target.value as any })}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-[#C5A059] focus:outline-none font-bold"
                   >
                     <option value="ACTIVA">ACTIVA</option>
                     <option value="SUSPENDIDA">SUSPENDIDA</option>
                     <option value="VENCIDA">VENCIDA</option>
+                    <option value="ARCHIVADA">ARCHIVADA</option>
                   </select>
                 </div>
               </div>
 
-              <div>
-                <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1">
-                  Fecha de Vencimiento (ISO Date String)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingAccount.contractEndDate}
-                  onChange={(e) => setEditingAccount({ ...editingAccount, contractEndDate: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
-                />
+              {/* DATE PICKERS FOR CONTRACT START AND END DATES */}
+              <div className="p-3 bg-amber-50/70 rounded-2xl border border-amber-200 space-y-2">
+                <div className="text-[10px] font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-[#B8860B]" /> Atributos de Vigencia de Contrato (Date Pickers)
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[10px]">
+                      Fecha de Contrato (Inicio)
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={editStartDate}
+                      onChange={(e) => {
+                        const s = e.target.value;
+                        setEditStartDate(s);
+                        // Recalculate end date with 365 days
+                        if (s) {
+                          const newEnd = calculateContractEndDate(s, 365);
+                          setEditEndDate(newEnd.split('T')[0]);
+                        }
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-800 focus:ring-2 focus:ring-[#C5A059] focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-bold text-slate-700 uppercase tracking-wider mb-1 text-[10px]">
+                      Fecha de Vencimiento (Fin)
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={editEndDate}
+                      onChange={(e) => setEditEndDate(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-mono font-bold text-amber-900 focus:ring-2 focus:ring-[#C5A059] focus:outline-none bg-amber-50/30"
+                    />
+                  </div>
+                </div>
               </div>
 
               <div className="pt-1">
@@ -1316,6 +1909,178 @@ export default function SuperAdminPage() {
                 className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl transition"
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: HISTORIAL DE CONTRATO Y SUSCRIPCIONES (METRIC TRACE) */}
+      {historyModalAccount && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="max-w-2xl w-full card-luxury p-6 shadow-2xl border-2 border-indigo-400 space-y-4 bg-white max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-50 border border-indigo-200 flex items-center justify-center text-indigo-700">
+                  <History className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-serif font-bold text-slate-900">
+                    Histórico de Contratos y Suscripciones
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {historyModalAccount.companyName} • {historyModalAccount.adminName}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setHistoryModalAccount(null)}
+                className="p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-700 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Current Summary Banner */}
+            <div className="p-3.5 bg-indigo-50/70 rounded-2xl border border-indigo-200 grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Plan Actual</span>
+                <strong className="text-indigo-900 font-bold">Plan {PLAN_LIMITS[historyModalAccount.planCode]?.name}</strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Fecha Inicio Inicial</span>
+                <strong className="text-slate-800 font-mono text-[11px] font-bold">
+                  {new Date(historyModalAccount.contractStartDate).toLocaleDateString('es-PE')}
+                </strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Vencimiento Vigente</span>
+                <strong className="text-slate-800 font-mono text-[11px] font-bold">
+                  {new Date(historyModalAccount.contractEndDate).toLocaleDateString('es-PE')}
+                </strong>
+              </div>
+              <div>
+                <span className="text-[10px] text-slate-500 uppercase font-bold block">Total Registros</span>
+                <strong className="text-indigo-700 font-extrabold">
+                  {historyModalAccount.contractHistory?.length || 1} registros
+                </strong>
+              </div>
+            </div>
+
+            {/* Timeline / History Records List */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-indigo-600" /> Línea de Tiempo de Contrato & Renovaciones:
+              </h4>
+
+              <div className="space-y-2.5">
+                {(historyModalAccount.contractHistory && historyModalAccount.contractHistory.length > 0
+                  ? historyModalAccount.contractHistory
+                  : [
+                      {
+                        id: `sub-init-${historyModalAccount.id}`,
+                        type: 'INITIAL' as const,
+                        planCode: historyModalAccount.planCode,
+                        startDate: historyModalAccount.contractStartDate,
+                        endDate: historyModalAccount.contractEndDate,
+                        durationDays: Math.round((new Date(historyModalAccount.contractEndDate).getTime() - new Date(historyModalAccount.contractStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+                        pricePEN: PLAN_LIMITS[historyModalAccount.planCode]?.monthlyPricePEN,
+                        notes: 'Alta y apertura oficial de cuenta administradora',
+                        created_at: historyModalAccount.created_at || historyModalAccount.contractStartDate,
+                      }
+                    ]
+                ).map((sub, idx) => (
+                  <div key={sub.id || idx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5 hover:border-indigo-300 transition">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                          sub.type === 'INITIAL' 
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                            : sub.type === 'PLAN_UPGRADE'
+                            ? 'bg-purple-100 text-purple-800 border-purple-300'
+                            : 'bg-amber-100 text-amber-900 border-amber-300'
+                        }`}>
+                          {sub.type === 'INITIAL' ? '🏁 CONTRATO INICIAL' : sub.type === 'PLAN_UPGRADE' ? '🚀 UPGRADE DE PLAN' : '🔄 EXTENSIÓN / RENOVACIÓN'}
+                        </span>
+                        <strong className="text-slate-800 font-bold">Plan {PLAN_LIMITS[sub.planCode]?.name || sub.planCode}</strong>
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {new Date(sub.created_at).toLocaleDateString('es-PE')} {new Date(sub.created_at).toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] pt-1 border-t border-slate-200/60 font-mono">
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase">Desde</span>
+                        <span className="text-slate-800 font-bold">{new Date(sub.startDate).toLocaleDateString('es-PE')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase">Hasta</span>
+                        <span className="text-indigo-900 font-bold">{new Date(sub.endDate).toLocaleDateString('es-PE')}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[9px] uppercase">Período</span>
+                        <span className="text-emerald-700 font-bold">+{sub.durationDays} Días</span>
+                      </div>
+                    </div>
+
+                    {sub.notes && (
+                      <p className="text-[11px] text-slate-600 pt-1 italic">
+                        📝 {sub.notes}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setHistoryModalAccount(null)}
+                className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+              >
+                Cerrar Histórico
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: CONFIRMAR ELIMINACIÓN PERMANENTE DE CUENTA */}
+      {accountToDelete && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+          <div className="max-w-md w-full bg-white rounded-3xl p-6 shadow-2xl border-2 border-rose-500 space-y-4">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl border border-rose-200 flex items-center justify-center mx-auto shadow-sm">
+              <Trash2 className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-serif font-bold text-slate-900">¿Eliminar Cuenta Definitivamente?</h3>
+              <p className="text-xs text-slate-600 leading-relaxed">
+                Estás a punto de eliminar permanentemente la cuenta de <strong className="text-slate-900">{accountToDelete.companyName}</strong> ({accountToDelete.contactEmail}).
+              </p>
+            </div>
+
+            <div className="p-3 bg-rose-50 rounded-xl border border-rose-200 text-[11px] text-rose-900 space-y-1">
+              <p>⚠️ <strong>Advertencia:</strong> Esta acción no se puede deshacer. Se removerán los accesos y credenciales de esta empresa en la consola.</p>
+              <p className="text-slate-600">💡 <em>Si solo deseas suspenderla o pausarla temporalmente sin borrar sus datos, utiliza la opción <strong>Archivar</strong>.</em></p>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setAccountToDelete(null)}
+                className="w-1/2 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl text-xs transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="w-1/2 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs shadow-md transition"
+              >
+                Sí, Eliminar Cuenta
               </button>
             </div>
           </div>

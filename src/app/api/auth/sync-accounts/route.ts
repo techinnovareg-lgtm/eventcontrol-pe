@@ -14,10 +14,13 @@ export interface AdminAccount {
   planCode: string;
   contractStartDate: string;
   contractEndDate: string;
-  status: 'ACTIVA' | 'SUSPENDIDA' | 'VENCIDA';
+  status: 'ACTIVA' | 'SUSPENDIDA' | 'VENCIDA' | 'ARCHIVADA';
   mustChangePassword?: boolean;
   initialPassword?: string;
   passwordHashMasked: string;
+  contractHistory?: any[];
+  isArchived?: boolean;
+  archived_at?: string;
   created_at: string;
 }
 
@@ -364,6 +367,16 @@ export async function POST(req: Request) {
         saveAccountsToFile();
         await persistAccountToSupabase(acc);
         return NextResponse.json({ success: true, account: acc });
+      }
+      return NextResponse.json({ success: false, message: 'Cuenta no encontrada' }, { status: 404 });
+    }
+
+    if (action === 'DELETE' && accountId) {
+      const idx = globalServerAccountsStore.findIndex(a => a.id === accountId);
+      if (idx !== -1) {
+        globalServerAccountsStore.splice(idx, 1);
+        saveAccountsToFile();
+        return NextResponse.json({ success: true, message: 'Cuenta eliminada en servidor central' });
       }
       return NextResponse.json({ success: false, message: 'Cuenta no encontrada' }, { status: 404 });
     }

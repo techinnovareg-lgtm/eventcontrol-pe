@@ -1,5 +1,17 @@
 import { PlanCode, PLAN_LIMITS } from './plans';
 
+export interface ContractSubscriptionRecord {
+  id: string;
+  type: 'INITIAL' | 'EXTENSION' | 'PLAN_UPGRADE';
+  planCode: PlanCode;
+  startDate: string;
+  endDate: string;
+  durationDays: number;
+  pricePEN?: number;
+  notes?: string;
+  created_at: string;
+}
+
 export interface AdminAccount {
   id: string;
   workspaceId: string;
@@ -10,10 +22,13 @@ export interface AdminAccount {
   planCode: PlanCode;
   contractStartDate: string;
   contractEndDate: string;
-  status: 'ACTIVA' | 'SUSPENDIDA' | 'VENCIDA';
+  status: 'ACTIVA' | 'SUSPENDIDA' | 'VENCIDA' | 'ARCHIVADA';
   mustChangePassword?: boolean;
   initialPassword?: string;
   passwordHashMasked: string; // Password privacy: only stores hashed representation, never raw text
+  contractHistory?: ContractSubscriptionRecord[];
+  isArchived?: boolean;
+  archived_at?: string;
   created_at: string;
 }
 
@@ -406,13 +421,24 @@ export function isAccountNearExpiration(endDateIso: string): boolean {
 }
 
 /**
+ * Helper: Calculate expiration date automatically based on contract start date and chosen duration/plan
+ */
+export function calculateContractEndDate(startDateIso: string, durationDays: number): string {
+  const start = new Date(startDateIso);
+  const end = new Date(start.getTime() + durationDays * 24 * 60 * 60 * 1000);
+  return end.toISOString();
+}
+
+/**
  * Super Admin: Extend Client Contract with optional Plan Upgrade/Change
- * Calculates new end date starting from the DAY AFTER the previous contract end date
+ * Calculates new end date starting from the DAY AFTER the previous contract end date,
+ * and appends an immutable subscription record to contractHistory.
  */
 export function extendAdminContract(
   accountId: string, 
   extensionDays: number, 
-  newPlanCode?: PlanCode
+  newPlanCode?: PlanCode,
+  notes?: string
 ): { success: boolean; newEndDate: string; message: string } {
   const store = getAdminAccountsStore();
   const acc = store.find(a => a.id === accountId);
@@ -422,17 +448,55 @@ export function extendAdminContract(
   const startFromDate = new Date(currentEnd.getTime() + 24 * 60 * 60 * 1000);
   const newEndDate = new Date(startFromDate.getTime() + extensionDays * 24 * 60 * 60 * 1000);
 
+  const prevPlan = acc.planCode;
+  const targetPlan = newPlanCode || acc.planCode;
+
+  // Initialize history if missing
+  if (!acc.contractHistory) {
+    acc.contractHistory = [
+      {
+        id: `sub-init-${acc.id}`,
+        type: 'INITIAL',
+        planCode: prevPlan,
+        startDate: acc.contractStartDate,
+        endDate: acc.contractEndDate,
+        durationDays: Math.round((new Date(acc.contractEndDate).getTime() - new Date(acc.contractStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+        pricePEN: PLAN_LIMITS[prevPlan]?.monthlyPricePEN,
+        notes: 'Suscripción inicial de contrato',
+        created_at: acc.created_at || acc.contractStartDate,
+      }
+    ];
+  }
+
+  // Create extension history entry
+  const historyEntry: ContractSubscriptionRecord = {
+    id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    type: targetPlan !== prevPlan ? 'PLAN_UPGRADE' : 'EXTENSION',
+    planCode: targetPlan,
+    startDate: startFromDate.toISOString(),
+    endDate: newEndDate.toISOString(),
+    durationDays: extensionDays,
+    pricePEN: PLAN_LIMITS[targetPlan]?.monthlyPricePEN,
+    notes: notes || (targetPlan !== prevPlan ? `Migración de ${prevPlan} a ${targetPlan} (+${extensionDays} días)` : `Renovación de servicio (+${extensionDays} días)`),
+    created_at: new Date().toISOString(),
+  };
+
+  acc.contractHistory.push(historyEntry);
   acc.contractEndDate = newEndDate.toISOString();
   if (newPlanCode) {
     acc.planCode = newPlanCode;
   }
-  acc.status = 'ACTIVA';
+  if (acc.status === 'VENCIDA') {
+    acc.status = 'ACTIVA';
+  }
   saveAccountsToStorage(store);
+
+  syncAdminAccountOnlineAsync(acc).catch(err => console.warn('[Sync Accounts Extend Online Warning]', err));
 
   return {
     success: true,
-    newEndDate: newEndDate.toLocaleDateString(),
-    message: `¡Contrato extendido con éxito! ${newPlanCode ? `Plan actualizado a ${PLAN_LIMITS[newPlanCode].name}.` : ''} La nueva fecha de vencimiento es el ${newEndDate.toLocaleDateString()}, calculada desde el día siguiente del fin del plan anterior.`,
+    newEndDate: newEndDate.toLocaleDateString('es-PE'),
+    message: `¡Contrato extendido con éxito! ${newPlanCode ? `Plan actualizado a ${PLAN_LIMITS[newPlanCode].name}.` : ''} La nueva fecha de vencimiento es el ${newEndDate.toLocaleDateString('es-PE')}, registrada en el histórico de métricas.`,
   };
 }
 
@@ -504,15 +568,37 @@ export function createAdminAccount(data: {
   contactEmail: string;
   contactPhone?: string;
   planCode: PlanCode;
-  durationDays: number;
+  durationDays?: number;
+  contractStartDate?: string;
+  contractEndDate?: string;
   initialPassword?: string;
 }): { account: AdminAccount; assignedPassword: string } {
   const now = new Date();
-  const endDate = new Date(now.getTime() + data.durationDays * 24 * 60 * 60 * 1000);
+  const startDate = data.contractStartDate ? new Date(data.contractStartDate).toISOString() : now.toISOString();
+  let endDate: string;
+  
+  if (data.contractEndDate) {
+    endDate = new Date(data.contractEndDate).toISOString();
+  } else {
+    const days = data.durationDays || 365;
+    endDate = calculateContractEndDate(startDate, days);
+  }
   
   const id = `usr-admin-${Date.now()}`;
   const workspaceId = `ws-${data.companyName.toLowerCase().replace(/[^a-z0-9]/g, '')}-${Date.now().toString().slice(-4)}`;
   const assignedPassword = data.initialPassword?.trim() || 'EventControl2026!';
+
+  const initialSubscription: ContractSubscriptionRecord = {
+    id: `sub-init-${id}`,
+    type: 'INITIAL',
+    planCode: data.planCode,
+    startDate,
+    endDate,
+    durationDays: Math.round((new Date(endDate).getTime() - new Date(startDate).getTime()) / (24 * 60 * 60 * 1000)),
+    pricePEN: PLAN_LIMITS[data.planCode]?.monthlyPricePEN,
+    notes: 'Alta y apertura oficial de cuenta administradora',
+    created_at: now.toISOString(),
+  };
 
   const account: AdminAccount = {
     id,
@@ -522,12 +608,14 @@ export function createAdminAccount(data: {
     contactEmail: data.contactEmail,
     contactPhone: data.contactPhone || '',
     planCode: data.planCode,
-    contractStartDate: now.toISOString(),
-    contractEndDate: endDate.toISOString(),
+    contractStartDate: startDate,
+    contractEndDate: endDate,
     status: 'ACTIVA',
     mustChangePassword: true,
     initialPassword: assignedPassword,
     passwordHashMasked: '••••••••••••',
+    contractHistory: [initialSubscription],
+    isArchived: false,
     created_at: now.toISOString(),
   };
 
@@ -544,19 +632,113 @@ export function createAdminAccount(data: {
 }
 
 /**
- * Super Admin: Update ALL Account Attributes
+ * Super Admin: Update ALL Account Attributes (including contract dates)
  */
 export function updateAdminAccount(
   accountId: string, 
-  data: Partial<Pick<AdminAccount, 'planCode' | 'status' | 'contractEndDate' | 'contactEmail' | 'contactPhone' | 'companyName' | 'adminName'>>
+  data: Partial<Pick<AdminAccount, 'planCode' | 'status' | 'contractStartDate' | 'contractEndDate' | 'contactEmail' | 'contactPhone' | 'companyName' | 'adminName' | 'isArchived'>>
 ): AdminAccount | undefined {
   const store = getAdminAccountsStore();
   const acc = store.find(a => a.id === accountId);
   if (acc) {
+    // If contract dates changed or plan changed, add a modification record in history if needed
+    const oldStartDate = acc.contractStartDate;
+    const oldEndDate = acc.contractEndDate;
+    const oldPlan = acc.planCode;
+
     Object.assign(acc, data);
+
+    if (!acc.contractHistory) {
+      acc.contractHistory = [
+        {
+          id: `sub-init-${acc.id}`,
+          type: 'INITIAL',
+          planCode: oldPlan,
+          startDate: oldStartDate,
+          endDate: oldEndDate,
+          durationDays: Math.round((new Date(oldEndDate).getTime() - new Date(oldStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+          pricePEN: PLAN_LIMITS[oldPlan]?.monthlyPricePEN,
+          notes: 'Registro previo de suscripción',
+          created_at: acc.created_at || oldStartDate,
+        }
+      ];
+    }
+
+    if (data.contractEndDate && data.contractEndDate !== oldEndDate) {
+      acc.contractHistory.push({
+        id: `sub-mod-${Date.now()}`,
+        type: data.planCode && data.planCode !== oldPlan ? 'PLAN_UPGRADE' : 'EXTENSION',
+        planCode: acc.planCode,
+        startDate: acc.contractStartDate,
+        endDate: acc.contractEndDate,
+        durationDays: Math.round((new Date(acc.contractEndDate).getTime() - new Date(acc.contractStartDate).getTime()) / (24 * 60 * 60 * 1000)),
+        pricePEN: PLAN_LIMITS[acc.planCode]?.monthlyPricePEN,
+        notes: 'Ajuste manual de atributos de vigencia o plan por Superadmin',
+        created_at: new Date().toISOString(),
+      });
+    }
+
     saveAccountsToStorage(store);
+    syncAdminAccountOnlineAsync(acc).catch(err => console.warn('[Sync Accounts Update Online Warning]', err));
   }
   return acc;
+}
+
+/**
+ * Super Admin: Archive or Unarchive Account
+ */
+export function toggleArchiveAdminAccount(accountId: string): { success: boolean; isArchived: boolean; message: string } {
+  const store = getAdminAccountsStore();
+  const acc = store.find(a => a.id === accountId);
+  if (!acc) return { success: false, isArchived: false, message: 'Cuenta no encontrada.' };
+
+  const willArchive = !acc.isArchived;
+  acc.isArchived = willArchive;
+  if (willArchive) {
+    acc.archived_at = new Date().toISOString();
+    acc.status = 'ARCHIVADA';
+  } else {
+    acc.archived_at = undefined;
+    const now = Date.now();
+    const end = new Date(acc.contractEndDate).getTime();
+    acc.status = end < now ? 'VENCIDA' : 'ACTIVA';
+  }
+
+  saveAccountsToStorage(store);
+  syncAdminAccountOnlineAsync(acc).catch(err => console.warn('[Sync Accounts Archive Online Warning]', err));
+
+  return {
+    success: true,
+    isArchived: willArchive,
+    message: willArchive 
+      ? `La cuenta "${acc.companyName}" ha sido archivada. Se oculta del listado activo pero conserva todo su histórico.`
+      : `La cuenta "${acc.companyName}" ha sido restaurada con estado ${acc.status}.`,
+  };
+}
+
+/**
+ * Super Admin: Delete Account permanently
+ */
+export function deleteAdminAccount(accountId: string): { success: boolean; message: string } {
+  const store = getAdminAccountsStore();
+  const accIdx = store.findIndex(a => a.id === accountId);
+  if (accIdx === -1) return { success: false, message: 'Cuenta no encontrada.' };
+
+  const removed = store.splice(accIdx, 1)[0];
+  saveAccountsToStorage(store);
+
+  if (typeof window !== 'undefined') {
+    fetch('/api/auth/sync-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'DELETE', accountId }),
+    }).catch(err => console.warn('[Sync Accounts DELETE Online Warning]', err));
+  }
+
+  return {
+    success: true,
+    message: `La cuenta "${removed.companyName}" ha sido eliminada permanentemente.`,
+  };
 }
 
 /**
