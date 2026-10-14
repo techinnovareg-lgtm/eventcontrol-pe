@@ -112,6 +112,16 @@ Fase 13: Despliegue a Producción (Vercel + Supabase), Backup y Cierre
 * **Entregables**: Despliegue en Vercel + Supabase Production, configuración de variables de entorno, documentación técnica final (`README.md`, `DEPLOYMENT.md`) y demo guiada.
 * **Validación**: Aprobación final y sign-off del desarrollador supervisor.
 
+### Fase 14 — Consola Superadmin, Gestión Integral de Contratos y RBAC Canónico (Hito 5 - Octubre 2026)
+* **Entregables**:
+  - Panel Superadmin Ejecutivo (`/superadmin`) con autenticación 2FA vía correo electrónico.
+  - Gestión integral de cuentas cliente: crear cuenta, editar atributos completos con selectores de fecha, archivar/restaurar, eliminar definitivamente, reset de contraseña y reenvío de credenciales por WhatsApp y Resend API.
+  - Motor de vigencias canónicas: Plan Starter mensual fijado en 30 días exactos y Planes Anuales (Pro/Business) en 365 días exactos con saneamiento retroactivo.
+  - Dashboard de Suscripciones & Métricas Financieras (MRR recurrente estimado, facturación acumulada, desglose porcentual por plan y auditoría inmutable de movimientos).
+  - Control de accesos RBAC por perfiles (`SUPER_USER`, `OWNER`, `ADMIN`, `COORDINADOR`, `OPERATOR`) y restricción de límites de eventos y pases QR según el plan activo.
+  - Optimización de UI sin scroll horizontal (icon buttons de acción compactos de 28x28px y badges fluidos).
+* **Validación**: Batería de pruebas aprobada, `npx tsc --noEmit` y `npm run build` sin errores, despliegue verificado en producción Vercel.
+
 ---
 
 ## 3. Batería de Pruebas y Casos Críticos de QA

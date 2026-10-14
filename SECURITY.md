@@ -48,22 +48,26 @@ La **Plataforma SaaS de Control de Eventos** aplica el principio de **Defensa en
 
 ## 4. Control de Acceso Basado en Roles (RBAC)
 
-La plataforma impone la matriz de mínimos privilegios:
+La plataforma impone la matriz de mínimos privilegios y control por roles:
 
-| Módulo / Acción | OWNER | ADMIN | COORDINADOR | SEGURIDAD | CONSULTA |
+| Módulo / Acción | SUPER_USER | OWNER | ADMIN | COORDINADOR | OPERATOR / SEGURIDAD |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Facturación / Planes** |  | ❌ | ❌ | ❌ | ❌ |
-| **Gestión de Usuarios del Workspace** |  | ❌ | ❌ | ❌ | ❌ |
-| **Crear / Editar Eventos** |  |  | ⚠️ (Solo asignados) | ❌ | ❌ |
-| **Importar Excel / Grupos** |  |  | ⚠️ | ❌ | ❌ |
-| **Organizar Mesas y Asignar** |  |  |  | ❌ | ❌ |
-| **Generar / Revocar QR** |  |  |  | ❌ | ❌ |
-| **Escanear QR y Registrar Check-in** |  |  |  |  | ❌ |
-| **Crear Cortes de Catering** |  |  |  | ❌ | ❌ |
-| **Ver Dashboard en Vivo** |  |  |  | ❌ (Solo modal scan) |  |
-| **Exportar Reportes PDF / Excel** |  |  |  | ❌ | ⚠️ (Lectura) |
+| **Consola Superadmin & Contratos** | ✅ (2FA) | ❌ | ❌ | ❌ | ❌ |
+| **Métricas MRR & Auditoría Global** | ✅ (2FA) | ❌ | ❌ | ❌ | ❌ |
+| **Facturación / Planes del Workspace** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Gestión de Usuarios del Workspace** | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Crear / Editar Eventos** | ✅ | ✅ | ✅ | ⚠️ (Solo asignados) | ❌ |
+| **Importar Excel / Grupos** | ✅ | ✅ | ✅ | ⚠️ | ❌ |
+| **Organizar Mesas y Asignar** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Generar / Revocar QR** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Escanear QR y Registrar Check-in** | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Crear Cortes de Catering** | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **Ver Dashboard en Vivo** | ✅ | ✅ | ✅ | ✅ | ❌ (Solo modal scan) |
+| **Exportar Reportes PDF / Excel** | ✅ | ✅ | ✅ | ✅ | ❌ |
 
-> ⚠️ **Principio de Mínimo Privilegio para Personal de Seguridad**: El perfil `SEGURIDAD` únicamente tiene acceso a la pantalla de cámara y confirmación del número de personas que ingresan. No puede consultar la lista de otros invitados, números de teléfono, ingresos de otras mesas ni módulos financieros/administrativos.
+> 🔒 **Autenticación en Dos Pasos (2FA) para Superadmin**: El acceso a la Consola Superadmin y los cambios de credenciales maestras requieren validación de identidad mediante código PIN de 4 dígitos despachado vía correo electrónico a la cuenta central autorizada (`tech.innova.reg@gmail.com`).
+
+> ⚠️ **Principio de Mínimo Privilegio para Personal de Seguridad**: El perfil `OPERATOR` / `SEGURIDAD` únicamente tiene acceso a la pantalla de cámara y confirmación del número de personas que ingresan. No puede consultar la lista de otros invitados, números de teléfono, ingresos de otras mesas ni módulos financieros/administrativos.
 
 ---
 
