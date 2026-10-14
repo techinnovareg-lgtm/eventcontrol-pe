@@ -225,9 +225,13 @@ export default function SuperAdminPage() {
 
   const handleCreatePlanChange = (newPlan: PlanCode) => {
     setPlanCode(newPlan);
-    if (newPlan === 'STARTER' && durationDays !== 30) {
+    if (newPlan === 'STARTER') {
       setDurationDays(30);
       const newEnd = calculateContractEndDate(createContractStartDate, 30);
+      setCreateContractEndDate(newEnd.split('T')[0]);
+    } else {
+      setDurationDays(365);
+      const newEnd = calculateContractEndDate(createContractStartDate, 365);
       setCreateContractEndDate(newEnd.split('T')[0]);
     }
   };
@@ -429,14 +433,40 @@ export default function SuperAdminPage() {
           created_at: acc.created_at || acc.contractStartDate,
           notes: 'Contrato inicial de apertura',
         }];
-    return list.map((rec) => ({
-      ...rec,
-      companyName: acc.companyName,
-      adminName: acc.adminName,
-      contactEmail: acc.contactEmail,
-      accountStatus: acc.status,
-      isArchived: acc.isArchived,
-    }));
+    return list.map((rec, idx) => {
+      let sDate = rec.startDate;
+      let eDate = rec.endDate;
+      let dur = rec.durationDays;
+
+      if (idx === 0 && rec.type === 'INITIAL') {
+        if (rec.planCode === 'STARTER') {
+          if (dur !== 30 || calculateContractDurationDays(sDate, eDate) !== 30) {
+            eDate = calculateContractEndDate(sDate, 30);
+            dur = 30;
+          }
+        } else {
+          const diff = calculateContractDurationDays(sDate, eDate);
+          if (diff === 366 || diff === 364 || dur === 366 || dur === 364) {
+            eDate = calculateContractEndDate(sDate, 365);
+            dur = 365;
+          }
+        }
+      } else {
+        dur = calculateContractDurationDays(sDate, eDate);
+      }
+
+      return {
+        ...rec,
+        startDate: sDate,
+        endDate: eDate,
+        durationDays: dur,
+        companyName: acc.companyName,
+        adminName: acc.adminName,
+        contactEmail: acc.contactEmail,
+        accountStatus: acc.status,
+        isArchived: acc.isArchived,
+      };
+    });
   }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   // Filtered subscriptions for Metrics Table
@@ -1573,9 +1603,9 @@ export default function SuperAdminPage() {
                     onChange={(e) => {
                       const newP = e.target.value as PlanCode;
                       setEditingAccount({ ...editingAccount, planCode: newP });
-                      // If start date exists, recalculate end date automatically based on a 365 days term
                       if (editStartDate) {
-                        const newEnd = calculateContractEndDate(editStartDate, 365);
+                        const targetDays = newP === 'STARTER' ? 30 : 365;
+                        const newEnd = calculateContractEndDate(editStartDate, targetDays);
                         setEditEndDate(newEnd.split('T')[0]);
                       }
                     }}
@@ -1622,10 +1652,9 @@ export default function SuperAdminPage() {
                       onChange={(e) => {
                         const s = e.target.value;
                         setEditStartDate(s);
-                        // Recalculate end date with 365 days
                         if (s) {
                           const currentDur = calculateContractDurationDays(editingAccount.contractStartDate, editingAccount.contractEndDate);
-                          const durToApply = editingAccount.planCode === 'STARTER' ? 30 : currentDur;
+                          const durToApply = editingAccount.planCode === 'STARTER' ? 30 : (currentDur === 366 || currentDur === 364 ? 365 : currentDur);
                           const newEnd = calculateContractEndDate(s, durToApply);
                           setEditEndDate(newEnd.split('T')[0]);
                         }
@@ -1998,7 +2027,29 @@ export default function SuperAdminPage() {
                         created_at: historyModalAccount.created_at || historyModalAccount.contractStartDate,
                       }
                     ]
-                ).map((sub, idx) => (
+                ).map((sub, idx) => {
+                  let sDate = sub.startDate;
+                  let eDate = sub.endDate;
+                  let dur = sub.durationDays;
+
+                  if (idx === 0 && sub.type === 'INITIAL') {
+                    if (sub.planCode === 'STARTER') {
+                      if (dur !== 30 || calculateContractDurationDays(sDate, eDate) !== 30) {
+                        eDate = calculateContractEndDate(sDate, 30);
+                        dur = 30;
+                      }
+                    } else {
+                      const diff = calculateContractDurationDays(sDate, eDate);
+                      if (diff === 366 || diff === 364 || dur === 366 || dur === 364) {
+                        eDate = calculateContractEndDate(sDate, 365);
+                        dur = 365;
+                      }
+                    }
+                  } else {
+                    dur = calculateContractDurationDays(sDate, eDate);
+                  }
+
+                  return (
                   <div key={sub.id || idx} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5 hover:border-indigo-300 transition">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -2039,7 +2090,8 @@ export default function SuperAdminPage() {
                       </p>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 

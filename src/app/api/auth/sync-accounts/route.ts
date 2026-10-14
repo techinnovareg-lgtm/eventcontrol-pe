@@ -34,7 +34,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 987 000 111',
     planCode: 'BUSINESS',
     contractStartDate: '2026-10-05T00:00:00.000Z',
-    contractEndDate: '2027-12-31T23:59:59.000Z',
+    contractEndDate: '2027-10-04T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -50,7 +50,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 987 654 321',
     planCode: 'STARTER',
     contractStartDate: '2026-10-05T00:00:00.000Z',
-    contractEndDate: '2027-12-31T23:59:59.000Z',
+    contractEndDate: '2026-11-03T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -66,7 +66,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 999 888 777',
     planCode: 'BUSINESS',
     contractStartDate: '2026-09-07T00:00:00.000Z',
-    contractEndDate: '2027-09-07T23:59:59.000Z',
+    contractEndDate: '2027-09-06T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -81,13 +81,13 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactEmail: 'ana@amgweddings.pe',
     contactPhone: '+51 987 654 321',
     planCode: 'STARTER',
-    contractStartDate: '2026-08-01T00:00:00.000Z',
-    contractEndDate: '2027-12-31T23:59:59.000Z',
+    contractStartDate: '2026-10-01T00:00:00.000Z',
+    contractEndDate: '2026-10-30T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
     passwordHashMasked: '••••••••••••',
-    created_at: '2026-08-01T00:00:00.000Z',
+    created_at: '2026-10-01T00:00:00.000Z',
   },
   {
     id: 'usr-admin-02',
@@ -98,7 +98,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 912 345 678',
     planCode: 'PROFESSIONAL',
     contractStartDate: '2026-07-15T00:00:00.000Z',
-    contractEndDate: '2027-07-15T23:59:59.000Z',
+    contractEndDate: '2027-07-14T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -114,7 +114,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 955 443 322',
     planCode: 'BUSINESS',
     contractStartDate: '2026-08-20T00:00:00.000Z',
-    contractEndDate: '2027-08-20T23:59:59.000Z',
+    contractEndDate: '2027-08-19T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: true,
     initialPassword: 'EventControl2026!',
@@ -122,6 +122,41 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     created_at: '2026-08-20T00:00:00.000Z',
   },
 ];
+
+function sanitizeServerAccount(acc: AdminAccount): AdminAccount {
+  if (!acc) return acc;
+  const sIso = acc.contractStartDate || acc.created_at || new Date().toISOString();
+  const cleanStart = sIso.includes('T') ? sIso.split('T')[0] : sIso;
+  const canonicalStart = new Date(`${cleanStart}T00:00:00.000Z`).toISOString();
+  acc.contractStartDate = canonicalStart;
+
+  const [sY, sM, sD] = cleanStart.split('-').map(Number);
+  const sUtc = Date.UTC(sY, sM - 1, sD);
+
+  const eStr = (acc.contractEndDate || '').includes('T') ? acc.contractEndDate.split('T')[0] : acc.contractEndDate;
+  let diff = 30;
+  if (eStr) {
+    const [eY, eM, eD] = eStr.split('-').map(Number);
+    const eUtc = Date.UTC(eY, eM - 1, eD);
+    diff = Math.max(1, Math.round((eUtc - sUtc) / (24 * 60 * 60 * 1000)) + 1);
+  }
+
+  if (acc.planCode === 'STARTER') {
+    if (diff > 35 || diff < 28) {
+      const d = new Date(Date.UTC(sY, sM - 1, sD, 23, 59, 59, 999));
+      d.setUTCDate(d.getUTCDate() + 29);
+      acc.contractEndDate = d.toISOString();
+    }
+  } else {
+    if (diff === 366 || diff === 364 || diff > 400) {
+      const d = new Date(Date.UTC(sY, sM - 1, sD, 23, 59, 59, 999));
+      d.setUTCDate(d.getUTCDate() + 364);
+      acc.contractEndDate = d.toISOString();
+    }
+  }
+
+  return acc;
+}
 
 let globalServerAccountsStore: AdminAccount[] = [];
 
@@ -195,12 +230,12 @@ function loadAccountsFromFile() {
             parsed.unshift(initAcc);
           }
         });
-        globalServerAccountsStore = parsed;
+        globalServerAccountsStore = parsed.map(sanitizeServerAccount);
         return;
       }
     }
   } catch (e) {}
-  globalServerAccountsStore = [...INITIAL_ADMIN_ACCOUNTS];
+  globalServerAccountsStore = INITIAL_ADMIN_ACCOUNTS.map(sanitizeServerAccount);
   saveAccountsToFile();
 }
 
@@ -233,13 +268,16 @@ export async function GET(req: Request) {
   // Merge Online Supabase DB accounts
   const onlineAccounts = await fetchOnlineAccountsFromSupabase();
   onlineAccounts.forEach(oa => {
-    const idx = globalServerAccountsStore.findIndex(a => a.id === oa.id || a.contactEmail.toLowerCase() === oa.contactEmail.toLowerCase());
+    const sanitizedOa = sanitizeServerAccount(oa);
+    const idx = globalServerAccountsStore.findIndex(a => a.id === sanitizedOa.id || a.contactEmail.toLowerCase() === sanitizedOa.contactEmail.toLowerCase());
     if (idx !== -1) {
-      globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...oa };
+      globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...sanitizedOa };
     } else {
-      globalServerAccountsStore.unshift(oa);
+      globalServerAccountsStore.unshift(sanitizedOa);
     }
   });
+
+  globalServerAccountsStore = globalServerAccountsStore.map(sanitizeServerAccount);
 
   const { searchParams } = new URL(req.url);
   const email = searchParams.get('email');
@@ -334,28 +372,30 @@ export async function POST(req: Request) {
 
     if (action === 'SYNC' && Array.isArray(accounts)) {
       for (const acc of accounts) {
-        const idx = globalServerAccountsStore.findIndex(a => a.id === acc.id || a.contactEmail.toLowerCase() === acc.contactEmail.toLowerCase());
+        const sanitized = sanitizeServerAccount(acc);
+        const idx = globalServerAccountsStore.findIndex(a => a.id === sanitized.id || a.contactEmail.toLowerCase() === sanitized.contactEmail.toLowerCase());
         if (idx !== -1) {
-          globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...acc };
+          globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...sanitized };
         } else {
-          globalServerAccountsStore.unshift(acc);
+          globalServerAccountsStore.unshift(sanitized);
         }
-        await persistAccountToSupabase(acc);
+        await persistAccountToSupabase(sanitized);
       }
       saveAccountsToFile();
       return NextResponse.json({ success: true, accounts: globalServerAccountsStore });
     }
 
     if (action === 'UPSERT' && account) {
-      const idx = globalServerAccountsStore.findIndex(a => a.id === account.id || a.contactEmail.toLowerCase() === account.contactEmail.toLowerCase());
+      const sanitized = sanitizeServerAccount(account);
+      const idx = globalServerAccountsStore.findIndex(a => a.id === sanitized.id || a.contactEmail.toLowerCase() === sanitized.contactEmail.toLowerCase());
       if (idx !== -1) {
-        globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...account };
+        globalServerAccountsStore[idx] = { ...globalServerAccountsStore[idx], ...sanitized };
       } else {
-        globalServerAccountsStore.unshift(account);
+        globalServerAccountsStore.unshift(sanitized);
       }
       saveAccountsToFile();
-      await persistAccountToSupabase(account);
-      return NextResponse.json({ success: true, account });
+      await persistAccountToSupabase(sanitized);
+      return NextResponse.json({ success: true, account: sanitized });
     }
 
     if (action === 'CHANGE_PASSWORD' && (accountId || body.email) && password) {

@@ -56,7 +56,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 987 000 111',
     planCode: 'BUSINESS',
     contractStartDate: '2026-10-05T00:00:00.000Z',
-    contractEndDate: '2027-12-31T23:59:59.000Z',
+    contractEndDate: '2027-10-04T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -72,7 +72,7 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
     contactPhone: '+51 987 654 321',
     planCode: 'STARTER',
     contractStartDate: '2026-10-05T00:00:00.000Z',
-    contractEndDate: '2027-12-31T23:59:59.000Z',
+    contractEndDate: '2026-11-03T23:59:59.999Z',
     status: 'ACTIVA',
     mustChangePassword: false,
     initialPassword: 'EventControl2026!',
@@ -145,10 +145,108 @@ const INITIAL_ADMIN_ACCOUNTS: AdminAccount[] = [
   },
 ];
 
+/**
+ * Normaliza y sanea canónicamente los datos de una cuenta administradora:
+ * - Plan Starter: Exactamente 30 días en contrato inicial (incluido el día 1).
+ * - Planes Anuales (Professional / Business): Exactamente 365 días (incluido el día 1).
+ * - Corrige dispersiones previas guardadas en localStorage o servidor (ej. 366d, 453d, 39d).
+ */
+export function sanitizeAdminAccount(acc: AdminAccount): AdminAccount {
+  if (!acc) return acc;
+
+  // 1. Normalizar fecha de inicio
+  const sIso = acc.contractStartDate || acc.created_at || new Date().toISOString();
+  const cleanStart = sIso.includes('T') ? sIso.split('T')[0] : sIso;
+  const canonicalStart = new Date(`${cleanStart}T00:00:00.000Z`).toISOString();
+  acc.contractStartDate = canonicalStart;
+
+  // 2. Normalizar código de plan válido
+  if (!acc.planCode || !['STARTER', 'PROFESSIONAL', 'BUSINESS'].includes(acc.planCode)) {
+    acc.planCode = 'STARTER';
+  }
+
+  // 3. Revisar y sanear el histórico de suscripciones
+  if (!acc.contractHistory || acc.contractHistory.length === 0) {
+    const expectedDays = acc.planCode === 'STARTER' ? 30 : 365;
+    const currentDiff = calculateContractDurationDays(canonicalStart, acc.contractEndDate);
+    let finalEnd = acc.contractEndDate;
+
+    // Si es Starter y tiene más de 35 días o menos de 28 días sin extensiones justificadas
+    if (acc.planCode === 'STARTER' && (currentDiff > 35 || currentDiff < 28)) {
+      finalEnd = calculateContractEndDate(canonicalStart, 30);
+    } else if (acc.planCode !== 'STARTER' && (currentDiff === 366 || currentDiff === 364 || currentDiff > 400)) {
+      finalEnd = calculateContractEndDate(canonicalStart, 365);
+    } else if (!finalEnd) {
+      finalEnd = calculateContractEndDate(canonicalStart, expectedDays);
+    }
+
+    acc.contractEndDate = finalEnd;
+    acc.contractHistory = [{
+      id: `sub-init-${acc.id}`,
+      type: 'INITIAL',
+      planCode: acc.planCode,
+      startDate: canonicalStart,
+      endDate: finalEnd,
+      durationDays: calculateContractDurationDays(canonicalStart, finalEnd),
+      pricePEN: PLAN_LIMITS[acc.planCode]?.monthlyPricePEN,
+      notes: 'Contrato inicial de apertura',
+      created_at: acc.created_at || canonicalStart,
+    }];
+  } else {
+    // Normalizar cada registro de contrato existente
+    acc.contractHistory = acc.contractHistory.map((rec, idx) => {
+      const recStartClean = rec.startDate.includes('T') ? rec.startDate.split('T')[0] : rec.startDate;
+      const recCanonicalStart = new Date(`${recStartClean}T00:00:00.000Z`).toISOString();
+      let recEnd = rec.endDate;
+      let dur = rec.durationDays;
+
+      if (idx === 0 && rec.type === 'INITIAL') {
+        if (rec.planCode === 'STARTER') {
+          // Starter mensual inicial es exactamente 30 días
+          if (dur !== 30 || calculateContractDurationDays(recCanonicalStart, recEnd) !== 30) {
+            recEnd = calculateContractEndDate(recCanonicalStart, 30);
+            dur = 30;
+          }
+        } else {
+          // Anual Pro/Business inicial: Si quedó en 366 o 364 días, normalizar canónicamente a 365
+          const diff = calculateContractDurationDays(recCanonicalStart, recEnd);
+          if (diff === 366 || diff === 364 || dur === 366 || dur === 364) {
+            recEnd = calculateContractEndDate(recCanonicalStart, 365);
+            dur = 365;
+          }
+        }
+      }
+
+      const exactDays = calculateContractDurationDays(recCanonicalStart, recEnd);
+
+      return {
+        ...rec,
+        startDate: recCanonicalStart,
+        endDate: recEnd,
+        durationDays: exactDays,
+      };
+    });
+
+    // La fecha de vencimiento actual de la cuenta coincide con el fin del último registro
+    const lastRecord = acc.contractHistory[acc.contractHistory.length - 1];
+    if (lastRecord) {
+      acc.contractEndDate = lastRecord.endDate;
+      acc.planCode = lastRecord.planCode;
+    }
+  }
+
+  return acc;
+}
+
+export function sanitizeAndNormalizeAccounts(accounts: AdminAccount[]): AdminAccount[] {
+  if (!Array.isArray(accounts)) return INITIAL_ADMIN_ACCOUNTS.map(a => sanitizeAdminAccount({ ...a }));
+  return accounts.map(a => sanitizeAdminAccount({ ...a }));
+}
+
 let accountsMemoryStore: AdminAccount[] | null = null;
 
 function loadAccountsFromStorage(): AdminAccount[] {
-  if (typeof window === 'undefined') return INITIAL_ADMIN_ACCOUNTS;
+  if (typeof window === 'undefined') return INITIAL_ADMIN_ACCOUNTS.map(a => sanitizeAdminAccount({ ...a }));
   try {
     const raw = localStorage.getItem(ACCOUNTS_STORAGE_KEY);
     if (raw) {
@@ -159,14 +257,17 @@ function loadAccountsFromStorage(): AdminAccount[] {
             parsed.unshift(initAcc);
           }
         });
-        return parsed;
+        const sanitized = sanitizeAndNormalizeAccounts(parsed);
+        saveAccountsToStorage(sanitized);
+        return sanitized;
       }
     }
   } catch (err) {
     console.warn('[AdminAccountsStore] Failed to load from localStorage', err);
   }
-  saveAccountsToStorage(INITIAL_ADMIN_ACCOUNTS);
-  return INITIAL_ADMIN_ACCOUNTS;
+  const initSanitized = sanitizeAndNormalizeAccounts(INITIAL_ADMIN_ACCOUNTS);
+  saveAccountsToStorage(initSanitized);
+  return initSanitized;
 }
 
 export function autoSyncAccountsToServer() {
